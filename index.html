@@ -53,12 +53,13 @@
         /* NOVO: Estilo para o display de timers de power-ups */
         #powerup-timers-display {
             position: absolute;
-            top: 55px; /* Abaixo da HUD */
+            top: 70px; /* Abaixo da HUD */
             left: 1.5rem;
             display: flex;
             flex-direction: column;
             gap: 4px;
             pointer-events: none;
+            z-index: 11; /* NOVO: Garante que fique acima da HUD principal (z-index: 10) */
         }
         .powerup-active {
             background-color: rgba(255, 215, 0, 0.8); /* Dourado */
@@ -113,6 +114,17 @@
             background-color: #4CAF50; /* Verde */
             border-radius: 2px;
             transition: width 0.3s ease; /* Transição suave */
+        }
+        /* NOVO: Estilo para a marca de "Invocado" */
+        .summon-marker {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: #9400D3; /* Roxo escuro */
+            border: 1px solid black;
+            border-radius: 50%;
+            transform: translate(-50%, -100%);
+            z-index: 21; /* Acima de tudo */
         }
 
         /* NOVO: Estilo para os Labels dos Power-ups */
@@ -223,7 +235,11 @@
                 </div>
                 <!-- NOVO: Cargas da Nova Mágica (Level 2+) -->
                 <div id="nova-bomb-display" class="text-xs font-bold text-cyan-300 mt-1 hidden">
-                    NOVA MÁGICA: <span id="nova-bomb-kills-count">0</span>/10
+                    EXPLOSÃO DE ENERGIA: <span id="nova-bomb-kills-count">0</span>/10
+                </div>
+                <!-- NOVO: Cargas do Raio de Energia (Level 4+) -->
+                <div id="energy-beam-display" class="text-xs font-bold text-blue-300 mt-1 hidden">
+                    RAIO DE ENERGIA: <span id="energy-beam-kills-count">0</span>/25
                 </div>
 
             </div>
@@ -285,7 +301,7 @@
             <div class="ranking-item font-bold border-b border-white mb-2">
                 <span class="w-1/3 text-left">Mago</span>
                 <span class="w-1/3 text-center">Pontos</span>
-                <span class="w-1/3 text-right">Abates (G/O/T)</span>
+                <span class="w-1/3 text-right" title="Abates: Goblins/Orcs/Trolls/Necromantes">Abates (G/O/T/N)</span>
             </div>
             <div id="full-ranking-list" class="text-sm space-y-2 max-h-80 overflow-y-auto">
                 <p class="text-gray-400 text-center">Carregando...</p>
@@ -321,8 +337,12 @@
             try {
                 if (Object.keys(firebaseConfig).length === 0) {
                     console.error("Firebase config is missing or empty.");
-                    // Remove o ranking list pois ele não tem utilidade sem o firebase
-                    document.getElementById('full-ranking-list').innerHTML = '<p class="text-red-400 text-center">Erro: Configuração Firebase ausente.</p>';
+                    
+                    // NOVO: Tenta carregar do cache e exibe um aviso
+                    loadInitialRankingFromCache(); 
+                    const rankingList = document.getElementById('full-ranking-list');
+                    rankingList.innerHTML += '<p class="text-yellow-400 text-center text-xs mt-2">Aviso: Ranking offline. Os dados podem estar desatualizados.</p>';
+                    
                     return;
                 }
 
@@ -338,11 +358,13 @@
 
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
+                        window.userId = user.uid; // NOVO: Expõe o userId globalmente
                         userId = user.uid;
                         isAuthReady = true;
                         document.getElementById('user-id-display').textContent = userId;
                         window.loadRanking();
                     } else {
+                        window.userId = null; // NOVO: Limpa o userId global
                         userId = null;
                         isAuthReady = true; 
                     }
@@ -381,7 +403,7 @@
             }
         };
 
-        const renderRanking = (elementId, scores) => {
+        window.renderRanking = (elementId, scores) => {
             const rankingList = document.getElementById(elementId);
             rankingList.innerHTML = '';
 
@@ -390,14 +412,14 @@
                 return;
             }
             
-            scores.slice(0, 30).forEach((scoreData, index) => { // Limite de 30 para o modal
-                const isCurrentUser = scoreData.fullUserId === userId;
+            scores.slice(0, 5).forEach((scoreData, index) => { // Limite de 5 para o modal
+                const isCurrentUser = scoreData.fullUserId === window.userId;
                 const rankClass = isCurrentUser ? 'text-yellow-300 font-bold' : 'text-white';
                 const nameText = scoreData.playerName || 'Mago Anônimo';
                 
                 // NOVO: Extrai as estatísticas de abates
-                const stats = scoreData.killStats || { goblin: 0, orc: 0, troll: 0 };
-                const statsText = `${stats.goblin}/${stats.orc}/${stats.troll}`;
+                const stats = scoreData.killStats || { goblin: 0, orc: 0, troll: 0, necromancer: 0 };
+                const statsText = `${stats.goblin || 0}/${stats.orc || 0}/${stats.troll || 0}/${stats.necromancer || 0}`;
 
                 rankingList.innerHTML += `
                     <div class="ranking-item ${rankClass}">
@@ -408,28 +430,34 @@
                 `;
             });
         };
-        
+
         // Listener que carrega e atualiza o ranking (apenas para o modal)
         window.loadRanking = () => {
             if (!isAuthReady || !db) return;
-
             const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'global_scores');
-            
-            // Ordena por score e limita a 30
-            const q = query(collectionRef, limit(30)); 
+            const q = query(collectionRef, orderBy("score", "desc"), limit(5)); 
 
             // Usa onSnapshot para atualizações em tempo real
             onSnapshot(q, (snapshot) => {
+                // CORREÇÃO: Limpa o ranking apenas quando os novos dados chegam
+                document.getElementById('full-ranking-list').innerHTML = '';
                 let scores = [];
                 snapshot.forEach(doc => {
                     scores.push({ id: doc.id, ...doc.data() });
                 });
 
-                // Classificação final client-side, embora o Firestore ajude, garante que só os top 30 sejam exibidos.
-                scores.sort((a, b) => b.score - a.score);
+                // A ordenação agora é feita pelo Firestore, mas uma reordenação local não prejudica
+                // e garante a ordem caso a query falhe em ordenar.
+
+                // NOVO: Salva o ranking no localStorage para cache
+                try {
+                    localStorage.setItem('hordaMagicaRanking', JSON.stringify(scores));
+                } catch (e) {
+                    console.warn("Não foi possível salvar o ranking no localStorage:", e);
+                }
 
                 // Atualiza o ranking do Modal
-                renderRanking('full-ranking-list', scores); 
+                window.renderRanking('full-ranking-list', scores); 
 
             }, (error) => {
                 console.error("Erro ao carregar ranking:", error);
@@ -490,8 +518,8 @@
         let playerHP = 100;
         let maxHP = 100;
         let killPoints = 0;
-        const maxKillPoints = 5;
-        let killStats = { goblin: 0, orc: 0, troll: 0 }; // NOVO: Contadores de abates por tipo
+        const maxKillPoints = 5; // NOVO: Contadores de abates por tipo
+        let killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0 };
         let killsSinceLastPotion = 0; // NOVO: Contador para spawn de poção por kill
         const killsPerPotionSpawn = 30; // NOVO: Limite de abates para garantir uma poção
 
@@ -507,12 +535,24 @@
         let experiencePoints = 0;
         const baseExperience = 500; // XP base para o Lvl 2
         let experienceForNextLevel = baseExperience;
+        // NOVO: Cura passiva (Lvl 3+)
+        let passiveHealTimer = 0;
+        const passiveHealInterval = 180; // 3 segundos (60fps)
+
         
         // NOVO: Habilidade do Level 2
         let novaBombKills = 0;
         const killsForNovaBomb = 10;
         let repulsionBubbleTimer = 0; // Timer para o novo power-up
         let repulsionBubbleMesh; // NOVO: Malha para o efeito visual da bolha
+
+        // NOVO: Habilidade do Clone
+        let clone = null;
+        let cloneTimer = 0;
+
+        // NOVO: Habilidade do Level 4
+        let energyBeamKills = 0;
+        const killsForEnergyBeam = 25;
 
         let isGameOver = true; // Inicia como TRUE para mostrar o menu
         let keys = {};
@@ -537,11 +577,6 @@
         let tempPlayer; 
 
         // Propriedades das Entidades
-        const entityProps = {
-            goblin: { hp: 20, speed: 0.05, score: 5, color: 0x6be070, geometry: new THREE.BoxGeometry(0.5, 0.5, 0.5), damage: 5, name: "Goblin" },
-            orc: { hp: 50, speed: 0.04, score: 10, color: 0xe0a06b, geometry: new THREE.BoxGeometry(0.75, 0.75, 0.75), damage: 10, name: "Orc" },
-            troll: { hp: 100, speed: 0.03, score: 15, color: 0x6b75e0, geometry: new THREE.CylinderGeometry(0.5, 0.5, 1.2, 8), damage: 15, name: "Troll" }
-        };
 
         const projectileProps = {
             weak: { damage: 10, color: 0x3d3dff, size: 0.3, speed: 0.3 },
@@ -551,10 +586,11 @@
         // NOVO: Propriedades dos Power-Ups (combinado poção e novos poderes)
         const powerUpProps = {
             potion: { healAmount: 30, color: 0xff4d4d, geometry: new THREE.CylinderGeometry(0.2, 0.2, 0.5, 8) },
-            tripleShot: { duration: 3600, color: 0x00A8FF, geometry: new THREE.TorusGeometry(0.3, 0.1, 8, 16) }, // 50 seg (600 * 5)
+            tripleShot: { color: 0x00A8FF, geometry: new THREE.TorusGeometry(0.3, 0.1, 8, 16) }, // Duração dinâmica
             shield: { color: 0xFFD700, geometry: new THREE.IcosahedronGeometry(0.3, 0) }, // REMOVIDO: duration
             explosion: { charges: 3, color: 0x9400D3, geometry: new THREE.DodecahedronGeometry(0.3), explosionDamage: 100, explosionRadius: 10 }, // AUMENTADO: 3 para 5
-            repulsionBubble: { duration: 900, color: 0xADD8E6, geometry: new THREE.SphereGeometry(0.3, 16, 16) } // 15 segundos (900 / 60)
+            repulsionBubble: { duration: 900, color: 0xADD8E6, geometry: new THREE.SphereGeometry(0.3, 16, 16) }, // 15 segundos (900 / 60)
+            clone: { duration: 1200, color: 0x87CEEB, geometry: new THREE.OctahedronGeometry(0.4) } // NOVO: 20 segundos
         };
 
         // UI Elementos
@@ -757,8 +793,104 @@
             return group;
         }
 
+        // --- NOVAS FUNÇÕES DE MODELO DOS INIMIGOS ---
+
+        function createGoblinModel() {
+            const group = new THREE.Group();
+            const material = new THREE.MeshLambertMaterial({ color: 0x6be070 }); // Verde Goblin
+
+            // Corpo (esfera achatada)
+            const bodyGeometry = new THREE.SphereGeometry(0.4, 8, 6);
+            const body = new THREE.Mesh(bodyGeometry, material);
+            body.scale.y = 0.8; // Achata
+            body.position.y = 0.3;
+            body.castShadow = true;
+            group.add(body);
+
+            // Cabeça
+            const headGeometry = new THREE.SphereGeometry(0.25, 8, 8);
+            const head = new THREE.Mesh(headGeometry, material);
+            head.position.y = 0.7;
+            head.castShadow = true;
+            group.add(head);
+
+            return group;
+        }
+
+        function createOrcModel() {
+            const group = new THREE.Group();
+            const material = new THREE.MeshLambertMaterial({ color: 0xe0a06b }); // Cor de pele de Orc
+
+            // Corpo (caixa robusta)
+            const bodyGeometry = new THREE.BoxGeometry(0.8, 0.9, 0.5);
+            const body = new THREE.Mesh(bodyGeometry, material);
+            body.position.y = 0.45;
+            body.castShadow = true;
+            group.add(body);
+
+            // Cabeça
+            const headGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+            const head = new THREE.Mesh(headGeometry, material);
+            head.position.y = 1.1;
+            head.castShadow = true;
+            group.add(head);
+
+            return group;
+        }
+
+        function createTrollModel() {
+            const group = new THREE.Group();
+            const material = new THREE.MeshLambertMaterial({ color: 0x6b75e0 }); // Azul/Roxo de Troll
+
+            // Corpo (cilindro grande)
+            const bodyGeometry = new THREE.CylinderGeometry(0.6, 0.8, 1.5, 8);
+            const body = new THREE.Mesh(bodyGeometry, material);
+            body.position.y = 0.75;
+            body.castShadow = true;
+            group.add(body);
+
+            // Cabeça
+            const headGeometry = new THREE.SphereGeometry(0.4, 8, 8);
+            const head = new THREE.Mesh(headGeometry, material);
+            head.position.y = 1.8;
+            head.castShadow = true;
+            group.add(head);
+
+            return group;
+        }
+
+        function createNecromancerModel() {
+            const group = new THREE.Group();
+            
+            // Robe (similar ao mago, mas mais escuro)
+            const robeMaterial = new THREE.MeshLambertMaterial({ color: 0x3D0C02 }); // Marrom escuro
+            const robeGeometry = new THREE.CylinderGeometry(0.4, 0.6, 1.5, 8);
+            const robe = new THREE.Mesh(robeGeometry, robeMaterial);
+            robe.position.y = 0.75;
+            robe.castShadow = true;
+            group.add(robe);
+
+            // Capuz (cone sobre a cabeça)
+            const hoodMaterial = new THREE.MeshLambertMaterial({ color: 0x8A2BE2 }); // Roxo
+            const hoodGeometry = new THREE.ConeGeometry(0.4, 0.7, 8);
+            const hood = new THREE.Mesh(hoodGeometry, hoodMaterial);
+            hood.position.y = 1.6;
+            hood.castShadow = true;
+            group.add(hood);
+
+            return group;
+        }
+
+        // Propriedades das Entidades (ATUALIZADO com Modelos)
+        const entityProps = {
+            goblin: { hp: 20, speed: 0.05, score: 5, damage: 5, name: "Goblin", modelFn: createGoblinModel, modelHeight: 0.9 },
+            orc: { hp: 50, speed: 0.04, score: 10, damage: 10, name: "Orc", modelFn: createOrcModel, modelHeight: 1.35 },
+            troll: { hp: 100, speed: 0.03, score: 15, damage: 15, name: "Troll", modelFn: createTrollModel, modelHeight: 2.2 },
+            necromancer: { hp: 80, speed: 0.025, score: 25, damage: 5, name: "Necromante", modelFn: createNecromancerModel, modelHeight: 1.9 }
+        };
+
         // Funções de criação de Obstáculos
-        function createTree(position) {
+        function createTree(position) { // ... (função createTree sem alterações)
             const group = new THREE.Group();
 
             // Tronco (Cylinder, Marrom) - Altura 3
@@ -816,7 +948,7 @@
             obstacles.length = 0;
 
             const numTrees = 50;
-            const boundary = mapSize - 2; // Garante que não spawne na borda
+            const boundary = mapSize - 2; // Garante que não spawne na borda // ... (resto da função populateObstacles sem alterações)
             for (let i = 0; i < numTrees; i++) {
                 const x = (Math.random() * boundary * 2) - boundary;
                 const z = (Math.random() * boundary * 2) - boundary;
@@ -850,13 +982,12 @@
             scene.add(targetRing);
         }
 
-        function createEnemy(type, position) {
+        function createEnemy(type, position, isSummon = false) {
             const props = entityProps[type];
-            const material = new THREE.MeshLambertMaterial({ color: props.color });
-            const enemy = new THREE.Mesh(props.geometry, material);
+            const enemy = props.modelFn(); // Usa a função para criar o modelo
+
             enemy.position.copy(position);
-            enemy.position.y = props.geometry.parameters.height ? props.geometry.parameters.height / 2 : 0.5;
-            enemy.castShadow = true;
+            enemy.position.y = 0; // A altura é controlada dentro do modelo
 
             enemy.userData = {
                 type: type,
@@ -865,17 +996,33 @@
                 speed: props.speed,
                 score: props.score,
                 damage: props.damage,
-                hitTimer: 0 // NOVO: Timer para feedback de hit
+                hitTimer: 0, // NOVO: Timer para feedback de hit
+                modelHeight: props.modelHeight, // Guarda a altura para o label
+                isSummon: isSummon // NOVO: Marca se é uma invocação
             };
+
+            // NOVO: Adiciona propriedades específicas para o Necromante
+            if (type === 'necromancer') {
+                enemy.userData.summonCooldown = Math.random() * 240; // Cooldown inicial aleatório (até 4s)
+                enemy.userData.summonInterval = 480; // Invoca a cada 8 segundos
+            }
+
+            // NOVO: Guarda a cor original de cada parte do modelo para o feedback de hit
+            enemy.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    // Garante que userData exista
+                    child.userData.originalColor = child.material.color.getHex();
+                }
+            });
 
             enemies.push(enemy);
             scene.add(enemy);
             
-            // Criação do Label 2D e Barra de Vida
+            // Criação da UI 2D do inimigo
             createEnemyUI(enemy, props.name);
         }
         
-        // Renomeada: Cria o Label e a Barra de Vida
+        // Cria a UI do Inimigo (Nome, HP, Marcador)
         function createEnemyUI(enemy, name) {
             // 1. Cria o Label do Nome
             const label = document.createElement('div');
@@ -893,19 +1040,30 @@
             
             enemyLabelsContainer.appendChild(hpBarContainer);
 
-            // 3. Armazena ambas as referências
-            enemyLabels.set(enemy.uuid, { nameLabel: label, hpBar: hpBarContainer, hpFill: hpFill });
+            // 3. NOVO: Cria o Marcador de Invocação (se necessário)
+            let summonMarker = null;
+            if (enemy.userData.isSummon) {
+                summonMarker = document.createElement('div');
+                summonMarker.className = 'summon-marker';
+                enemyLabelsContainer.appendChild(summonMarker);
+            }
+
+            // 4. Armazena todas as referências
+            enemyLabels.set(enemy.uuid, { nameLabel: label, hpBar: hpBarContainer, hpFill: hpFill, summonMarker: summonMarker });
         }
         
-        // Renomeada: Remove o Label e a Barra de Vida
+        // Remove a UI do Inimigo
         function removeEnemyUI(enemy) {
             const uiElements = enemyLabels.get(enemy.uuid);
             if (uiElements) {
                 if (uiElements.nameLabel) {
                     enemyLabelsContainer.removeChild(uiElements.nameLabel);
                 }
-                if (uiElements.hpBar) { // NOVO
+                if (uiElements.hpBar) {
                     enemyLabelsContainer.removeChild(uiElements.hpBar);
+                }
+                if (uiElements.summonMarker) { // NOVO
+                    enemyLabelsContainer.removeChild(uiElements.summonMarker);
                 }
                 enemyLabels.delete(enemy.uuid);
             }
@@ -941,12 +1099,13 @@
                     
                     if (waveLevel < 8) { 
                         type = 'goblin'; 
-                    } else if (waveLevel < 20) {
+                    } else if (waveLevel < 30) { // Orcs e Trolls aparecem antes
                         type = roll < 75 ? 'goblin' : 'orc'; 
-                    } else {
-                        if (roll < 50) type = 'goblin'; 
-                        else if (roll < 80) type = 'orc'; 
-                        else type = 'troll'; 
+                    } else { // Necromantes aparecem depois do nível 30
+                        if (roll < 40) type = 'goblin'; 
+                        else if (roll < 70) type = 'orc'; 
+                        else if (roll < 85) type = 'troll';
+                        else type = 'necromancer';
                     }
                     createEnemy(type, position);
                 }
@@ -1043,10 +1202,11 @@
             let text = 'Item';
             switch(type) {
                 case 'potion': text = 'Cura'; break;
-                case 'tripleShot': text = 'Tiro Triplo'; break;
+                case 'tripleShot': text = 'Tiro Múltiplo'; break;
                 case 'shield': text = 'Escudo'; break;
                 case 'explosion': text = 'Explosão'; break;
                 case 'repulsionBubble': text = 'Bolha Repulsora'; break;
+                case 'clone': text = 'Clone'; break; // NOVO: Adiciona o nome correto
             }
 
             const label = document.createElement('div');
@@ -1071,14 +1231,19 @@
             powerUpTimer++;
             const timeSpawnInterval = 300; 
 
+            // NOVO: A chance de spawn aumenta com o nível do jogador
+            // Nível 1: 20%, Nível 2: 30%, Nível 3: 40%, etc. (limitado a 70%)
+            const baseSpawnChance = 0.2;
+            const spawnChancePerLevel = 0.1;
+            const spawnChance = Math.min(0.7, baseSpawnChance + (playerLevel - 1) * spawnChancePerLevel);
+
             if (powerUpTimer >= timeSpawnInterval) {
-                if (Math.random() < 0.2) { 
+                if (Math.random() < spawnChance) { 
                     
-                    // 50% chance de poção, 50% chance de poder especial
                     if (Math.random() < 0.5) {
                         createPowerUp('potion');
                     } else {
-                        const specialPowers = ['tripleShot', 'shield', 'explosion', 'repulsionBubble'];
+                        const specialPowers = ['tripleShot', 'shield', 'explosion', 'repulsionBubble', 'clone'];
                         const type = specialPowers[Math.floor(Math.random() * specialPowers.length)];
                         createPowerUp(type);
                     }
@@ -1108,6 +1273,143 @@
             }
         }
 
+        // NOVO: Função para criar o clone
+        function createClone() {
+            if (clone) { // Remove o clone antigo se existir
+                scene.remove(clone);
+            }
+
+            clone = createWizardModel();
+            clone.position.copy(player.position);
+
+            // Torna o clone semitransparente
+            clone.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = child.material.clone(); // Clona o material para não afetar o jogador
+                    child.material.transparent = true;
+                    child.material.opacity = 0.5;
+                }
+            });
+
+            scene.add(clone);
+        }
+
+        // NOVO: Função para atualizar a lógica do clone
+        function updateClone() {
+            if (cloneTimer > 0 && clone) {
+                // Lógica de movimento do clone (idêntica à do jogador)
+                const direction = new THREE.Vector3().subVectors(clone.position, player.position).normalize();
+                const movementVector = new THREE.Vector2(direction.x, direction.z).normalize();
+                const currentMovement = new THREE.Vector3(movementVector.x, 0, movementVector.y).multiplyScalar(playerSpeed * 0.8);
+                
+                const newPosition = clone.position.clone().add(currentMovement);
+                
+                const tempCloneBBox = new THREE.Box3();
+                let collisionDetected = false;
+
+                tempPlayer.position.copy(newPosition);
+                tempPlayer.updateMatrixWorld();
+                tempCloneBBox.setFromObject(tempPlayer);
+
+                for (const obstacle of obstacles) {
+                    obstacle.updateMatrixWorld();
+                    let obstacleBBox;
+                    if (obstacle.userData.collisionMesh) {
+                        obstacle.userData.collisionMesh.updateWorldMatrix(true, false);
+                        obstacleBBox = new THREE.Box3().setFromObject(obstacle.userData.collisionMesh);
+                    } else {
+                        obstacleBBox = new THREE.Box3().setFromObject(obstacle);
+                    }
+                    
+                    if (tempCloneBBox.intersectsBox(obstacleBBox)) {
+                        collisionDetected = true;
+                        break;
+                    }
+                }
+
+                if (!collisionDetected) {
+                    clone.position.copy(newPosition);
+                } else {
+                    // Tenta deslizar no eixo X
+                    const newPositionX = clone.position.clone();
+                    newPositionX.x += currentMovement.x;
+                    tempPlayer.position.copy(newPositionX);
+                    tempPlayer.updateMatrixWorld();
+                    if (!obstacles.some(o => new THREE.Box3().setFromObject(tempPlayer).intersectsBox(new THREE.Box3().setFromObject(o.userData.collisionMesh || o)))) {
+                        clone.position.x = newPositionX.x;
+                    }
+
+                    // Tenta deslizar no eixo Z
+                    const newPositionZ = clone.position.clone();
+                    newPositionZ.z += currentMovement.z;
+                    tempPlayer.position.copy(newPositionZ);
+                    tempPlayer.updateMatrixWorld();
+                    if (!obstacles.some(o => new THREE.Box3().setFromObject(tempPlayer).intersectsBox(new THREE.Box3().setFromObject(o.userData.collisionMesh || o)))) {
+                        clone.position.z = newPositionZ.z;
+                    }
+                }
+                clone.position.x = Math.max(-mapSize, Math.min(mapSize, clone.position.x));
+                clone.position.z = Math.max(-mapSize, Math.min(mapSize, clone.position.z));
+            } else if (clone) {
+                // Remove o clone quando o tempo acaba
+                scene.remove(clone);
+                clone = null;
+            }
+        }
+
+        // NOVO: Função para disparar o Raio de Energia
+        function fireEnergyBeam() {
+            // 1. Pega a direção da mira
+            raycaster.setFromCamera(pointer, camera);
+            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            const intersection = new THREE.Vector3();
+            if (!raycaster.ray.intersectPlane(plane, intersection)) return;
+
+            const direction = new THREE.Vector3().subVectors(intersection, player.position).normalize();
+
+            // 2. Configura o raycaster para a colisão do raio
+            const beamRaycaster = new THREE.Raycaster(player.position, direction);
+
+            // 3. Checa colisão com obstáculos para determinar o comprimento do raio
+            const obstacleIntersects = beamRaycaster.intersectObjects(obstacles, true);
+            let beamLength = mapSize * 2; // Comprimento máximo
+            if (obstacleIntersects.length > 0) {
+                beamLength = obstacleIntersects.distance;
+            }
+
+            // 4. Checa colisão com inimigos
+            const enemyIntersects = beamRaycaster.intersectObjects(enemies, true);
+            const beamDamage = 150;
+            enemyIntersects.forEach(intersect => {
+                // Atinge apenas inimigos dentro do comprimento efetivo do raio
+                if (intersect.distance < beamLength) {
+                    let enemyGroup = intersect.object;
+                    while (enemyGroup.parent && !enemyGroup.userData.hp) {
+                        enemyGroup = enemyGroup.parent;
+                    }
+                    if (enemyGroup && enemyGroup.userData.hp) {
+                        enemyGroup.userData.hp -= beamDamage;
+                        enemyGroup.userData.hitTimer = 10;
+                    }
+                }
+            });
+
+            // 5. Cria o efeito visual do raio
+            const beamStart = player.position.clone();
+            beamStart.y = 0.5; // Altura do centro do mago
+            const beamEnd = beamStart.clone().addScaledVector(direction, beamLength);
+            
+            const beamGeometry = new THREE.CylinderGeometry(0.2, 0.2, beamLength, 8);
+            const beamMaterial = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.8 });
+            const beamMesh = new THREE.Mesh(beamGeometry, beamMaterial);
+
+            beamMesh.position.copy(beamStart).add(beamEnd).divideScalar(2);
+            beamMesh.lookAt(beamEnd);
+            beamMesh.rotateX(Math.PI / 2);
+            scene.add(beamMesh);
+            setTimeout(() => scene.remove(beamMesh), 200);
+        }
+
         // --- Funções de Lógica do Jogo ---
         
         // Vetor temporário para o cálculo dos labels
@@ -1119,10 +1421,12 @@
                 const uiElements = enemyLabels.get(enemy.uuid); // Pega o objeto
                 if (!uiElements) return;
 
-                const { nameLabel, hpBar, hpFill } = uiElements;
-
+                const { nameLabel, hpBar, hpFill, summonMarker } = uiElements;
+                const modelHeight = enemy.userData.modelHeight || 1.0;
+                
                 // 1. Projeta a Posição 3D (como antes)
-                tempV.set(enemy.position.x, enemy.position.y + 0.8, enemy.position.z); // Posição base acima da cabeça
+                const labelBaseY = enemy.position.y + modelHeight;
+                tempV.set(enemy.position.x, labelBaseY, enemy.position.z); // Posição base acima da cabeça
                 tempV.project(camera);
 
                 // 2. Converte para coordenadas de tela
@@ -1140,6 +1444,12 @@
                 // 5. NOVO: Atualiza a largura da barra de vida
                 const hpPercent = (enemy.userData.hp / enemy.userData.maxHP) * 100;
                 hpFill.style.width = `${hpPercent}%`;
+
+                // 6. NOVO: Atualiza a posição do marcador de invocação
+                if (summonMarker) {
+                    summonMarker.style.left = `${x}px`;
+                    summonMarker.style.top = `${y - 18}px`; // Posiciona acima do nome
+                }
             });
         }
 
@@ -1244,22 +1554,36 @@
                 targetRing.position.y = 0.01;
                 
                 // Ataque Automático
+                // NOVO: A cadência de tiro aumenta com o nível.
+                // Reduz o cooldown em 2 frames por nível, com um mínimo de 10.
+                const currentCooldown = Math.max(10, baseCooldown - (playerLevel - 1) * 2);
+
                 if (projectileCooldown <= 0) {
-                    // NOVO: Lógica de Tiro Triplo
+                    // Lógica de ataque aprimorada por nível e power-up
                     if (tripleShotTimer > 0) {
-                        const angle = 0.1745; // 10 graus em radianos
-                        const dirLeft = direction.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-                        const dirRight = direction.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -angle);
-                        
-                        createProjectile('weak', direction, player.position);
-                        createProjectile('weak', dirLeft, player.position);
-                        createProjectile('weak', dirRight, player.position);
+                        // NOVO: O power-up escala com o nível
+                        const isUpgraded = playerLevel >= 4;
+                        const angles = isUpgraded 
+                            ? [-0.3, -0.15, 0, 0.15, 0.3] // Nível 4+: 5 projéteis
+                            : [-0.1745, 0, 0.1745];       // Nível 1-3: 3 projéteis
+
+                        angles.forEach(angle => {
+                            const shotDirection = direction.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+                            createProjectile('weak', shotDirection, player.position);
+                        });
+
+                    } else if (playerLevel >= 4) {
+                        // Nível 4+ base: 3 projéteis
+                        const angles = [-0.1745, 0, 0.1745]; // 10 graus
+                        angles.forEach(angle => {
+                            const shotDirection = direction.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+                            createProjectile('weak', shotDirection, player.position);
+                        });
                     } else {
                         // Disparo normal
                         createProjectile('weak', direction, player.position);
                     }
-                    
-                    projectileCooldown = baseCooldown;
+                    projectileCooldown = currentCooldown;
                 }
             }
         }
@@ -1297,13 +1621,20 @@
                 raycaster.ray.intersectPlane(plane, intersection);
                 
                 if (intersection.x !== 0 && intersection.z !== 0) {
-                    const direction = new THREE.Vector3().subVectors(intersection, player.position);
-                    direction.y = 0; 
-                    
-                    createProjectile('strong', direction, player.position);
+                    // NOVO: Comportamento do especial muda com o nível
+                    if (playerLevel >= 3) {
+                        // Nível 3+: Pequena explosão em área
+                        const specialExplosionRadius = 3; // Raio menor que a explosão normal
+                        const specialExplosionDamage = projectileProps.strong.damage; // Dano do projétil forte (50)
+                        triggerBigExplosion(intersection, specialExplosionRadius, specialExplosionDamage);
+                    } else {
+                        // Nível 1-2: Projétil único e forte
+                        const direction = new THREE.Vector3().subVectors(intersection, player.position);
+                        direction.y = 0; 
+                        createProjectile('strong', direction, player.position);
+                    }
                 }
-                
-                updateUI(); 
+                updateUI();
             }
         }
 
@@ -1314,7 +1645,13 @@
             for (let i = powerUps.length - 1; i >= 0; i--) {
                 const powerUp = powerUps[i];
                 powerUp.updateMatrixWorld();
+                
+                // NOVO: Aumenta a área de colisão do item para facilitar a coleta
+                // Cria uma BBox maior em torno do item para a checagem
                 const powerUpBBox = new THREE.Box3().setFromObject(powerUp);
+                const size = new THREE.Vector3();
+                powerUpBBox.getSize(size);
+                powerUpBBox.expandByVector(size.multiplyScalar(0.5)); // Aumenta a caixa em 50%
 
                 if (playerBBox.intersectsBox(powerUpBBox)) {
                     // Colisão detectada - Coletar item
@@ -1332,8 +1669,11 @@
                             break;
                         
                         case 'tripleShot':
-                            // NOVO: Acumula (soma) o tempo
-                            tripleShotTimer += data.duration;
+                            // NOVO: A duração depende do nível do jogador
+                            const duration = playerLevel < 4 
+                                ? 1800  // 30 segundos
+                                : 3600; // 60 segundos
+                            tripleShotTimer += duration;
                             break;
                         
                         case 'shield':
@@ -1349,6 +1689,12 @@
                         case 'explosion':
                             // NOVO: Acumula (soma) as cargas
                             explosionCharges += data.charges;
+                            break;
+                        
+                        case 'clone':
+                            // NOVO: Ativa o clone
+                            if (!clone) createClone();
+                            cloneTimer += data.duration;
                             break;
                     }
 
@@ -1526,7 +1872,10 @@
         }
 
         function updateEnemies() {
-            const playerPos = player.position;
+            // NOVO: Define o alvo (clone ou jogador)
+            const target = clone && cloneTimer > 0 ? clone : player;
+            const targetPos = target.position;
+
             // CORREÇÃO: Posição do BBox do Player atualizada em checkPlayerCollisions
             
             for (let i = enemies.length - 1; i >= 0; i--) {
@@ -1535,27 +1884,51 @@
 
                 // NOVO: Feedback de Hit (Piscar Branco)
                 if (enemyData.hitTimer > 0) {
-                    enemy.material.color.setHex(0xffffff);
+                    // CORREÇÃO: Percorre os filhos para aplicar o efeito
+                    enemy.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            child.material.color.setHex(0xffffff);
+                        }
+                    });
                     enemyData.hitTimer--;
                 } else {
-                    enemy.material.color.setHex(entityProps[enemyData.type].color); // Volta à cor normal
+                    // Volta à cor normal para todos os filhos do grupo
+                    enemy.traverse((child) => {
+                        if (child.isMesh && child.material && child.userData.originalColor) {
+                            child.material.color.setHex(child.userData.originalColor);
+                        }
+                    });
                 }
                 
                 // NOVO: Lógica da Bolha de Repulsão
                 if (repulsionBubbleTimer > 0) {
-                    const distanceToPlayer = enemy.position.distanceTo(playerPos);
+                    const distanceToPlayer = enemy.position.distanceTo(player.position);
                     const repulsionRadius = 4; // Raio da bolha
                     if (distanceToPlayer < repulsionRadius) {
                         // Calcula a direção para empurrar o inimigo para longe
-                        const pushDirection = new THREE.Vector3().subVectors(enemy.position, playerPos).normalize();
+                        const pushDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
                         const pushSpeed = 0.1; // Força com que são empurrados
                         enemy.position.addScaledVector(pushDirection, pushSpeed);
                         continue; // Pula o resto da lógica de movimento normal
                     }
                 }
 
+                // NOVO: Lógica de invocação do Necromante
+                if (enemyData.type === 'necromancer') {
+                    enemyData.summonCooldown = Math.max(0, enemyData.summonCooldown - 1);
+                    
+                    // Se o cooldown acabou e não estamos no limite de inimigos
+                    if (enemyData.summonCooldown <= 0 && enemies.length < maxActiveEnemies) {
+                        // Invoca um goblin perto do necromante
+                        const offset = new THREE.Vector3((Math.random() - 0.5) * 4, 0, (Math.random() - 0.5) * 4);
+                        const spawnPosition = enemy.position.clone().add(offset);
+                        createEnemy('goblin', spawnPosition, true); // NOVO: Marca como invocação
+                        
+                        enemyData.summonCooldown = enemyData.summonInterval; // Reseta o cooldown
+                    }
+                }
 
-                const direction = new THREE.Vector3().subVectors(playerPos, enemy.position).normalize();
+                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
                 
                 // --- INÍCIO DA CORREÇÃO DE COLISÃO (WALL SLIDING) ---
                 
@@ -1671,6 +2044,15 @@
                         if (novaBombKills >= killsForNovaBomb) {
                             triggerNovaBomb();
                             novaBombKills = 0;
+                        }
+                    }
+
+                    // NOVO: Lógica do Raio de Energia (Level 4+)
+                    if (playerLevel >= 4) {
+                        energyBeamKills++;
+                        if (energyBeamKills >= killsForEnergyBeam) {
+                            fireEnergyBeam();
+                            energyBeamKills = 0;
                         }
                     }
                     
@@ -1802,10 +2184,16 @@
 
             if (tookDamage) {
                  // Feedback visual de dano no Mago (pisca o robe)
-                 player.children[0].material.color.setHex(0xff0000);
+                 const robe = player.children[0];
+                 const originalColor = robe.material.color.getHex();
+                 robe.material.color.setHex(0xff0000);
+
                  setTimeout(() => {
-                     if (player && player.children[0]) {
-                         player.children[0].material.color.setHex(0x5b3c8f); // Cor original do robe
+                     // Garante que o jogador e o robe ainda existem
+                     // (o jogo pode ter reiniciado)
+                     if (player && player.children[0] && !isGameOver) {
+                         // Volta para a cor original
+                         player.children[0].material.color.setHex(originalColor);
                      }
                  }, 100);
                  updateUI(); // Atualiza a UI imediatamente
@@ -1845,10 +2233,13 @@
             const timerDisplay = document.getElementById('powerup-timers-display');
             let timersHTML = '';
             if (tripleShotTimer > 0) {
-                timersHTML += `<span class="powerup-active">Tiro Triplo! (${Math.ceil(tripleShotTimer/60)}s)</span>`;
+                timersHTML += `<span class="powerup-active">Tiro Múltiplo! (${Math.ceil(tripleShotTimer/60)}s)</span>`;
             }
             if (repulsionBubbleTimer > 0) {
                 timersHTML += `<span class="powerup-active">Bolha Repulsora! (${Math.ceil(repulsionBubbleTimer/60)}s)</span>`;
+            }
+            if (cloneTimer > 0) {
+                timersHTML += `<span class="powerup-active">Clone Ativo! (${Math.ceil(cloneTimer/60)}s)</span>`;
             }
 
             // NOVO: Calcula o total de esferas em todas as camadas
@@ -1875,6 +2266,16 @@
             } else {
                 novaBombDisplay.classList.add('hidden');
             }
+
+            // NOVO: Atualiza display do Raio de Energia
+            const energyBeamDisplay = document.getElementById('energy-beam-display');
+            if (playerLevel >= 4) {
+                document.getElementById('energy-beam-kills-count').textContent = energyBeamKills;
+                energyBeamDisplay.classList.remove('hidden');
+            } else {
+                energyBeamDisplay.classList.add('hidden');
+            }
+
 
         }
 
@@ -1918,6 +2319,7 @@
             specialCooldown = Math.max(0, specialCooldown - 1);
             if (tripleShotTimer > 0) tripleShotTimer--; // NOVO: Decrementa timer
             if (repulsionBubbleTimer > 0) repulsionBubbleTimer--; // NOVO: Decrementa timer da bolha
+            if (cloneTimer > 0) cloneTimer--; // NOVO: Decrementa timer do clone
 
             // NOVO: Atualiza a visibilidade e posição da bolha de repulsão
             if (repulsionBubbleTimer > 0) {
@@ -1926,6 +2328,16 @@
                 repulsionBubbleMesh.position.copy(player.position);
             } else {
                 repulsionBubbleMesh.visible = false;
+            }
+
+            // NOVO: Cura passiva a partir do Nível 3
+            if (playerLevel >= 3) {
+                passiveHealTimer++;
+                if (passiveHealTimer >= passiveHealInterval) {
+                    playerHP = Math.min(maxHP, playerHP + 5);
+                    updateUI(); // Apenas atualiza a barra de vida
+                    passiveHealTimer = 0;
+                }
             }
 
 
@@ -1937,6 +2349,7 @@
             player.updateMatrixWorld(true);
 
             updateAiming();
+            updateClone(); // NOVO: Atualiza a lógica do clone
             updatePowerUps(); // Checa colisão com poções e poderes
 
             // 3. Lógica de Inimigos e Spawning
@@ -1979,7 +2392,7 @@
             experienceForNextLevel = baseExperience;
 
             killPoints = 0;
-            killStats = { goblin: 0, orc: 0, troll: 0 }; // NOVO: Reseta killStats
+            killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0 }; // NOVO: Reseta killStats
             killsSinceLastPotion = 0; // NOVO: Reseta contador de poção
             
             // NOVO: Reseta timers e estados dos novos poderes
@@ -1987,6 +2400,9 @@
             removeShield(); // Garante que o escudo seja removido
             repulsionBubbleTimer = 0; // NOVO: Reseta timer da bolha
             novaBombKills = 0; // NOVO: Reseta contador da nova
+            if (clone) scene.remove(clone); // NOVO: Remove clone se existir
+            clone = null; cloneTimer = 0; // NOVO: Reseta clone
+            energyBeamKills = 0; // NOVO: Reseta contador do raio
             explosionCharges = 0; // NOVO: Reseta cargas
 
             waveLevel = 0;
@@ -1994,6 +2410,7 @@
             powerUpTimer = 0; 
             projectileCooldown = 0;
             specialCooldown = 0;
+            passiveHealTimer = 0; // NOVO: Reseta timer da cura
             
             // Limpa as entidades 3D e seus labels
             enemies.forEach(e => { scene.remove(e); removeEnemyUI(e); });
@@ -2037,21 +2454,69 @@
 
             // Salva a pontuação com o nome do jogador e as estatísticas de abates
             window.saveScore(score, playerName, killStats);
+            // NOVO: Atualiza o cache local imediatamente para garantir a persistência
+            updateLocalRankingCache(score, playerName, killStats);
             
             // NOVO: Garante que a bolha desapareça no fim do jogo
             if (repulsionBubbleMesh) {
                 repulsionBubbleMesh.visible = false;
             }
 
+            // NOVO: Garante que o clone desapareça no fim do jogo
+            if (clone) {
+                scene.remove(clone);
+                clone = null;
+            }
             // Remove todos os labels quando o jogo termina
             enemyLabelsContainer.innerHTML = '';
             enemyLabels.clear();
             powerUpLabels.clear(); // NOVO: Limpa o mapa de labels dos itens
         }
 
+        // NOVO: Função para atualizar o cache local do ranking imediatamente
+        function updateLocalRankingCache(newScore, playerName, killStats) {
+            try {
+                const cachedRankingJSON = localStorage.getItem('hordaMagicaRanking');
+                let scores = [];
+                if (cachedRankingJSON) {
+                    scores = JSON.parse(cachedRankingJSON);
+                }
+
+                // Adiciona a nova pontuação ao array
+                scores.push({
+                    score: newScore,
+                    playerName: playerName,
+                    killStats: killStats,
+                    fullUserId: window.userId || null // CORREÇÃO: Usa o userId global
+                });
+
+                // Reordena e salva de volta no localStorage
+                scores.sort((a, b) => b.score - a.score);
+                localStorage.setItem('hordaMagicaRanking', JSON.stringify(scores.slice(0, 5))); // Salva apenas os top 5
+            } catch (error) {
+                console.warn("Falha ao atualizar o cache do ranking local:", error);
+            }
+        }
+
+        // NOVO: Carrega o ranking do cache para exibição inicial
+        function loadInitialRankingFromCache() {
+            try {
+                const cachedRankingJSON = localStorage.getItem('hordaMagicaRanking');
+                if (cachedRankingJSON) {
+                    const scores = JSON.parse(cachedRankingJSON);
+                    if (scores && scores.length > 0) {
+                        window.renderRanking('full-ranking-list', scores);
+                    }
+                }
+            } catch (error) {
+                console.error("Erro ao carregar ranking do cache:", error);
+            }
+        }
+
         // Inicia a aplicação Three.js quando a janela estiver carregada
         window.onload = function () {
             setupUIElements(); // NOVO: Inicializa referências da UI
+            loadInitialRankingFromCache(); // NOVO: Carrega o ranking do cache
             init();
             animate();
             // A tela de menu fica visível no início (isGameOver = true)
