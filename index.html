@@ -205,6 +205,19 @@
             margin-left: 1rem;
             white-space: nowrap;
         }
+        /* NOVO: Estilo para o Tooltip do Ranking */
+        #ranking-tooltip {
+            position: fixed;
+            display: none;
+            background: rgba(20, 20, 30, 0.95);
+            border: 1px solid #ffc700;
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: white;
+            font-size: 0.8rem;
+            pointer-events: none;
+            z-index: 100;
+        }
     </style>
 </head>
 <body>
@@ -229,6 +242,12 @@
             <div class="text-center pointer-events-auto px-4">
                 <label class="text-xs font-medium text-gray-300">LEVEL</label>
                 <div id="player-level-display" class="text-2xl font-bold text-green-400">1</div>
+            </div>
+
+            <!-- NOVO: Display de Onda -->
+            <div class="text-center pointer-events-auto px-4">
+                <label class="text-xs font-medium text-gray-300">ONDA</label>
+                <div id="wave-level-display" class="text-2xl font-bold text-red-400">0</div>
             </div>
 
             <!-- 2. Centro: Pontuação (RE-ADICIONADO) -->
@@ -320,13 +339,18 @@
                 <span class="w-1/5 text-center">Pontos</span>
                 <span class="w-1/5 text-right" title="Abates: Goblins/Orcs/Trolls/Necromantes">Abates</span>
             </div>
-            <div id="full-ranking-list" class="text-sm space-y-2 max-h-80 overflow-y-auto">
+            <div id="full-ranking-list" class="text-sm space-y-2 max-h-72 overflow-y-auto">
                 <p class="text-gray-400 text-center">Carregando...</p>
             </div>
             <button class="mt-6 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition duration-300 shadow-lg w-full" onclick="document.getElementById('full-ranking-modal').classList.add('hidden');">
                 Voltar
             </button>
         </div>
+    </div>
+
+    <!-- NOVO: Tooltip para o Ranking -->
+    <div id="ranking-tooltip">
+        <!-- Conteúdo será preenchido via JS -->
     </div>
 
 
@@ -395,11 +419,11 @@
 
         // Funções de Firestore (Disponibilizadas no escopo global para uso no JS principal)
         // NOVO: Adiciona killStats
-        window.saveScore = async (score, name, killStats, level) => {
+        window.saveScore = async (score, name, killStats, level, waveLevel) => {
             if (!isAuthReady || !userId || !db) {
                 console.warn("Firebase não está pronto ou user não autenticado. Pontuação não salva.");
                 // Mesmo sem Firebase, atualiza o cache local
-                updateLocalRankingCache(score, name, killStats, level);
+                updateLocalRankingCache(score, name, killStats, level, waveLevel);
                 return;
             }
             
@@ -411,6 +435,7 @@
                 fullUserId: userId, 
                 killStats: killStats, // NOVO: Salva estatísticas de abates
                 level: level, // NOVO: Salva o nível alcançado
+                waveLevel: waveLevel, // NOVO: Salva o nível da onda
                 timestamp: Date.now()
             };
 
@@ -423,7 +448,7 @@
             }
 
             // Atualiza o cache local após tentar salvar no Firebase
-            updateLocalRankingCache(score, name, killStats, level);
+            updateLocalRankingCache(score, name, killStats, level, waveLevel);
         };
 
         window.renderRanking = (elementId, scores) => {
@@ -440,21 +465,53 @@
 
             scores.slice(0, 10).forEach((scoreData, index) => { // Limite de 10 para o modal
                 const isCurrentUser = scoreData.fullUserId === window.userId;
-                const rankClass = isCurrentUser ? 'text-yellow-300 font-bold' : 'text-white';
+                const rankClass = isCurrentUser ? 'text-yellow-300 font-bold' : 'text-white hover:bg-gray-700';
                 const nameText = scoreData.playerName || 'Mago Anônimo';
                 
                 // NOVO: Extrai as estatísticas de abates
-                const stats = scoreData.killStats || { goblin: 0, orc: 0, troll: 0, necromancer: 0 };
+                const stats = scoreData.killStats || { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0 };
                 const statsText = `${stats.goblin || 0}/${stats.orc || 0}/${stats.troll || 0}/${stats.necromancer || 0}`;
 
-                rankingList.innerHTML += `
-                    <div class="ranking-item ${rankClass}">
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `ranking-item ${rankClass} cursor-default`;
+                itemDiv.innerHTML = `
                         <span class="w-2/5 text-left">${index + 1}. ${nameText}</span>
                         <span class="w-1/5 text-center">${scoreData.level || 1}</span>
                         <span class="w-1/5 text-center">${scoreData.score}</span>
                         <span class="w-1/5 text-right ranking-stats">${statsText}</span>
-                    </div>
                 `;
+
+                // NOVO: Adiciona listeners para o tooltip
+                itemDiv.addEventListener('mousemove', (e) => {
+                    const tooltip = document.getElementById('ranking-tooltip');
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = `${e.clientX + 15}px`;
+                    tooltip.style.top = `${e.clientY + 15}px`;
+                    
+                    const killsHTML = `
+                        Goblins: ${stats.goblin || 0}<br>
+                        Orcs: ${stats.orc || 0}<br>
+                        Trolls: ${stats.troll || 0}<br>
+                        Necromantes: ${stats.necromancer || 0}<br>
+                        Fantasmas: ${stats.ghost || 0}
+                    `;
+
+                    tooltip.innerHTML = `
+                        <strong class="text-yellow-400">${nameText}</strong><br>
+                        Pontuação: ${scoreData.score}<br>
+                        Nível do Mago: ${scoreData.level || 1}<br>
+                        Onda Alcançada: ${scoreData.waveLevel || 1}<br>
+                        <hr class="my-1 border-gray-600">
+                        <strong>Abates:</strong><br>
+                        ${killsHTML}
+                    `;
+                });
+
+                itemDiv.addEventListener('mouseout', () => {
+                    document.getElementById('ranking-tooltip').style.display = 'none';
+                });
+
+                rankingList.appendChild(itemDiv);
             });
         };
 
@@ -626,7 +683,7 @@
         };
 
         // UI Elementos
-        let scoreDisplay, hpBar, specialBar, killPointsDisplay, gameOverModal, finalScoreDisplay, playerNameDisplay, healingMessage;
+        let scoreDisplay, hpBar, specialBar, killPointsDisplay, gameOverModal, finalScoreDisplay, playerNameDisplay, healingMessage, startMenuModal, waveLevelDisplay;
         
         // NOVO: Elementos da UI de Level
         let playerLevelDisplay, levelUpMessage;
@@ -641,10 +698,14 @@
             finalScoreDisplay = document.getElementById('final-score');
             playerNameDisplay = document.getElementById('player-name-display');
             healingMessage = document.getElementById('healing-message');
+            startMenuModal = document.getElementById('start-menu-modal');
             
             // NOVO: Mapeia UI de Level
             playerLevelDisplay = document.getElementById('player-level-display');
             levelUpMessage = document.getElementById('level-up-message');
+
+            // NOVO: Mapeia UI da Onda
+            waveLevelDisplay = document.getElementById('wave-level-display');
         }
 
 
@@ -2065,7 +2126,7 @@
                         enemy.position.addScaledVector(pushDirection, pushSpeed);
                         continue; // Pula o resto da lógica de movimento normal
                     }
-            }
+                }
             
             // CORREÇÃO: Toda a lógica abaixo foi movida para dentro do loop 'for'
 
@@ -2398,6 +2459,9 @@
             // NOVO: Atualiza o display de Level
             playerLevelDisplay.textContent = playerLevel;
 
+            // NOVO: Atualiza o display da Onda
+            waveLevelDisplay.textContent = waveLevel;
+
             const hpPercent = Math.max(0, playerHP / maxHP) * 100;
             hpBar.style.width = `${hpPercent}%`;
             
@@ -2661,7 +2725,7 @@
             createPlayer();
             
             // Reset UI
-            document.getElementById('start-menu-modal').classList.add('hidden');
+            startMenuModal.classList.add('hidden');
             gameOverModal.classList.add('hidden');
             
             // NOVO: Spawna um power-up especial obrigatório no início
@@ -2683,7 +2747,7 @@
             gameOverModal.classList.remove('hidden');
 
             // Salva a pontuação com o nome do jogador e as estatísticas de abates
-            window.saveScore(score, playerName, killStats, playerLevel);
+            window.saveScore(score, playerName, killStats, playerLevel, waveLevel);
             
             // NOVO: Garante que a bolha desapareça no fim do jogo
             if (repulsionBubbleMesh) {
@@ -2707,7 +2771,7 @@
         }
 
         // NOVO: Função para atualizar o cache local do ranking imediatamente
-        function updateLocalRankingCache(newScore, playerName, killStats, level) {
+        function updateLocalRankingCache(newScore, playerName, killStats, level, waveLevel) {
             try {
                 const cachedRankingJSON = localStorage.getItem('hordaMagicaRanking');
                 let scores = [];
@@ -2721,7 +2785,8 @@
                     playerName: playerName,
                     killStats: killStats,
                     level: level, // NOVO: Salva o nível
-                    fullUserId: window.userId || null,
+                    waveLevel: waveLevel, // NOVO: Salva a onda
+                    fullUserId: window.userId || null, // CORREÇÃO: Usa o userId global
                     timestamp: Date.now() // Garante que sempre tenha um timestamp
                 });
 
@@ -2736,8 +2801,8 @@
 
         // --- Funções de Controle da UI (Menu) ---
         function handleRestartClick() {
-            document.getElementById('game-over-modal').classList.add('hidden');
-            document.getElementById('start-menu-modal').classList.remove('hidden');
+            gameOverModal.classList.add('hidden');
+            startMenuModal.classList.remove('hidden');
         }
 
         function handleStartGameClick() {
@@ -2749,7 +2814,7 @@
                 setTimeout(() => input.classList.remove('border-red-500', 'border-2'), 1000);
                 return;
             }
-            document.getElementById('start-menu-modal').classList.add('hidden');
+            startMenuModal.classList.add('hidden');
             startGame(playerName); // Chama a função diretamente
         }
 
