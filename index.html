@@ -218,6 +218,21 @@
             pointer-events: none;
             z-index: 100;
         }
+        /* NOVO: Estilo para o Texto Flutuante de Dano/Cura */
+        #floating-text-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100; /* Acima de tudo */
+        }
+        .floating-text {
+            position: absolute;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(0,0,0,0.8);
+        }
     </style>
 </head>
 <body>
@@ -352,6 +367,9 @@
     <div id="ranking-tooltip">
         <!-- Conteúdo será preenchido via JS -->
     </div>
+
+    <!-- NOVO: Container para o Texto Flutuante -->
+    <div id="floating-text-container"></div>
 
 
     <!-- Firebase Imports -->
@@ -587,6 +605,9 @@
         const powerUpLabels = new Map(); // NOVO: Mapa para labels dos itens
 
         // Variáveis do Jogo
+        const floatingTexts = []; // NOVO: Para texto de dano/cura
+
+
         let player, targetRing;
         let playerName = 'Mago Anônimo'; // NOVO: Nome do jogador
         let score = 0;
@@ -652,12 +673,17 @@
         const projectiles = [];
         const powerUps = []; 
         const obstacles = []; // NOVO: Array para guardar obstáculos
-        let projectileCooldown = 0;
-        const baseCooldown = 30; 
-        let specialCooldown = 0; 
-        let waveTimer = 0;
-        let waveLevel = 0;
-        const initialSpawnDelay = 600; 
+        let projectileCooldown = 0; // Cooldown do ataque básico
+        const baseCooldown = 30; // Cooldown base do ataque
+        let specialCooldown = 0; // Cooldown do ataque especial
+
+        // NOVO: Variáveis do Sistema de Ondas
+        let currentWave = 0;
+        let enemiesToSpawnThisWave = 0;
+        let enemiesAliveThisWave = 0;
+        let monstersInPreviousWave = 0; // NOVO: Guarda o total da onda anterior
+        let intraWaveSpawnTimer = 0;
+
         const maxActiveEnemies = 40; 
         let powerUpTimer = 0; 
 
@@ -1009,12 +1035,39 @@
             return group;
         }
 
+        // NOVO: Modelo para o Fantasma
+        function createGhostModel() {
+            const group = new THREE.Group();
+            const material = new THREE.MeshLambertMaterial({
+                color: 0xe0e0e0,
+                transparent: true,
+                opacity: 0.7
+            });
+
+            // Corpo em forma de sino
+            const bodyGeometry = new THREE.CylinderGeometry(0.2, 0.6, 1.2, 8);
+            const body = new THREE.Mesh(bodyGeometry, material);
+            body.position.y = 0.6;
+            body.castShadow = true;
+            group.add(body);
+
+            // Cabeça
+            const headGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+            const head = new THREE.Mesh(headGeometry, material);
+            head.position.y = 1.4;
+            head.castShadow = true;
+            group.add(head);
+
+            return group;
+        }
+
         // Propriedades das Entidades (ATUALIZADO com Modelos)
         const entityProps = {
             goblin: { hp: 20, speed: 0.05, score: 5, damage: 5, name: "Goblin", modelFn: createGoblinModel, modelHeight: 0.9 },
             orc: { hp: 50, speed: 0.04, score: 10, damage: 10, name: "Orc", modelFn: createOrcModel, modelHeight: 1.35 },
             troll: { hp: 100, speed: 0.03, score: 15, damage: 15, name: "Troll", modelFn: createTrollModel, modelHeight: 2.2 },
-            necromancer: { hp: 80, speed: 0.025, score: 25, damage: 5, name: "Necromante", modelFn: createNecromancerModel, modelHeight: 1.9 }
+            necromancer: { hp: 80, speed: 0.025, score: 25, damage: 5, name: "Necromante", modelFn: createNecromancerModel, modelHeight: 1.9 },
+            ghost: { hp: 60, speed: 0.06, score: 20, damage: 10, name: "Fantasma", modelFn: createGhostModel, modelHeight: 1.5 }
         };
 
         // Funções de criação de Obstáculos
@@ -1127,7 +1180,8 @@
                 hitTimer: 0, // NOVO: Timer para feedback de hit
                 modelHeight: props.modelHeight, // Guarda a altura para o label
                 isSummon: isSummon, // NOVO: Marca se é uma invocação
-                freezeLingerTimer: 0 // NOVO: Timer para o efeito de congelamento persistente
+                freezeLingerTimer: 0, // NOVO: Timer para o efeito de congelamento persistente
+                damageCooldown: 0 // NOVO: Cooldown para o ataque do monstro
             };
 
             // NOVO: Adiciona propriedades específicas para o Necromante
@@ -1208,45 +1262,71 @@
             }
         }
 
-        function spawnEnemies() {
-            waveTimer++;
+        // NOVO: Sistema de Ondas por Abates
+        function startNextWave() {
+            currentWave++;
+            monstersInPreviousWave = enemiesAliveThisWave; // Guarda o valor antes de resetar
             
-            if (waveTimer < initialSpawnDelay) return;
-            
-            if (enemies.length >= maxActiveEnemies) return;
+            let numMonsters;
+            if (currentWave === 1) {
+                numMonsters = 5; // Onda inicial
+            } else {
+                // NOVO: A progressão muda com o nível da onda
+                const growthRate = currentWave <= 20 ? 1.5 : 1.2;
+                const baseNum = monstersInPreviousWave > 0 ? monstersInPreviousWave : 5; // Segurança
+                numMonsters = Math.floor(baseNum * growthRate);
+            }
 
-            // Progressão suavizada
-            const spawnInterval = Math.max(60, 150 - waveLevel * 2); // Densidade 25% maior (era 200)
-            
-            if (waveTimer % spawnInterval === 0) {
-                waveLevel++;
-                
-                // Demora mais para spawnar múltiplos inimigos (divisor de 12)
-                let numSpawns = Math.floor(waveLevel / 12) + 1; 
+            enemiesToSpawnThisWave = numMonsters;
+            enemiesAliveThisWave = numMonsters;
+            updateUI();
+        }
 
-                for (let i = 0; i < numSpawns; i++) {
+        function spawnEnemies() { // Agora gerencia o spawn da onda atual
+            // Se não há mais inimigos na onda, inicia a próxima
+            if (enemiesAliveThisWave <= 0) {
+                startNextWave();
+            }
+
+            // Se ainda há inimigos para spawnar e não atingiu o limite da tela
+            if (enemiesToSpawnThisWave > 0 && enemies.length < maxActiveEnemies) {
+                intraWaveSpawnTimer++;
+                // Spawna um inimigo a cada ~1 segundo
+                if (intraWaveSpawnTimer >= 60) {
                     const angle = Math.random() * Math.PI * 2;
-                    const radius = mapSize + 5; 
-                    
+                    const radius = mapSize + 5;
                     const x = Math.cos(angle) * radius;
                     const z = Math.sin(angle) * radius;
-                    
                     const position = new THREE.Vector3(x, 0, z);
 
+                    // A lógica de qual monstro aparece continua a mesma, baseada no nível da onda
                     let type;
                     const roll = Math.random() * 100;
-                    
-                    if (waveLevel < 8) { 
-                        type = 'goblin'; 
-                    } else if (waveLevel < 30) { // Orcs e Trolls aparecem antes
-                        type = roll < 75 ? 'goblin' : 'orc'; 
-                    } else { // Necromantes aparecem depois do nível 30
-                        if (roll < 40) type = 'goblin'; 
-                        else if (roll < 70) type = 'orc'; 
+
+                    if (currentWave < 5) {
+                        type = 'goblin';
+                    } else if (currentWave < 8) { // Ondas 5, 6, 7
+                        type = roll < 70 ? 'goblin' : 'orc';
+                    } else if (currentWave < 10) { // Ondas 8, 9
+                        if (roll < 50) type = 'goblin';
+                        else if (roll < 80) type = 'orc';
+                        else type = 'troll';
+                    } else if (currentWave < 12) { // Ondas 10, 11
+                        if (roll < 40) type = 'goblin';
+                        else if (roll < 65) type = 'orc';
                         else if (roll < 85) type = 'troll';
                         else type = 'necromancer';
+                    } else { // Onda 12+
+                        if (roll < 30) type = 'goblin';
+                        else if (roll < 50) type = 'orc';
+                        else if (roll < 70) type = 'troll';
+                        else if (roll < 85) type = 'necromancer';
+                        else type = 'ghost';
                     }
+
                     createEnemy(type, position);
+                    enemiesToSpawnThisWave--;
+                    intraWaveSpawnTimer = 0;
                 }
             }
         }
@@ -1550,6 +1630,44 @@
             setTimeout(() => scene.remove(beamMesh), 200);
         }
 
+        // NOVO: Função para criar texto flutuante de dano/cura
+        function createFloatingText(text, position, color = 'white', fontSize = '1rem') {
+            const textElement = document.createElement('div');
+            textElement.className = 'floating-text';
+            textElement.textContent = text;
+            textElement.style.color = color;
+            textElement.style.fontSize = fontSize;
+
+            document.getElementById('floating-text-container').appendChild(textElement);
+
+            const textData = {
+                element: textElement,
+                position: position.clone(),
+                life: 60, // 1 segundo de vida
+                velocity: new THREE.Vector3(0, 0.03, 0) // Move para cima
+            };
+            floatingTexts.push(textData);
+        }
+
+        // NOVO: Função para atualizar o texto flutuante
+        function updateFloatingText() {
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.life--;
+                ft.position.add(ft.velocity);
+
+                if (ft.life <= 0) {
+                    ft.element.remove();
+                    floatingTexts.splice(i, 1);
+                } else {
+                    // Atualiza a posição 2D
+                    const tempV = ft.position.clone().project(camera);
+                    ft.element.style.left = `${(tempV.x * 0.5 + 0.5) * window.innerWidth}px`;
+                    ft.element.style.top = `${(-tempV.y * 0.5 + 0.5) * window.innerHeight}px`;
+                    ft.element.style.opacity = ft.life / 60;
+                }
+            }
+        }
         // NOVO: Função para disparar a Corrente de Raios
         function triggerChainLightning(startEnemy) {
             const maxJumps = 5;
@@ -1875,6 +1993,7 @@
                             const actualHeal = playerHP - oldHP;
                             if (actualHeal > 0) {
                                 displayHealingMessage(actualHeal);
+                                createFloatingText(`+${actualHeal}`, player.position.clone().setY(1.5), '#00ff00', '1.5rem');
                             }
                             break;
                         
@@ -1989,6 +2108,7 @@
             enemies.forEach(enemy => {
                 if (enemy.position.distanceToSquared(position) <= radiusSq) {
                     enemy.userData.hp -= damage;
+                    createFloatingText(damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff4500');
                     enemy.userData.hitTimer = 10; // Ativa o feedback de hit
                 }
             });
@@ -2057,6 +2177,7 @@
                         if (sphereBBox.intersectsBox(enemyBBox)) {
                             // Causa dano
                             enemy.userData.hp -= projectileProps.weak.damage; // 10 de dano
+                            createFloatingText(projectileProps.weak.damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
                             enemy.userData.hitTimer = 10; // Ativa o feedback de hit
                             hitEnemy = enemy;
                             break; // Esfera só acerta um inimigo
@@ -2096,6 +2217,11 @@
             for (let i = enemies.length - 1; i >= 0; i--) {
                 const enemy = enemies[i];
                 const enemyData = enemy.userData;
+
+                // NOVO: Decrementa o cooldown de ataque do monstro
+                if (enemyData.damageCooldown > 0) {
+                    enemyData.damageCooldown--;
+                }
 
                 // NOVO: Feedback de Hit (Piscar Branco)
                 if (enemyData.hitTimer > 0) {
@@ -2142,6 +2268,7 @@
                 if (distanceToPlayer < auraRadius) {
                     // Efeito de congelamento e dano por segundo
                     enemyData.freezeLingerTimer = 300; // Reseta o timer para 5 segundos
+                    if (enemyData.hp > 0) createFloatingText(1, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#87CEFA', '0.8rem');
                     enemyData.hp -= 5 / 60; // 5 de dano por segundo (a 60fps)
                 }
             }
@@ -2168,54 +2295,65 @@
                 }
             }
 
-            const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-            
-            // Lógica de movimento com colisão (Wall Sliding)
-            const newPosition = enemy.position.clone().addScaledVector(direction, enemyData.speed);
-            tempPlayer.position.copy(newPosition);
-            tempPlayer.updateMatrixWorld();
-            let fullEnemyBBox = new THREE.Box3().setFromObject(tempPlayer);
-            let fullCollisionDetected = false;
-            
-            for (const obstacle of obstacles) {
-                obstacle.updateMatrixWorld();
-                let obstacleBBox = obstacle.userData.collisionMesh ? new THREE.Box3().setFromObject(obstacle.userData.collisionMesh) : new THREE.Box3().setFromObject(obstacle);
-                if (fullEnemyBBox.intersectsBox(obstacleBBox)) {
-                    fullCollisionDetected = true;
-                    break;
-                }
-            }
-
-            if (!fullCollisionDetected) {
-                enemy.position.copy(newPosition);
+            // NOVO: Lógica de movimento separada para fantasmas
+            if (enemyData.type === 'ghost') {
+                // Fantasmas ignoram obstáculos e se movem diretamente
+                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                enemy.position.addScaledVector(direction, enemyData.speed);
             } else {
-                // Tenta deslizar no eixo X
-                const newPositionX = enemy.position.clone();
-                newPositionX.x += direction.x * enemyData.speed;
-                tempPlayer.position.copy(newPositionX);
+                // Lógica de movimento padrão com colisão para outros inimigos
+                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                const newPosition = enemy.position.clone().addScaledVector(direction, enemyData.speed);
+                tempPlayer.position.copy(newPosition);
                 tempPlayer.updateMatrixWorld();
-                let enemyBBoxX = new THREE.Box3().setFromObject(tempPlayer);
-                let collisionOnX = obstacles.some(o => enemyBBoxX.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
-                if (!collisionOnX) {
-                    enemy.position.x = newPositionX.x;
+                let fullEnemyBBox = new THREE.Box3().setFromObject(tempPlayer);
+                let fullCollisionDetected = false;
+                
+                for (const obstacle of obstacles) {
+                    obstacle.updateMatrixWorld();
+                    let obstacleBBox = obstacle.userData.collisionMesh ? new THREE.Box3().setFromObject(obstacle.userData.collisionMesh) : new THREE.Box3().setFromObject(obstacle);
+                    if (fullEnemyBBox.intersectsBox(obstacleBBox)) {
+                        fullCollisionDetected = true;
+                        break;
+                    }
                 }
 
-                // Tenta deslizar no eixo Z
-                const newPositionZ = enemy.position.clone();
-                newPositionZ.z += direction.z * enemyData.speed;
-                tempPlayer.position.copy(newPositionZ);
-                tempPlayer.updateMatrixWorld();
-                let enemyBBoxZ = new THREE.Box3().setFromObject(tempPlayer);
-                let collisionOnZ = obstacles.some(o => enemyBBoxZ.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
-                if (!collisionOnZ) {
-                    enemy.position.z = newPositionZ.z;
+                if (!fullCollisionDetected) {
+                    enemy.position.copy(newPosition);
+                } else {
+                    // Tenta deslizar no eixo X
+                    const newPositionX = enemy.position.clone();
+                    newPositionX.x += direction.x * enemyData.speed;
+                    tempPlayer.position.copy(newPositionX);
+                    tempPlayer.updateMatrixWorld();
+                    let enemyBBoxX = new THREE.Box3().setFromObject(tempPlayer);
+                    let collisionOnX = obstacles.some(o => enemyBBoxX.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
+                    if (!collisionOnX) {
+                        enemy.position.x = newPositionX.x;
+                    }
+
+                    // Tenta deslizar no eixo Z
+                    const newPositionZ = enemy.position.clone();
+                    newPositionZ.z += direction.z * enemyData.speed;
+                    tempPlayer.position.copy(newPositionZ);
+                    tempPlayer.updateMatrixWorld();
+                    let enemyBBoxZ = new THREE.Box3().setFromObject(tempPlayer);
+                    let collisionOnZ = obstacles.some(o => enemyBBoxZ.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
+                    if (!collisionOnZ) {
+                        enemy.position.z = newPositionZ.z;
+                    }
                 }
             }
             
             // NOVO: Checa colisão com o jogador APÓS o movimento
             const playerBBox = new THREE.Box3().setFromObject(player);
             if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(enemy))) {
-                damagePlayer(enemyData.damage);
+                // NOVO: Causa dano apenas se o cooldown do monstro acabou
+                if (enemyData.damageCooldown <= 0) {
+                    damagePlayer(enemyData.damage);
+                    createFloatingText(enemyData.damage, player.position.clone().setY(1.5), '#ff0000', '1.5rem');
+                    enemyData.damageCooldown = 60; // Reseta o cooldown para 1 segundo (60 frames)
+                }
             }
 
             enemy.updateMatrixWorld();
@@ -2255,6 +2393,9 @@
                 scene.remove(enemy);
                 removeEnemyUI(enemy);
                 enemies.splice(i, 1);
+
+                enemiesAliveThisWave--; // NOVO: Decrementa contador da onda
+
                 updateUI();
             }
         }
@@ -2342,6 +2483,7 @@
                     // Checa colisão com o alvo
                     if (projectile.position.distanceTo(projData.target.position) < 0.8) {
                         projData.target.userData.hp -= projData.damage;
+                        createFloatingText(projData.damage, projData.target.position.clone().setY(projData.target.userData.modelHeight || 1.5), '#98FB98');
                         projData.target.userData.hitTimer = 10;
                         projData.life = 0; // Marca para remoção
                     }
@@ -2384,6 +2526,7 @@
                             } else {
                                 // Dano normal
                                 enemy.userData.hp -= projData.damage;
+                                createFloatingText(projData.damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
                                 enemy.userData.hitTimer = 10; // Ativa o feedback de hit
                                 hit = true;
                             }
@@ -2460,7 +2603,7 @@
             playerLevelDisplay.textContent = playerLevel;
 
             // NOVO: Atualiza o display da Onda
-            waveLevelDisplay.textContent = waveLevel;
+            waveLevelDisplay.textContent = currentWave;
 
             const hpPercent = Math.max(0, playerHP / maxHP) * 100;
             hpBar.style.width = `${hpPercent}%`;
@@ -2624,6 +2767,7 @@
                 passiveHealTimer++;
                 if (passiveHealTimer >= passiveHealInterval) {
                     playerHP = Math.min(maxHP, playerHP + 5);
+                    createFloatingText('+5', player.position.clone().setY(1.5), '#00ff00', '1.5rem');
                     updateUI(); // Apenas atualiza a barra de vida
                     passiveHealTimer = 0;
                 }
@@ -2657,6 +2801,7 @@
             
             // 5. Atualiza a posição dos labels 2D e HP
             updateEnemyUI();
+            updateFloatingText(); // NOVO: Atualiza o texto flutuante
             updatePowerUpLabels(); // NOVO: Atualiza labels dos itens
 
             // 6. Renderização
@@ -2699,8 +2844,12 @@
                 if (p.parent) scene.remove(p);
             });
 
-            waveLevel = 0;
-            waveTimer = 0; 
+            // NOVO: Reseta o estado das ondas
+            currentWave = 0;
+            enemiesAliveThisWave = 0;
+            enemiesToSpawnThisWave = 0;
+            monstersInPreviousWave = 0;
+
             powerUpTimer = 0; 
             projectileCooldown = 0;
             specialCooldown = 0;
@@ -2747,7 +2896,7 @@
             gameOverModal.classList.remove('hidden');
 
             // Salva a pontuação com o nome do jogador e as estatísticas de abates
-            window.saveScore(score, playerName, killStats, playerLevel, waveLevel);
+            window.saveScore(score, playerName, killStats, playerLevel, currentWave);
             
             // NOVO: Garante que a bolha desapareça no fim do jogo
             if (repulsionBubbleMesh) {
