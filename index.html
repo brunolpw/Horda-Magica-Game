@@ -1737,14 +1737,10 @@
 
             if (powerUpTimer >= timeSpawnInterval) {
                 if (Math.random() < spawnChance) { 
-                    
-                    if (Math.random() < 0.5) {
-                        createPowerUp('potion');
-                    } else {
-                        const specialPowers = ['tripleShot', 'shield', 'explosion', 'repulsionBubble', 'clone', 'freezingAura', 'expBoost'];
-                        const type = specialPowers[Math.floor(Math.random() * specialPowers.length)];
-                        createPowerUp(type);
-                    }
+                    // NOVO: Todos os itens agora têm a mesma chance de aparecer.
+                    const powerUpTypes = Object.keys(powerUpProps);
+                    const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
+                    createPowerUp(randomType);
                 }
                 powerUpTimer = 0;
             }
