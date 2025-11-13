@@ -633,7 +633,7 @@
         let experienceForNextLevel = baseExperience;
         // NOVO: Cura passiva (Lvl 3+)
         let passiveHealTimer = 0;
-        const passiveHealInterval = 180; // 3 segundos (60fps)
+        const passiveHealInterval = 300; // 5 segundos (60fps)
 
         
         // NOVO: Habilidade do Level 2
@@ -1276,6 +1276,7 @@
                 numMonsters = 5; // Onda inicial
             } else {
                 // Aumenta em 30% da quantidade da onda anterior
+                const growthRate = 1.3; // 30%
                 const baseNum = monstersInPreviousWave > 0 ? monstersInPreviousWave : 5;
                 numMonsters = Math.floor(baseNum * growthRate);
             }
@@ -2834,8 +2835,8 @@
             if (playerLevel >= 3) {
                 passiveHealTimer++;
                 if (passiveHealTimer >= passiveHealInterval) {
-                    playerHP = Math.min(maxHP, playerHP + 5);
-                    createFloatingText('+5', player.position.clone().setY(1.5), '#00ff00', '1.5rem');
+                    playerHP = Math.min(maxHP, playerHP + 1);
+                    createFloatingText('+1', player.position.clone().setY(1.5), '#00ff00', '1.5rem');
                     updateUI(); // Apenas atualiza a barra de vida
                     passiveHealTimer = 0;
                 }
