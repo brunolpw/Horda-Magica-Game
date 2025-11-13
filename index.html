@@ -615,7 +615,7 @@
         let maxHP = 100;
         let killPoints = 0;
         const maxKillPoints = 5; // NOVO: Contadores de abates por tipo
-        let killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0 };
+        let killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0 };
         let killsSinceLastPotion = 0; // NOVO: Contador para spawn de poção por kill
         const killsPerPotionSpawn = 30; // NOVO: Limite de abates para garantir uma poção
 
@@ -694,7 +694,8 @@
 
         const projectileProps = {
             weak: { damage: 10, color: 0x3d3dff, size: 0.3, speed: 0.3 },
-            strong: { damage: 50, color: 0xff3d3d, size: 0.5, speed: 0.4 } 
+            strong: { damage: 50, color: 0xff3d3d, size: 0.5, speed: 0.4 },
+            necro_bolt: { damage: 15, color: 0x9400D3, size: 0.35, speed: 0.15 } // NOVO: Projétil do Necromante
         };
         
         // NOVO: Propriedades dos Power-Ups (combinado poção e novos poderes)
@@ -1063,11 +1064,11 @@
 
         // Propriedades das Entidades (ATUALIZADO com Modelos)
         const entityProps = {
-            goblin: { hp: 20, speed: 0.05, score: 5, damage: 5, name: "Goblin", modelFn: createGoblinModel, modelHeight: 0.9 },
-            orc: { hp: 50, speed: 0.04, score: 10, damage: 10, name: "Orc", modelFn: createOrcModel, modelHeight: 1.35 },
-            troll: { hp: 100, speed: 0.03, score: 15, damage: 15, name: "Troll", modelFn: createTrollModel, modelHeight: 2.2 },
-            necromancer: { hp: 80, speed: 0.025, score: 25, damage: 5, name: "Necromante", modelFn: createNecromancerModel, modelHeight: 1.9 },
-            ghost: { hp: 60, speed: 0.06, score: 20, damage: 10, name: "Fantasma", modelFn: createGhostModel, modelHeight: 1.5 }
+            goblin: { hp: 20, speed: 0.05, score: 5, damage: 10, name: "Goblin", modelFn: createGoblinModel, modelHeight: 0.9 },
+            orc: { hp: 50, speed: 0.04, score: 10, damage: 15, name: "Orc", modelFn: createOrcModel, modelHeight: 1.35 },
+            troll: { hp: 100, speed: 0.03, score: 15, damage: 20, name: "Troll", modelFn: createTrollModel, modelHeight: 2.2 },
+            necromancer: { hp: 80, speed: 0.025, score: 25, damage: 10, name: "Necromante", modelFn: createNecromancerModel, modelHeight: 1.9 },
+            ghost: { hp: 60, speed: 0.06, score: 20, damage: 15, name: "Fantasma", modelFn: createGhostModel, modelHeight: 1.5 }
         };
 
         // Funções de criação de Obstáculos
@@ -1188,6 +1189,8 @@
             if (type === 'necromancer') {
                 enemy.userData.summonCooldown = Math.random() * 240; // Cooldown inicial aleatório (até 4s)
                 enemy.userData.summonInterval = 480; // Invoca a cada 8 segundos
+                enemy.userData.attackCooldown = 120; // Ataca a cada 2 segundos
+                enemy.userData.attackTimer = Math.random() * 120; // Cooldown inicial aleatório
             }
 
             // NOVO: Guarda a cor original de cada parte do modelo para o feedback de hit
@@ -1271,9 +1274,8 @@
             if (currentWave === 1) {
                 numMonsters = 5; // Onda inicial
             } else {
-                // NOVO: A progressão muda com o nível da onda
-                const growthRate = currentWave <= 20 ? 1.5 : 1.2;
-                const baseNum = monstersInPreviousWave > 0 ? monstersInPreviousWave : 5; // Segurança
+                // Aumenta em 30% da quantidade da onda anterior
+                const baseNum = monstersInPreviousWave > 0 ? monstersInPreviousWave : 5;
                 numMonsters = Math.floor(baseNum * growthRate);
             }
 
@@ -1350,6 +1352,13 @@
                 props = { damage: 20, speed: 0.25 };
                 isExplosive = false;
             
+            } else if (type === 'necro_bolt') {
+                // NOVO: Projétil do Necromante
+                props = projectileProps[type];
+                geometry = new THREE.SphereGeometry(props.size, 8, 8);
+                material = new THREE.MeshBasicMaterial({ color: props.color });
+                isExplosive = false;
+
             } else { // weak or strong
                 props = projectileProps[type];
                 if (!props) {
@@ -2208,10 +2217,6 @@
         }
 
         function updateEnemies() {
-            // NOVO: Define o alvo (clone ou jogador)
-            const target = clone && cloneTimer > 0 ? clone : player;
-            const targetPos = target.position;
-
             // CORREÇÃO: Posição do BBox do Player atualizada em checkPlayerCollisions
             
             for (let i = enemies.length - 1; i >= 0; i--) {
@@ -2256,31 +2261,42 @@
             
             // CORREÇÃO: Toda a lógica abaixo foi movida para dentro do loop 'for'
 
-            // Lógica de congelamento persistente e dano por segundo
-            if (enemyData.freezeLingerTimer > 0) {
-                enemyData.freezeLingerTimer--;
-            }
-
-            // Lógica da Aura Congelante
-            if (freezingAuraTimer > 0) {
-                const distanceToPlayer = enemy.position.distanceTo(player.position);
-                const auraRadius = 6;
-                if (distanceToPlayer < auraRadius) {
-                    // Efeito de congelamento e dano por segundo
-                    enemyData.freezeLingerTimer = 300; // Reseta o timer para 5 segundos
-                    if (enemyData.hp > 0) createFloatingText(1, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#87CEFA', '0.8rem');
-                    enemyData.hp -= 5 / 60; // 5 de dano por segundo (a 60fps)
-                }
-            }
-            
-            if (enemyData.freezeLingerTimer > 0) {
-                enemyData.isFrozen = true; // Para o ícone da UI
-                // Aplica lentidão
-                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                enemy.position.addScaledVector(direction, enemyData.speed * 0.5); // 50% da velocidade
-                continue;
+            // NOVO: Define o alvo (fantasmas ignoram o clone)
+            let target;
+            if (enemyData.type === 'ghost') {
+                target = player;
             } else {
-                enemyData.isFrozen = false; // Desmarca se o timer acabar
+                target = clone && cloneTimer > 0 ? clone : player;
+            }
+            const targetPos = target.position;
+
+            // Lógica de congelamento persistente e dano por segundo
+            if (enemyData.type !== 'ghost') {
+                if (enemyData.freezeLingerTimer > 0) {
+                    enemyData.freezeLingerTimer--;
+                }
+
+                // Lógica da Aura Congelante
+                if (freezingAuraTimer > 0) {
+                    const distanceToPlayer = enemy.position.distanceTo(player.position);
+                    const auraRadius = 6;
+                    if (distanceToPlayer < auraRadius) {
+                        // Efeito de congelamento e dano por segundo
+                        enemyData.freezeLingerTimer = 300; // Reseta o timer para 5 segundos
+                        if (enemyData.hp > 0) createFloatingText(1, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#87CEFA', '0.8rem');
+                        enemyData.hp -= 5 / 60; // 5 de dano por segundo (a 60fps)
+                    }
+                }
+                
+                if (enemyData.freezeLingerTimer > 0) {
+                    enemyData.isFrozen = true; // Para o ícone da UI
+                    // Aplica lentidão
+                    const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                    enemy.position.addScaledVector(direction, enemyData.speed * 0.5); // 50% da velocidade
+                    continue;
+                } else {
+                    enemyData.isFrozen = false; // Desmarca se o timer acabar
+                }
             }
 
             // Lógica de invocação do Necromante
@@ -2294,6 +2310,46 @@
                     enemyData.summonCooldown = enemyData.summonInterval;
                 }
             }
+
+            // Lógica de ataque e movimento específica do Necromante
+            if (enemyData.type === 'necromancer') {
+                const distanceToPlayer = enemy.position.distanceTo(player.position);
+                const minDistance = 10;
+                let direction;
+
+                if (distanceToPlayer < minDistance) {
+                    // Muito perto, foge do jogador
+                    direction = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
+                } else {
+                    // Distância segura, para de se mover para atacar
+                    direction = new THREE.Vector3(0, 0, 0);
+                }
+
+                // Lógica de ataque à distância
+                if (enemyData.attackTimer > 0) {
+                    enemyData.attackTimer--;
+                } else {
+                    const attackDirection = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
+                    createProjectile('necro_bolt', attackDirection, enemy.position);
+                    enemyData.attackTimer = enemyData.attackCooldown;
+                }
+
+                // Aplica o movimento (seja para fugir ou parar)
+                if (direction.lengthSq() > 0) {
+                    const newPosition = enemy.position.clone().addScaledVector(direction, enemyData.speed);
+                    // Reutiliza a lógica de colisão para não atravessar paredes ao fugir
+                    tempPlayer.position.copy(newPosition);
+                    tempPlayer.updateMatrixWorld();
+                    let fullEnemyBBox = new THREE.Box3().setFromObject(tempPlayer);
+                    let collisionDetected = obstacles.some(o => fullEnemyBBox.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
+
+                    if (!collisionDetected) {
+                        enemy.position.copy(newPosition);
+                    }
+                }
+                // Pula o resto da lógica de movimento padrão
+            }
+            // Fim da lógica do Necromante
 
             // NOVO: Lógica de movimento separada para fantasmas
             if (enemyData.type === 'ghost') {
@@ -2347,12 +2403,14 @@
             
             // NOVO: Checa colisão com o jogador APÓS o movimento
             const playerBBox = new THREE.Box3().setFromObject(player);
-            if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(enemy))) {
-                // NOVO: Causa dano apenas se o cooldown do monstro acabou
-                if (enemyData.damageCooldown <= 0) {
-                    damagePlayer(enemyData.damage);
-                    createFloatingText(enemyData.damage, player.position.clone().setY(1.5), '#ff0000', '1.5rem');
-                    enemyData.damageCooldown = 60; // Reseta o cooldown para 1 segundo (60 frames)
+            // Necromante não causa dano de toque
+            if (enemyData.type !== 'necromancer') {
+                if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(enemy))) {
+                    if (enemyData.damageCooldown <= 0) {
+                        damagePlayer(enemyData.damage);
+                        createFloatingText(enemyData.damage, player.position.clone().setY(1.5), '#ff0000', '1.5rem');
+                        enemyData.damageCooldown = 60; // Reseta o cooldown para 1 segundo (60 frames)
+                    }
                 }
             }
 
@@ -2823,7 +2881,7 @@
             experienceForNextLevel = baseExperience;
 
             killPoints = 0;
-            killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0 }; // NOVO: Reseta killStats
+            killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0 }; // NOVO: Reseta killStats
             killsSinceLastPotion = 0; // NOVO: Reseta contador de poção
             
             // NOVO: Reseta timers e estados dos novos poderes
