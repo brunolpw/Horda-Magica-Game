@@ -1681,15 +1681,16 @@
         // NOVO: Função para disparar a Corrente de Raios
         function triggerChainLightning(startEnemy) {
             const maxJumps = 5;
-            const damage = 20;
+            const damage = 25; // Dano aumentado
+            const maxJumpDistanceSq = 25; // Raio de 5 unidades (5*5)
             const chain = [startEnemy];
             let currentEnemy = startEnemy;
 
             for (let i = 0; i < maxJumps; i++) {
                 let closestEnemy = null;
-                let minDistanceSq = Infinity;
+                let minDistanceSq = maxJumpDistanceSq; // Inicia com o alcance máximo
 
-                // Encontra o inimigo mais próximo que ainda não está na corrente
+                // Encontra o inimigo mais próximo DENTRO DO ALCANCE
                 enemies.forEach(enemy => {
                     if (!chain.includes(enemy)) {
                         const distanceSq = enemy.position.distanceToSquared(currentEnemy.position);
@@ -1700,7 +1701,7 @@
                     }
                 });
 
-                if (closestEnemy) {
+                if (closestEnemy) { // Se encontrou um inimigo dentro do alcance
                     chain.push(closestEnemy);
                     currentEnemy = closestEnemy;
                 } else {
