@@ -1650,7 +1650,13 @@
                 direction: direction.normalize(),
                 isExplosive: isExplosive,
                 explosionRadius: explosionRadius,
-                explosionDamage: explosionDamage
+                explosionDamage: explosionDamage,
+                // NOVO: Adiciona uma flag para controlar a reflexão.
+                // Projéteis do jogador não podem ser refletidos.
+                // Projéteis inimigos podem ser refletidos uma vez.
+                // Projéteis refletidos não podem ser refletidos novamente.
+                // null = pode ser refletido, true = já foi refletido.
+                hasBeenReflected: (type === 'necro_bolt' || type === 'arrow') ? null : true
             };
 
             projectiles.push(projectile);
@@ -2458,6 +2464,33 @@
                     // CORREÇÃO: Força a atualização da posição 3D ANTES da checagem
                     sphere.updateMatrixWorld();
 
+                    // NOVO: 2. Checa Colisão com Projéteis Inimigos
+                    const sphereBBoxForProjectiles = new THREE.Box3().setFromObject(sphere);
+                    for (let p_idx = projectiles.length - 1; p_idx >= 0; p_idx--) {
+                        const proj = projectiles[p_idx];
+                        const projData = proj.userData;
+
+                        // Checa apenas projéteis inimigos que não foram refletidos
+                        if (projData.hasBeenReflected === null) { // Checa se pode ser refletido
+                            const projBBox = new THREE.Box3().setFromObject(proj);
+                            if (sphereBBoxForProjectiles.intersectsBox(projBBox)) {
+                                // NOVO: Reflete o projétil em vez de destruir
+                                const reflectionVector = new THREE.Vector3().subVectors(proj.position, sphere.position).normalize();
+                                
+                                projData.direction.copy(reflectionVector);
+                                projData.type = 'weak'; // Transforma em projétil do jogador
+                                projData.damage = 15; // Dano de reflexão do escudo
+                                projData.speed *= 1.2; // Aumenta um pouco a velocidade
+                                projData.hasBeenReflected = true; // Marca para não refletir de novo
+
+                                // Muda a cor para a cor do escudo
+                                proj.material.color.setHex(0x00D7FE);
+
+                                // A esfera não é mais destruída, apenas reflete.
+                            }
+                        }
+                    }
+
                     // 2. Checa Colisão com Inimigos
                     const sphereBBox = new THREE.Box3().setFromObject(sphere);
                     let hitEnemy = null;
@@ -2932,6 +2965,27 @@
                         projData.life = 0; // Marca para remoção
                     }
                     continue; // Pula a lógica de projétil normal
+                }
+
+                // NOVO: Lógica de reflexão da Bolha Repulsora
+                if (repulsionBubbleTimer > 0 && projData.hasBeenReflected === null) {
+                    const distanceToPlayerSq = projectile.position.distanceToSquared(player.position);
+                    const repulsionRadius = 4; // Mesmo raio da bolha
+                    if (distanceToPlayerSq < repulsionRadius * repulsionRadius) {
+                        // Reflete o projétil
+                        const reflectionVector = new THREE.Vector3().subVectors(projectile.position, player.position).normalize();
+                        
+                        projData.direction.copy(reflectionVector); // A nova direção é para longe do jogador
+                        projData.type = 'weak'; // Transforma em um projétil do jogador
+                        projData.damage = 20; // Dano aumentado para recompensar a reflexão
+                        projData.speed *= 1.5; // Acelera o projétil refletido
+                        projData.hasBeenReflected = true; // Marca para não refletir de novo
+                        
+                        // Muda a cor para indicar que foi refletido
+                        projectile.material.color.setHex(0x00D7FE); // Cor ciano/azul
+                        
+                        continue; // Pula o resto da lógica para este projétil neste frame
+                    }
                 }
 
                 // CORREÇÃO: A lógica de movimento e a BBox devem ser atualizadas para TODOS os projéteis no início.
