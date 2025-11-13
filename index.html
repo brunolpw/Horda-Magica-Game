@@ -617,7 +617,7 @@
         const maxKillPoints = 5; // NOVO: Contadores de abates por tipo
         let killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0 };
         let killsSinceLastPotion = 0; // NOVO: Contador para spawn de poção por kill
-        const killsPerItemSpawn = 50; // NOVO: Limite de abates para garantir um item aleatório
+        const killsPerPotionSpawn = 30; // NOVO: Limite de abates para garantir uma poção
 
         // NOVO: Timers e referências para os novos poderes
         let tripleShotTimer = 0;
@@ -1455,42 +1455,35 @@
             }
         }
 
-        // NOVO: Função helper para gerar um item aleatório com base na nova distribuição
-        function spawnRandomItem() {
-            const specialPowers = ['tripleShot', 'shield', 'explosion', 'repulsionBubble', 'clone', 'freezingAura'];
-            const roll = Math.random() * 100; // Rola um d100
-
-            if (roll < 28) { // 28% de chance para a poção
-                createPowerUp('potion');
-            } else {
-                // Os 72% restantes são divididos entre os 6 itens especiais (12% cada)
-                const specialRoll = roll - 28; // Mapeia o resultado para um intervalo de 0 a 72
-                const itemIndex = Math.floor(specialRoll / 12);
-                const type = specialPowers[itemIndex];
-                createPowerUp(type);
-            }
-        }
-
         // Lógica de spawn de poção
         function spawnPowerUps() {
             // --- Lógica por tempo (Chance de 20% a cada 5 segundos) ---
             powerUpTimer++;
             const timeSpawnInterval = 300; 
 
+            // NOVO: A chance de spawn aumenta com o nível do jogador
+            // Nível 1: 20%, Nível 2: 30%, Nível 3: 40%, etc. (limitado a 70%)
             const baseSpawnChance = 0.2;
             const spawnChancePerLevel = 0.1;
             const spawnChance = Math.min(0.7, baseSpawnChance + (playerLevel - 1) * spawnChancePerLevel);
 
             if (powerUpTimer >= timeSpawnInterval) {
-                if (Math.random() < spawnChance) {
-                    spawnRandomItem(); // Usa a nova lógica de distribuição
+                if (Math.random() < spawnChance) { 
+                    
+                    if (Math.random() < 0.5) {
+                        createPowerUp('potion');
+                    } else {
+                        const specialPowers = ['tripleShot', 'shield', 'explosion', 'repulsionBubble', 'clone', 'freezingAura'];
+                        const type = specialPowers[Math.floor(Math.random() * specialPowers.length)];
+                        createPowerUp(type);
+                    }
                 }
                 powerUpTimer = 0;
             }
             
-            // --- NOVO: Lógica por kills (gera um item aleatório) ---
-            if (killsSinceLastPotion >= killsPerItemSpawn) {
-                spawnRandomItem(); // Usa a nova lógica de distribuição
+            // --- NOVO: Lógica por kills (SÓ SPAWNA POÇÃO) ---
+            if (killsSinceLastPotion >= killsPerPotionSpawn) {
+                createPowerUp('potion'); // Spawn garantido de poção
                 killsSinceLastPotion = 0; // Reseta o contador
             }
         }
@@ -2135,9 +2128,9 @@
         // NOVO: Lógica do Escudo (Múltiplas Camadas)
         function createShield(layerIndex) {
             const numSpheres = 10;
-            const baseRadius = 3.6;
-            const radiusIncrement = 1.2;
-            const radius = baseRadius + (layerIndex - 1) * radiusIncrement;
+            const baseRadius = 3.0; // Raio inicial de 3 unidades
+            const radiusIncrement = 1.0; // Cada camada adiciona 1 unidade
+            const radius = baseRadius + (layerIndex - 1) * radiusIncrement; // 3, 4, 5...
 
             const geometry = new THREE.SphereGeometry(0.2, 8, 8);
             const material = new THREE.MeshLambertMaterial({ color: 0x00D7FE, emissive: 0x00D7FE, emissiveIntensity: 1 });
