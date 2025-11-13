@@ -699,7 +699,7 @@
         const maxKillPoints = 5; // NOVO: Contadores de abates por tipo
         let killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 };
         let killsSinceLastPotion = 0; // NOVO: Contador para spawn de poção por kill
-        const killsPerItemSpawn = 50; // NOVO: Limite de abates para garantir um item aleatório
+        const killsPerItemSpawn = 30; // NOVO: Limite de abates para garantir um item aleatório
 
         // NOVO: Timers e referências para os novos poderes
         let tripleShotTimer = 0;
@@ -707,6 +707,8 @@
         // let shieldSpheres = []; // Antigo
         let shieldLayers = []; // NOVO: Array de camadas
         let explosionCharges = 0; // NOVO: Cargas de Explosão
+        let expBoostAuraMesh; // NOVO: Efeito visual para o bônus de EXP
+        let expBoostTimer = 0; // NOVO: Timer para o EXP em dobro
 
         // NOVO: Variáveis de Level
         let playerLevel = 1;
@@ -796,7 +798,8 @@
             explosion: { charges: 3, color: 0x9400D3, geometry: new THREE.DodecahedronGeometry(0.3), explosionDamage: 100, explosionRadius: 10 }, // AUMENTADO: 3 para 5
             repulsionBubble: { duration: 900, color: 0xADD8E6, geometry: new THREE.SphereGeometry(0.3, 16, 16) }, // 15 segundos (900 / 60)
             clone: { duration: 1200, color: 0x87CEEB, geometry: new THREE.OctahedronGeometry(0.4) }, // NOVO: 20 segundos
-            freezingAura: { duration: 1200, color: 0x87CEFA, geometry: new THREE.TorusKnotGeometry(0.3, 0.1, 64, 8) } // NOVO: 20 segundos
+            freezingAura: { duration: 1200, color: 0x87CEFA, geometry: new THREE.TorusKnotGeometry(0.3, 0.1, 64, 8) }, // NOVO: 20 segundos
+            expBoost: { duration: 3600, color: 0xFFFF00, geometry: new THREE.TorusKnotGeometry(0.3, 0.08, 50, 8) } // NOVO: EXP em dobro por 60s
         };
 
         // UI Elementos
@@ -913,6 +916,9 @@
             // NOVO: Cria as partículas de carregamento de habilidade
             createAbilityChargeParticles();
             
+            // NOVO: Cria a malha da aura de EXP
+            createExpBoostAuraMesh();
+
             // 10. O jogo inicia no menu (isGameOver = true)
         }
         // NOVO: Função para criar o chão misturado (Terra e Grama)
@@ -1011,6 +1017,21 @@
                 scene.add(particle);
             }
         }
+
+        // NOVO: Função para criar a malha visual da Aura de EXP
+        function createExpBoostAuraMesh() {
+            const geometry = new THREE.TorusGeometry(0.7, 0.05, 16, 100);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xFFFF00, // Amarelo, como no power-up
+                transparent: true,
+                opacity: 0.8
+            });
+            expBoostAuraMesh = new THREE.Mesh(geometry, material);
+            expBoostAuraMesh.rotation.x = Math.PI / 2; // Deita o anel no chão
+            expBoostAuraMesh.visible = false; // Começa invisível
+            scene.add(expBoostAuraMesh);
+        }
+
 
         function setupInputs() {
             // Teclas de Movimento
@@ -1683,6 +1704,7 @@
                 case 'repulsionBubble': text = 'Bolha Repulsora'; break;
                 case 'clone': text = 'Clone'; break; // NOVO: Adiciona o nome correto
                 case 'freezingAura': text = 'Aura Congelante'; break; // NOVO
+                case 'expBoost': text = 'EXP em Dobro'; break; // NOVO
             }
 
             const label = document.createElement('div');
@@ -1719,7 +1741,7 @@
                     if (Math.random() < 0.5) {
                         createPowerUp('potion');
                     } else {
-                        const specialPowers = ['tripleShot', 'shield', 'explosion', 'repulsionBubble', 'clone', 'freezingAura'];
+                        const specialPowers = ['tripleShot', 'shield', 'explosion', 'repulsionBubble', 'clone', 'freezingAura', 'expBoost'];
                         const type = specialPowers[Math.floor(Math.random() * specialPowers.length)];
                         createPowerUp(type);
                     }
@@ -2298,6 +2320,11 @@
                             // NOVO: Ativa a aura congelante
                             freezingAuraTimer += data.duration;
                             break;
+
+                        case 'expBoost':
+                            // NOVO: Ativa o bônus de EXP
+                            expBoostTimer += data.duration;
+                            break;
                     }
 
                     // Remove o item do mapa
@@ -2775,7 +2802,8 @@
 
         // NOVO: Funções de Level Up
         function gainExperience(amount) {
-            experiencePoints += amount;
+            // NOVO: Dobra a experiência se o power-up estiver ativo
+            experiencePoints += amount * (expBoostTimer > 0 ? 2 : 1);
             
             // Permite múltiplos level ups de uma vez (ex: explosão)
             while (experiencePoints >= experienceForNextLevel) {
@@ -3072,6 +3100,9 @@
             if (freezingAuraTimer > 0) {
                 timersHTML += `<span class="powerup-active">Aura Congelante! (${Math.ceil(freezingAuraTimer/60)}s)</span>`;
             }
+            if (expBoostTimer > 0) {
+                timersHTML += `<span class="powerup-active">EXP em Dobro! (${Math.ceil(expBoostTimer/60)}s)</span>`;
+            }
 
             // NOVO: Calcula o total de esferas em todas as camadas
             const totalSpheres = shieldLayers.reduce((acc, layer) => acc + layer.spheres.length, 0);
@@ -3182,6 +3213,7 @@
             if (repulsionBubbleTimer > 0) repulsionBubbleTimer--; // NOVO: Decrementa timer da bolha
             if (cloneTimer > 0) cloneTimer--; // NOVO: Decrementa timer do clone
             if (freezingAuraTimer > 0) freezingAuraTimer--; // NOVO: Decrementa timer da aura
+            if (expBoostTimer > 0) expBoostTimer--; // NOVO: Decrementa timer do EXP
 
             // NOVO: Atualiza a visibilidade e posição da bolha de repulsão
             if (repulsionBubbleTimer > 0) {
@@ -3220,6 +3252,17 @@
                 // Remove as partículas se a aura acabar
                 smokeParticles.forEach(p => { if (p.parent) scene.remove(p); });
             }
+
+            // NOVO: Atualiza a aura de EXP Boost
+            if (expBoostTimer > 0) {
+                expBoostAuraMesh.visible = true;
+                expBoostAuraMesh.position.copy(player.position);
+                expBoostAuraMesh.position.y = 0.1; // Ligeiramente acima do chão
+                expBoostAuraMesh.rotation.z += 0.02; // Animação de rotação simples
+            } else {
+                expBoostAuraMesh.visible = false;
+            }
+
 
             // NOVO: Cura passiva a partir do Nível 3
             if (playerLevel >= 3) {
@@ -3300,6 +3343,8 @@
             chainLightningKills = 0; chainLightningCharged = false; // NOVO: Reseta corrente
             freezingAuraTimer = 0; // NOVO: Reseta aura
             if (freezingAuraMesh) freezingAuraMesh.visible = false; // NOVO: Esconde a aura
+            if (expBoostAuraMesh) expBoostAuraMesh.visible = false; // NOVO: Esconde a aura de EXP
+            expBoostTimer = 0; // NOVO: Reseta timer de EXP
 
             // NOVO: Remove as partículas de fumaça da cena
             smokeParticles.forEach(p => {
@@ -3375,6 +3420,11 @@
                 scene.remove(clone);
                 clone = null;
             }
+            // NOVO: Garante que a aura de EXP desapareça no fim do jogo
+            if (expBoostAuraMesh) {
+                expBoostAuraMesh.visible = false;
+            }
+
             // Remove todos os labels quando o jogo termina
             enemyLabelsContainer.innerHTML = '';
             enemyLabels.clear();
