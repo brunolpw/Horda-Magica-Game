@@ -1,0 +1,2071 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horda Mágica 3D: Sobrevivência do Mago</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        /* Estilização customizada para o jogo */
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        canvas {
+            display: block;
+        }
+        #game-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%; /* Para que os elementos inferiores funcionem */
+            pointer-events: none; /* Permite interagir com a tela 3D por baixo */
+            z-index: 10;
+        }
+        /* O ui-panel agora é um estilo base para modais e barras */
+        .ui-panel {
+            background: rgba(43, 45, 66, 0.9);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            border: 2px solid #ff6b6b;
+            pointer-events: auto; /* Permite cliques em botões/inputs no modal */
+        }
+        /* Estilo da barra superior de HUD */
+        #hud-top-bar {
+            background: rgba(43, 45, 66, 0.9);
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            border-bottom: 2px solid #ff6b6b;
+            border-radius: 0 0 0.75rem 0.75rem;
+            padding: 0.5rem 1.5rem; /* Reduzido de 0.75rem para 0.5rem */
+        }
+
+        /* NOVO: Estilo para o display de timers de power-ups */
+        #powerup-timers-display {
+            position: absolute;
+            top: 55px; /* Abaixo da HUD */
+            left: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            pointer-events: none;
+        }
+        .powerup-active {
+            background-color: rgba(255, 215, 0, 0.8); /* Dourado */
+            color: #333;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+
+        .hp-bar-fill {
+            transition: width 0.3s ease;
+        }
+        .special-bar-fill {
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+        .modal {
+            background-color: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(5px);
+        }
+        /* Estilização dos Labels dos Monstros */
+        .enemy-label {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 0px 4px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            transform: translate(-50%, -100%); /* Centraliza e posiciona acima */
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 20;
+        }
+
+        /* NOVO: Estilos da Barra de Vida do Inimigo */
+        .enemy-hp-bar {
+            position: absolute;
+            width: 50px; /* Largura fixa */
+            height: 6px;
+            background-color: rgba(100, 0, 0, 0.7); /* Fundo vermelho escuro */
+            border: 1px solid rgba(0, 0, 0, 0.5);
+            border-radius: 3px;
+            transform: translate(-50%, -100%); /* Centraliza e posiciona */
+            pointer-events: none;
+            z-index: 19; /* Fica abaixo do nome */
+        }
+        .enemy-hp-fill {
+            width: 100%; /* Começa cheio */
+            height: 100%;
+            background-color: #4CAF50; /* Verde */
+            border-radius: 2px;
+            transition: width 0.3s ease; /* Transição suave */
+        }
+
+        /* NOVO: Estilo para os Labels dos Power-ups */
+        .powerup-label {
+            position: absolute;
+            background: rgba(0, 180, 255, 0.8); /* Azul Ciano */
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            transform: translate(-50%, -100%);
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 18; /* Abaixo dos inimigos */
+            text-shadow: 0 0 3px rgba(0,0,0,0.7);
+        }
+
+        /* NOVO: Estilo da mensagem de Level Up */
+        #level-up-message {
+            position: fixed;
+            top: 15%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 215, 0, 0.85); /* Dourado */
+            color: #333;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            z-index: 51; /* Acima da cura */
+            opacity: 0;
+            transition: opacity 0.5s ease-out;
+            pointer-events: none;
+            text-shadow: 0 0 5px rgba(255,255,255,0.5);
+        }
+
+        /* Estilo da mensagem de cura (NOVO) */
+        #healing-message {
+            position: fixed;
+            top: 15%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 255, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 50;
+            opacity: 0;
+            transition: opacity 0.5s ease-out;
+            pointer-events: none;
+        }
+        /* Estilo customizado para a lista do Ranking */
+        .ranking-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .ranking-stats {
+            font-size: 0.7rem;
+            color: #ccc;
+            margin-left: 1rem;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Interface do Jogo (HTML Overlay) -->
+    <div id="game-ui">
+        <!-- NOVO HUD: Barra Superior (Full Width) -->
+        <div id="hud-top-bar" class="fixed top-0 left-0 right-0 flex justify-between items-center text-white" style="pointer-events: none;">
+            
+            <!-- 1. Esquerda: Nome e HP (RE-ADICIONADO) -->
+            <div class="flex items-center space-x-3 pointer-events-auto">
+                <h2 class="text-lg font-bold text-indigo-300">Mago: <span id="player-name-display"></span></h2>
+                <div class="w-32">
+                    <label class="text-xs font-medium">HP</label>
+                    <div class="w-full bg-gray-600 rounded-full h-2">
+                        <div id="hp-bar" class="hp-bar-fill h-2 rounded-full bg-red-500" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NOVO: Display de Level -->
+            <div class="text-center pointer-events-auto px-4">
+                <label class="text-xs font-medium text-gray-300">LEVEL</label>
+                <div id="player-level-display" class="text-2xl font-bold text-green-400">1</div>
+            </div>
+
+            <!-- 2. Centro: Pontuação (RE-ADICIONADO) -->
+            <p id="score-display" class="text-xl font-extrabold text-yellow-400 pointer-events-auto">Pontuação: 0</p>
+            
+            <!-- 3. Direita: Barra de Especial E Cargas de Explosão -->
+            <div class="flex flex-col items-end pointer-events-auto w-40">
+                <!-- Barra de Especial (Kills) -->
+                <label class="text-xs font-medium text-right">Especial (Kills: <span id="kill-points-display">0</span>/5) | Clique</label>
+                <div class="w-full bg-gray-600 rounded-full h-2">
+                    <div id="special-bar" class="special-bar-fill h-2 rounded-full bg-blue-500" style="width: 0%;"></div>
+                </div>
+                <!-- NOVO: Cargas de Explosão -->
+                <div id="explosion-charges-display" class="text-xs font-bold text-orange-400 mt-1 hidden">
+                    EXPLOSÃO: <span id="explosion-charges-count">0</span>
+                </div>
+                <!-- NOVO: Cargas da Nova Mágica (Level 2+) -->
+                <div id="nova-bomb-display" class="text-xs font-bold text-cyan-300 mt-1 hidden">
+                    NOVA MÁGICA: <span id="nova-bomb-kills-count">0</span>/10
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    <!-- NOVO: Display de Timers de Power-ups Ativos -->
+    <div id="powerup-timers-display">
+        <!-- Ex: <span class="powerup-active">Tiro Triplo! (10s)</span> -->
+    </div>
+
+    <!-- Container para os labels 2D dos inimigos -->
+    <div id="enemy-labels-container"></div>
+    
+    <!-- NOVO: Mensagem de cura (Feedback) -->
+    <div id="healing-message"></div>
+
+    <!-- NOVO: Mensagem de Level Up (Feedback) -->
+    <div id="level-up-message">LEVEL UP!</div>
+
+
+    <!-- Modal de Menu Inicial -->
+    <div id="start-menu-modal" class="modal fixed inset-0 flex items-center justify-center">
+        <div class="ui-panel text-white p-8 w-96 text-center">
+            <h1 class="text-4xl font-extrabold text-indigo-400 mb-6">HORDA MÁGICA</h1>
+            
+            <div class="mb-6">
+                <label for="mage-name" class="block text-lg mb-2">Nome do seu Mago:</label>
+                <input type="text" id="mage-name" placeholder="Ex: Gandalf, Merlim..." maxlength="15"
+                       class="w-full px-4 py-2 rounded-lg text-gray-900 bg-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+
+            <button id="start-game-button" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full transition duration-300 shadow-lg mb-4 w-full" onclick="handleStartGameClick()">
+                Novo Jogo
+            </button>
+            <button id="view-ranking-button" class="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 text-white font-bold rounded-full transition duration-300 shadow-lg w-full" onclick="handleViewRankingClick()">
+                Visualizar Ranking
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal de Game Over -->
+    <div id="game-over-modal" class="modal fixed inset-0 flex items-center justify-center hidden">
+        <div class="ui-panel text-white p-8 w-96 text-center">
+            <h1 class="text-4xl font-extrabold text-red-500 mb-4">GAME OVER!</h1>
+            <p class="text-xl mb-4">Sua Pontuação: <span id="final-score" class="font-bold text-yellow-300">0</span></p>
+            <p class="text-lg mb-6">Pressione ENTER para Recomeçar</p>
+            <button id="restart-button" class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition duration-300 shadow-lg" onclick="handleRestartClick()">
+                Recomeçar
+            </button>
+            <p class="mt-4 text-xs text-gray-400">ID do Usuário: <span id="user-id-display"></span></p>
+        </div>
+    </div>
+    
+    <!-- Modal de Ranking (Para ser usado no Menu Inicial) -->
+    <div id="full-ranking-modal" class="modal fixed inset-0 flex items-center justify-center hidden">
+        <div class="ui-panel text-white p-8 w-[500px] max-w-full">
+            <h1 class="text-3xl font-extrabold text-yellow-400 mb-4 text-center">RANKING GLOBAL</h1>
+            <div class="ranking-item font-bold border-b border-white mb-2">
+                <span class="w-1/3 text-left">Mago</span>
+                <span class="w-1/3 text-center">Pontos</span>
+                <span class="w-1/3 text-right">Abates (G/O/T)</span>
+            </div>
+            <div id="full-ranking-list" class="text-sm space-y-2 max-h-80 overflow-y-auto">
+                <p class="text-gray-400 text-center">Carregando...</p>
+            </div>
+            <button class="mt-6 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition duration-300 shadow-lg w-full" onclick="document.getElementById('full-ranking-modal').classList.add('hidden');">
+                Voltar
+            </button>
+        </div>
+    </div>
+
+
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, onSnapshot, collection, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+
+        // Configurações e Variáveis Globais (MANDATÓRIAS)
+        setLogLevel('Debug');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app;
+        let db;
+        let auth;
+        let userId = null;
+        let isAuthReady = false;
+
+        // Inicializa o Firebase e Autentica
+        async function setupFirebase() {
+            try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    console.error("Firebase config is missing or empty.");
+                    // Remove o ranking list pois ele não tem utilidade sem o firebase
+                    document.getElementById('full-ranking-list').innerHTML = '<p class="text-red-400 text-center">Erro: Configuração Firebase ausente.</p>';
+                    return;
+                }
+
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        document.getElementById('user-id-display').textContent = userId;
+                        window.loadRanking();
+                    } else {
+                        userId = null;
+                        isAuthReady = true; 
+                    }
+                });
+
+            } catch (error) {
+                console.error("Erro ao configurar Firebase:", error);
+                document.getElementById('full-ranking-list').innerHTML = `<p class="text-red-400 text-center">Erro: ${error.message}</p>`;
+            }
+        }
+
+        // Funções de Firestore (Disponibilizadas no escopo global para uso no JS principal)
+        // NOVO: Adiciona killStats
+        window.saveScore = async (score, name, killStats) => {
+            if (!isAuthReady || !userId || !db) {
+                console.warn("Firebase não está pronto ou user não autenticado. Pontuação não salva.");
+                return;
+            }
+            
+            const sanitizedName = name.substring(0, 15) || 'Mago Anônimo';
+
+            const scoreData = {
+                score: score,
+                playerName: sanitizedName, // Novo campo
+                fullUserId: userId, 
+                killStats: killStats, // NOVO: Salva estatísticas de abates
+                timestamp: Date.now()
+            };
+
+            try {
+                const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'global_scores');
+                await addDoc(collectionRef, scoreData);
+                console.log("Pontuação salva com sucesso:", score, name);
+            } catch (error) {
+                console.error("Erro ao salvar a pontuação:", error);
+            }
+        };
+
+        const renderRanking = (elementId, scores) => {
+            const rankingList = document.getElementById(elementId);
+            rankingList.innerHTML = '';
+
+            if (scores.length === 0) {
+                rankingList.innerHTML = '<p class="text-gray-400 text-center">Seja o primeiro a pontuar!</p>';
+                return;
+            }
+            
+            scores.slice(0, 30).forEach((scoreData, index) => { // Limite de 30 para o modal
+                const isCurrentUser = scoreData.fullUserId === userId;
+                const rankClass = isCurrentUser ? 'text-yellow-300 font-bold' : 'text-white';
+                const nameText = scoreData.playerName || 'Mago Anônimo';
+                
+                // NOVO: Extrai as estatísticas de abates
+                const stats = scoreData.killStats || { goblin: 0, orc: 0, troll: 0 };
+                const statsText = `${stats.goblin}/${stats.orc}/${stats.troll}`;
+
+                rankingList.innerHTML += `
+                    <div class="ranking-item ${rankClass}">
+                        <span class="w-1/3 text-left">${index + 1}. ${nameText}</span>
+                        <span class="w-1/3 text-center">${scoreData.score}</span>
+                        <span class="w-1/3 text-right ranking-stats">${statsText}</span>
+                    </div>
+                `;
+            });
+        };
+        
+        // Listener que carrega e atualiza o ranking (apenas para o modal)
+        window.loadRanking = () => {
+            if (!isAuthReady || !db) return;
+
+            const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'global_scores');
+            
+            // Ordena por score e limita a 30
+            const q = query(collectionRef, limit(30)); 
+
+            // Usa onSnapshot para atualizações em tempo real
+            onSnapshot(q, (snapshot) => {
+                let scores = [];
+                snapshot.forEach(doc => {
+                    scores.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Classificação final client-side, embora o Firestore ajude, garante que só os top 30 sejam exibidos.
+                scores.sort((a, b) => b.score - a.score);
+
+                // Atualiza o ranking do Modal
+                renderRanking('full-ranking-list', scores); 
+
+            }, (error) => {
+                console.error("Erro ao carregar ranking:", error);
+                const errorHtml = '<p class="text-red-400 text-center">Erro ao carregar ranking.</p>';
+                document.getElementById('full-ranking-list').innerHTML = errorHtml;
+            });
+        };
+
+        setupFirebase();
+
+        // Expõe funções para o código principal
+        window.handleRestartClick = () => {
+            document.getElementById('game-over-modal').classList.add('hidden');
+            document.getElementById('start-menu-modal').classList.remove('hidden');
+        };
+        
+        window.handleStartGameClick = () => {
+            const playerName = document.getElementById('mage-name').value.trim();
+            if (playerName.length === 0) {
+                // Substituindo alert() por uma mensagem mais amigável na UI (opcional)
+                const input = document.getElementById('mage-name');
+                input.placeholder = 'NOME OBRIGATÓRIO!';
+                input.classList.add('border-red-500', 'border-2');
+                setTimeout(() => input.classList.remove('border-red-500', 'border-2'), 1000);
+                return;
+            }
+            document.getElementById('start-menu-modal').classList.add('hidden');
+            window.startGame(playerName);
+        };
+        
+        window.handleViewRankingClick = () => {
+            document.getElementById('full-ranking-modal').classList.remove('hidden');
+        };
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !document.getElementById('game-over-modal').classList.contains('hidden')) {
+                document.getElementById('restart-button').click();
+            }
+        });
+    </script>
+
+    <!-- Script Principal do Jogo (Three.js) -->
+    <script>
+        // Variáveis do Three.js
+        let scene, camera, renderer;
+        let raycaster, mouse;
+        const pointer = new THREE.Vector2();
+        
+        // Variáveis de Labels 2D
+        const enemyLabelsContainer = document.getElementById('enemy-labels-container');
+        const enemyLabels = new Map(); // Mapa para rastrear labels
+        const powerUpLabels = new Map(); // NOVO: Mapa para labels dos itens
+
+        // Variáveis do Jogo
+        let player, targetRing;
+        let playerName = 'Mago Anônimo'; // NOVO: Nome do jogador
+        let score = 0;
+        let playerHP = 100;
+        let maxHP = 100;
+        let killPoints = 0;
+        const maxKillPoints = 5;
+        let killStats = { goblin: 0, orc: 0, troll: 0 }; // NOVO: Contadores de abates por tipo
+        let killsSinceLastPotion = 0; // NOVO: Contador para spawn de poção por kill
+        const killsPerPotionSpawn = 30; // NOVO: Limite de abates para garantir uma poção
+
+        // NOVO: Timers e referências para os novos poderes
+        let tripleShotTimer = 0;
+        // let shieldTimer = 0; // REMOVIDO: O escudo não usa mais timer
+        // let shieldSpheres = []; // Antigo
+        let shieldLayers = []; // NOVO: Array de camadas
+        let explosionCharges = 0; // NOVO: Cargas de Explosão
+
+        // NOVO: Variáveis de Level
+        let playerLevel = 1;
+        let experiencePoints = 0;
+        const baseExperience = 500; // XP base para o Lvl 2
+        let experienceForNextLevel = baseExperience;
+        
+        // NOVO: Habilidade do Level 2
+        let novaBombKills = 0;
+        const killsForNovaBomb = 10;
+        let repulsionBubbleTimer = 0; // Timer para o novo power-up
+        let repulsionBubbleMesh; // NOVO: Malha para o efeito visual da bolha
+
+        let isGameOver = true; // Inicia como TRUE para mostrar o menu
+        let keys = {};
+        const playerSpeed = 0.15;
+        const mapSize = 40; // AUMENTADO: Tamanho do mapa (X/Z)
+
+        // Variáveis de Jogo
+        const enemies = [];
+        const projectiles = [];
+        const powerUps = []; 
+        const obstacles = []; // NOVO: Array para guardar obstáculos
+        let projectileCooldown = 0;
+        const baseCooldown = 30; 
+        let specialCooldown = 0; 
+        let waveTimer = 0;
+        let waveLevel = 0;
+        const initialSpawnDelay = 600; 
+        const maxActiveEnemies = 40; 
+        let powerUpTimer = 0; 
+
+        // Variável temporária para checagem de colisão
+        let tempPlayer; 
+
+        // Propriedades das Entidades
+        const entityProps = {
+            goblin: { hp: 20, speed: 0.05, score: 5, color: 0x6be070, geometry: new THREE.BoxGeometry(0.5, 0.5, 0.5), damage: 5, name: "Goblin" },
+            orc: { hp: 50, speed: 0.04, score: 10, color: 0xe0a06b, geometry: new THREE.BoxGeometry(0.75, 0.75, 0.75), damage: 10, name: "Orc" },
+            troll: { hp: 100, speed: 0.03, score: 15, color: 0x6b75e0, geometry: new THREE.CylinderGeometry(0.5, 0.5, 1.2, 8), damage: 15, name: "Troll" }
+        };
+
+        const projectileProps = {
+            weak: { damage: 10, color: 0x3d3dff, size: 0.3, speed: 0.3 },
+            strong: { damage: 50, color: 0xff3d3d, size: 0.5, speed: 0.4 } 
+        };
+        
+        // NOVO: Propriedades dos Power-Ups (combinado poção e novos poderes)
+        const powerUpProps = {
+            potion: { healAmount: 30, color: 0xff4d4d, geometry: new THREE.CylinderGeometry(0.2, 0.2, 0.5, 8) },
+            tripleShot: { duration: 3600, color: 0x00A8FF, geometry: new THREE.TorusGeometry(0.3, 0.1, 8, 16) }, // 50 seg (600 * 5)
+            shield: { color: 0xFFD700, geometry: new THREE.IcosahedronGeometry(0.3, 0) }, // REMOVIDO: duration
+            explosion: { charges: 3, color: 0x9400D3, geometry: new THREE.DodecahedronGeometry(0.3), explosionDamage: 100, explosionRadius: 10 }, // AUMENTADO: 3 para 5
+            repulsionBubble: { duration: 900, color: 0xADD8E6, geometry: new THREE.SphereGeometry(0.3, 16, 16) } // 15 segundos (900 / 60)
+        };
+
+        // UI Elementos
+        let scoreDisplay, hpBar, specialBar, killPointsDisplay, gameOverModal, finalScoreDisplay, playerNameDisplay, healingMessage;
+        
+        // NOVO: Elementos da UI de Level
+        let playerLevelDisplay, levelUpMessage;
+
+        // NOVO: Função para inicializar os elementos da UI (Evita erros de 'null')
+        function setupUIElements() {
+            scoreDisplay = document.getElementById('score-display');
+            hpBar = document.getElementById('hp-bar');
+            specialBar = document.getElementById('special-bar');
+            killPointsDisplay = document.getElementById('kill-points-display');
+            gameOverModal = document.getElementById('game-over-modal');
+            finalScoreDisplay = document.getElementById('final-score');
+            playerNameDisplay = document.getElementById('player-name-display');
+            healingMessage = document.getElementById('healing-message');
+            
+            // NOVO: Mapeia UI de Level
+            playerLevelDisplay = document.getElementById('player-level-display');
+            levelUpMessage = document.getElementById('level-up-message');
+        }
+
+
+        // --- Funções de Inicialização ---
+
+        function init() {
+            // 1. Cena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x334155); // Fundo escuro
+            scene.fog = new THREE.Fog(0x334155, mapSize * 0.5, mapSize * 2.0); // Névoa
+
+            // 2. Câmera (Top-Down Isométrica)
+            const aspectRatio = window.innerWidth / window.innerHeight;
+            camera = new THREE.PerspectiveCamera(45, aspectRatio, 0.1, 1000);
+            camera.position.set(10, 15, 10);
+            camera.rotation.order = 'YXZ';
+            camera.rotation.y = Math.PI / 4;
+            camera.rotation.x = -Math.PI / 3;
+            
+            // 3. Renderizador
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true; // Habilita sombras
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Sombras suaves
+            document.body.appendChild(renderer.domElement);
+
+            // 4. Luzes e Sombras
+            const ambientLight = new THREE.AmbientLight(0x404040, 3); // Luz ambiente
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5); // Luz direcional principal
+            directionalLight.position.set(20, 30, 15);
+            directionalLight.target.position.set(0, 0, 0);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 1;
+            directionalLight.shadow.camera.far = 100;
+            directionalLight.shadow.camera.left = -mapSize * 1.5;
+            directionalLight.shadow.camera.right = mapSize * 1.5;
+            directionalLight.shadow.camera.top = mapSize * 1.5;
+            directionalLight.shadow.camera.bottom = -mapSize * 1.5;
+            scene.add(directionalLight);
+            scene.add(directionalLight.target);
+
+            // 5. Chão (Grama e Terra) - NOVO
+            createBlendedFloor();
+
+            // 6. Raycaster para mira
+            raycaster = new THREE.Raycaster();
+
+            // 7. Configura Obstáculos
+            populateObstacles(); // NOVO: Cria árvores e paredes
+
+            // 8. Setup de Inputs e Eventos
+            setupInputs();
+
+            // 9. Cria o Player Temporário para Colisão (NOVO)
+            tempPlayer = createWizardModel();
+
+            // NOVO: Cria a malha da bolha de repulsão
+            createRepulsionBubbleMesh();
+            
+            // 10. O jogo inicia no menu (isGameOver = true)
+        }
+        // NOVO: Função para criar o chão misturado (Terra e Grama)
+        function createBlendedFloor() {
+            const floorSize = mapSize * 2;
+            
+            // 1. Base (Terra/Dirt)
+            const dirtGeometry = new THREE.PlaneGeometry(floorSize, floorSize);
+            const dirtMaterial = new THREE.MeshLambertMaterial({ color: 0x5C4033 }); // Terra Marrom
+            const dirtFloor = new THREE.Mesh(dirtGeometry, dirtMaterial);
+            dirtFloor.rotation.x = -Math.PI / 2;
+            dirtFloor.position.y = 0; // Base floor
+            dirtFloor.receiveShadow = true;
+            scene.add(dirtFloor);
+
+            // 2. Grama (Patches)
+            const grassMaterial = new THREE.MeshLambertMaterial({ color: 0x556B2F }); // Verde Oliva
+            const numPatches = 300; 
+            const patchSize = 3; 
+            const halfFloor = mapSize;
+
+            for (let i = 0; i < numPatches; i++) {
+                // Varia o tamanho do patch de grama
+                const patchGeometry = new THREE.PlaneGeometry(patchSize * (0.5 + Math.random()), patchSize * (0.5 + Math.random()));
+                
+                // Posiciona a grama aleatoriamente dentro do mapa
+                const x = (Math.random() * floorSize) - halfFloor;
+                const z = (Math.random() * floorSize) - halfFloor;
+
+                const grassPatch = new THREE.Mesh(patchGeometry, grassMaterial);
+                grassPatch.rotation.x = -Math.PI / 2;
+                // Coloca a grama ligeiramente acima da terra para evitar z-fighting
+                grassPatch.position.set(x, 0.01, z); 
+                grassPatch.receiveShadow = true;
+                scene.add(grassPatch);
+            }
+        }
+
+        // NOVO: Função para criar a malha visual da bolha de repulsão
+        function createRepulsionBubbleMesh() {
+            const bubbleRadius = 4; // Deve ser o mesmo que repulsionRadius em updateEnemies
+            const geometry = new THREE.SphereGeometry(bubbleRadius, 32, 32);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xADD8E6, // Azul claro, como no power-up
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.DoubleSide // Para ver de dentro e de fora
+            });
+            repulsionBubbleMesh = new THREE.Mesh(geometry, material);
+            scene.add(repulsionBubbleMesh);
+        }
+
+        function setupInputs() {
+            // Teclas de Movimento
+            document.addEventListener('keydown', (e) => {
+                keys[e.key] = true;
+            });
+            document.addEventListener('keyup', (e) => {
+                keys[e.key] = false;
+            });
+
+            // Mira do Mouse
+            document.addEventListener('mousemove', onPointerMove);
+            window.addEventListener('resize', onWindowResize);
+            
+            // Ataque Especial com clique do mouse (botão esquerdo)
+            document.addEventListener('mousedown', (e) => {
+                if (e.button === 0 && !isGameOver) { // 0 é o botão esquerdo
+                    attemptSpecialAttack();
+                }
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onPointerMove(event) {
+            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+            pointer.y = - (event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        // --- Funções de Entidade e Spawning ---
+        
+        function createWizardModel() {
+            const group = new THREE.Group();
+            
+            // Robe/Corpo (Cilindro com base mais larga)
+            const robeGeometry = new THREE.CylinderGeometry(0.3, 0.5, 1.0, 8);
+            const robeMaterial = new THREE.MeshLambertMaterial({ color: 0x5b3c8f }); // Roxo Profundo
+            const robe = new THREE.Mesh(robeGeometry, robeMaterial);
+            robe.position.y = 0.5; // Base no chão
+            robe.castShadow = true;
+            group.add(robe);
+
+            // Cabeça (Esfera)
+            const headGeometry = new THREE.SphereGeometry(0.25, 8, 8);
+            const headMaterial = new THREE.MeshLambertMaterial({ color: 0xffcc99 }); // Cor de pele
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 1.25;
+            head.castShadow = true;
+            group.add(head);
+
+            // Chapéu (Cone)
+            const hatGeometry = new THREE.ConeGeometry(0.35, 0.6, 8);
+            const hatMaterial = new THREE.MeshLambertMaterial({ color: 0x3a255a }); // Roxo Escuro
+            const hat = new THREE.Mesh(hatGeometry, hatMaterial);
+            hat.position.y = 1.7;
+            hat.castShadow = true;
+            group.add(hat);
+
+            return group;
+        }
+
+        // Funções de criação de Obstáculos
+        function createTree(position) {
+            const group = new THREE.Group();
+
+            // Tronco (Cylinder, Marrom) - Altura 3
+            const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 3, 6);
+            const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+            trunk.position.y = 1.5;
+            trunk.castShadow = true;
+            group.add(trunk);
+
+            // Folhagem (Dodecahedron/Cone, Verde)
+            const leavesGeometry = new THREE.DodecahedronGeometry(2);
+            const leavesMaterial = new THREE.MeshLambertMaterial({ color: 0x228b22 });
+            const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+            leaves.position.y = 3.5;
+            leaves.castShadow = true;
+            group.add(leaves);
+
+            group.position.copy(position);
+            group.position.y = 0; 
+            
+            group.userData.isObstacle = true;
+            
+            // NOVO: Cria uma malha de colisão invisível que é pequena (apenas o tronco/base)
+            // Usamos uma BoxGeometry de 1x1x1 na base para uma colisão precisa no chão.
+            const collisionGeometry = new THREE.BoxGeometry(1.0, 1.0, 1.0); 
+            const collisionMesh = new THREE.Mesh(collisionGeometry, new THREE.MeshBasicMaterial({ visible: false }));
+            collisionMesh.position.y = 0.5; // Centraliza a malha de colisão no chão
+            group.add(collisionMesh);
+            group.userData.collisionMesh = collisionMesh; // Referência para ser usada no check
+
+            scene.add(group);
+            obstacles.push(group);
+        }
+
+        function createWall(position, width, depth) {
+            const height = 2;
+            const geometry = new THREE.BoxGeometry(width, height, depth);
+            const material = new THREE.MeshLambertMaterial({ color: 0x777777 }); // Cinza de pedra
+            const wall = new THREE.Mesh(geometry, material);
+            
+            wall.position.copy(position);
+            wall.position.y = height / 2;
+            wall.castShadow = true;
+
+            wall.userData.isObstacle = true;
+            
+            scene.add(wall);
+            obstacles.push(wall);
+        }
+
+        function populateObstacles() {
+            // Limpa obstáculos antigos (necessário para o restart)
+            obstacles.forEach(o => scene.remove(o));
+            obstacles.length = 0;
+
+            const numTrees = 50;
+            const boundary = mapSize - 2; // Garante que não spawne na borda
+            for (let i = 0; i < numTrees; i++) {
+                const x = (Math.random() * boundary * 2) - boundary;
+                const z = (Math.random() * boundary * 2) - boundary;
+                createTree(new THREE.Vector3(x, 0, z));
+            }
+
+            const numWalls = 15;
+            for (let i = 0; i < numWalls; i++) {
+                const x = (Math.random() * boundary * 2) - boundary;
+                const z = (Math.random() * boundary * 2) - boundary;
+                // Varia a largura e profundidade para criar diferentes tipos de parede
+                const width = Math.random() < 0.5 ? 5 : 1; 
+                const depth = width === 1 ? 5 : 1;
+                createWall(new THREE.Vector3(x, 0, z), width, depth);
+            }
+        }
+
+
+        function createPlayer() {
+            // Usa o novo modelo
+            player = createWizardModel();
+            player.position.set(0, 0, 0); // O modelo já está centralizado
+            player.userData = { maxHP: maxHP }; // Guarda os dados do player no grupo
+            scene.add(player);
+
+            const ringGeometry = new THREE.RingGeometry(1.5, 1.6, 32);
+            const ringMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+            targetRing = new THREE.Mesh(ringGeometry, ringMaterial);
+            targetRing.rotation.x = -Math.PI / 2;
+            targetRing.position.y = 0.01;
+            scene.add(targetRing);
+        }
+
+        function createEnemy(type, position) {
+            const props = entityProps[type];
+            const material = new THREE.MeshLambertMaterial({ color: props.color });
+            const enemy = new THREE.Mesh(props.geometry, material);
+            enemy.position.copy(position);
+            enemy.position.y = props.geometry.parameters.height ? props.geometry.parameters.height / 2 : 0.5;
+            enemy.castShadow = true;
+
+            enemy.userData = {
+                type: type,
+                hp: props.hp,
+                maxHP: props.hp,
+                speed: props.speed,
+                score: props.score,
+                damage: props.damage,
+                hitTimer: 0 // NOVO: Timer para feedback de hit
+            };
+
+            enemies.push(enemy);
+            scene.add(enemy);
+            
+            // Criação do Label 2D e Barra de Vida
+            createEnemyUI(enemy, props.name);
+        }
+        
+        // Renomeada: Cria o Label e a Barra de Vida
+        function createEnemyUI(enemy, name) {
+            // 1. Cria o Label do Nome
+            const label = document.createElement('div');
+            label.className = 'enemy-label';
+            label.textContent = name;
+            enemyLabelsContainer.appendChild(label);
+            
+            // 2. NOVO: Cria a Barra de Vida
+            const hpBarContainer = document.createElement('div');
+            hpBarContainer.className = 'enemy-hp-bar';
+            
+            const hpFill = document.createElement('div');
+            hpFill.className = 'enemy-hp-fill';
+            hpBarContainer.appendChild(hpFill);
+            
+            enemyLabelsContainer.appendChild(hpBarContainer);
+
+            // 3. Armazena ambas as referências
+            enemyLabels.set(enemy.uuid, { nameLabel: label, hpBar: hpBarContainer, hpFill: hpFill });
+        }
+        
+        // Renomeada: Remove o Label e a Barra de Vida
+        function removeEnemyUI(enemy) {
+            const uiElements = enemyLabels.get(enemy.uuid);
+            if (uiElements) {
+                if (uiElements.nameLabel) {
+                    enemyLabelsContainer.removeChild(uiElements.nameLabel);
+                }
+                if (uiElements.hpBar) { // NOVO
+                    enemyLabelsContainer.removeChild(uiElements.hpBar);
+                }
+                enemyLabels.delete(enemy.uuid);
+            }
+        }
+
+        function spawnEnemies() {
+            waveTimer++;
+            
+            if (waveTimer < initialSpawnDelay) return;
+            
+            if (enemies.length >= maxActiveEnemies) return;
+
+            // Progressão suavizada
+            const spawnInterval = Math.max(60, 150 - waveLevel * 2); // Densidade 25% maior (era 200)
+            
+            if (waveTimer % spawnInterval === 0) {
+                waveLevel++;
+                
+                // Demora mais para spawnar múltiplos inimigos (divisor de 12)
+                let numSpawns = Math.floor(waveLevel / 12) + 1; 
+
+                for (let i = 0; i < numSpawns; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = mapSize + 5; 
+                    
+                    const x = Math.cos(angle) * radius;
+                    const z = Math.sin(angle) * radius;
+                    
+                    const position = new THREE.Vector3(x, 0, z);
+
+                    let type;
+                    const roll = Math.random() * 100;
+                    
+                    if (waveLevel < 8) { 
+                        type = 'goblin'; 
+                    } else if (waveLevel < 20) {
+                        type = roll < 75 ? 'goblin' : 'orc'; 
+                    } else {
+                        if (roll < 50) type = 'goblin'; 
+                        else if (roll < 80) type = 'orc'; 
+                        else type = 'troll'; 
+                    }
+                    createEnemy(type, position);
+                }
+            }
+        }
+
+        function createProjectile(type, direction, startPosition) {
+            let props, geometry, material, isExplosive = false, explosionRadius = 0, explosionDamage = 0;
+
+            if (type === 'explosion') {
+                // Granada Explosiva (Roxa)
+                geometry = new THREE.SphereGeometry(0.3, 8, 8); // Um pouco maior
+                material = new THREE.MeshBasicMaterial({ color: powerUpProps.explosion.color }); 
+                props = { damage: 0, speed: 0.25 }; // Dano direto é 0, velocidade mais lenta (granada)
+                isExplosive = true;
+                explosionRadius = powerUpProps.explosion.explosionRadius; // 10
+                explosionDamage = powerUpProps.explosion.explosionDamage; // 100
+            
+            } else if (type === 'nova') {
+                // NOVO: Projétil da Nova Mágica
+                geometry = new THREE.SphereGeometry(0.25, 8, 8);
+                material = new THREE.MeshBasicMaterial({ color: 0xf0f0f0 }); // Branco
+                props = { damage: 20, speed: 0.25 };
+                isExplosive = false;
+            
+            } else { // weak or strong
+                props = projectileProps[type];
+                if (!props) {
+                    console.error("Tipo de projétil desconhecido:", type);
+                    return;
+                }
+                geometry = new THREE.SphereGeometry(props.size, 8, 8);
+                material = new THREE.MeshBasicMaterial({ color: props.color });
+            }
+            
+            const projectile = new THREE.Mesh(geometry, material);
+
+            projectile.position.copy(startPosition);
+            // Posição do projétil na altura do centro do player (Y=0.5)
+            projectile.position.y = 0.5; 
+
+            projectile.userData = {
+                type: type,
+                damage: props.damage,
+                speed: props.speed,
+                direction: direction.normalize(),
+                isExplosive: isExplosive,
+                explosionRadius: explosionRadius,
+                explosionDamage: explosionDamage
+            };
+
+            projectiles.push(projectile);
+            scene.add(projectile);
+        }
+        
+        // Função para criar poção (AGORA CRIA QUALQUER POWER-UP)
+        function createPowerUp(type = 'potion', position = null) {
+            const props = powerUpProps[type];
+            if (!props) {
+                console.warn("Tipo de power-up desconhecido:", type);
+                return;
+            }
+            
+            const material = new THREE.MeshLambertMaterial({ color: props.color });
+            const powerUp = new THREE.Mesh(props.geometry, material);
+            
+            if (position) {
+                powerUp.position.copy(position);
+            } else {
+                // Posição aleatória dentro do mapa
+                const x = (Math.random() * mapSize * 2) - mapSize;
+                const z = (Math.random() * mapSize * 2) - mapSize;
+                powerUp.position.set(x, 0, z);
+            }
+            
+            // Posição Y baseada na altura da geometria
+            const height = props.geometry.parameters.height || 0.5;
+            powerUp.position.y = height / 2;
+            
+            powerUp.userData = {
+                type: type,
+                ...props // Copia todas as propriedades (healAmount, duration, damage, radius)
+            };
+
+            powerUps.push(powerUp);
+            scene.add(powerUp);
+            
+            // NOVO: Cria o label para o power-up
+            createPowerUpLabel(powerUp, type);
+        }
+        
+        // NOVO: Função para criar label do Power-up
+        function createPowerUpLabel(powerUp, type) {
+            let text = 'Item';
+            switch(type) {
+                case 'potion': text = 'Cura'; break;
+                case 'tripleShot': text = 'Tiro Triplo'; break;
+                case 'shield': text = 'Escudo'; break;
+                case 'explosion': text = 'Explosão'; break;
+                case 'repulsionBubble': text = 'Bolha Repulsora'; break;
+            }
+
+            const label = document.createElement('div');
+            label.className = 'powerup-label';
+            label.textContent = text;
+            enemyLabelsContainer.appendChild(label); // Reutiliza o container
+            powerUpLabels.set(powerUp.uuid, label);
+        }
+
+        // NOVO: Função para remover label do Power-up
+        function removePowerUpLabel(powerUp) {
+            const label = powerUpLabels.get(powerUp.uuid);
+            if (label) {
+                enemyLabelsContainer.removeChild(label);
+                powerUpLabels.delete(powerUp.uuid);
+            }
+        }
+
+        // Lógica de spawn de poção
+        function spawnPowerUps() {
+            // --- Lógica por tempo (Chance de 20% a cada 5 segundos) ---
+            powerUpTimer++;
+            const timeSpawnInterval = 300; 
+
+            if (powerUpTimer >= timeSpawnInterval) {
+                if (Math.random() < 0.2) { 
+                    
+                    // 50% chance de poção, 50% chance de poder especial
+                    if (Math.random() < 0.5) {
+                        createPowerUp('potion');
+                    } else {
+                        const specialPowers = ['tripleShot', 'shield', 'explosion', 'repulsionBubble'];
+                        const type = specialPowers[Math.floor(Math.random() * specialPowers.length)];
+                        createPowerUp(type);
+                    }
+                }
+                powerUpTimer = 0;
+            }
+            
+            // --- NOVO: Lógica por kills (SÓ SPAWNA POÇÃO) ---
+            if (killsSinceLastPotion >= killsPerPotionSpawn) {
+                createPowerUp('potion'); // Spawn garantido de poção
+                killsSinceLastPotion = 0; // Reseta o contador
+            }
+        }
+        
+        // NOVO: Função para disparar a Nova Mágica
+        function triggerNovaBomb() {
+            const numProjectiles = 16; // Mais projéteis para um efeito mais denso
+            for (let i = 0; i < numProjectiles; i++) {
+                const angle = (i / numProjectiles) * Math.PI * 2;
+                const direction = new THREE.Vector3(
+                    Math.cos(angle),
+                    0,
+                    Math.sin(angle)
+                );
+                // Usa o novo tipo 'nova' com 20 de dano
+                createProjectile('nova', direction, player.position);
+            }
+        }
+
+        // --- Funções de Lógica do Jogo ---
+        
+        // Vetor temporário para o cálculo dos labels
+        const tempV = new THREE.Vector3(); 
+
+        // Renomeada: Atualiza a UI (Label e Barra de Vida) dos Inimigos
+        function updateEnemyUI() {
+            enemies.forEach(enemy => {
+                const uiElements = enemyLabels.get(enemy.uuid); // Pega o objeto
+                if (!uiElements) return;
+
+                const { nameLabel, hpBar, hpFill } = uiElements;
+
+                // 1. Projeta a Posição 3D (como antes)
+                tempV.set(enemy.position.x, enemy.position.y + 0.8, enemy.position.z); // Posição base acima da cabeça
+                tempV.project(camera);
+
+                // 2. Converte para coordenadas de tela
+                const x = (tempV.x * 0.5 + 0.5) * window.innerWidth;
+                const y = (-tempV.y * 0.5 + 0.5) * window.innerHeight;
+
+                // 3. Aplica posição ao Label do Nome (Offset para cima)
+                nameLabel.style.left = `${x}px`;
+                nameLabel.style.top = `${y - 8}px`; // Sobe 8px para dar espaço
+
+                // 4. NOVO: Aplica posição à Barra de Vida (Posição base)
+                hpBar.style.left = `${x}px`;
+                hpBar.style.top = `${y}px`;
+
+                // 5. NOVO: Atualiza a largura da barra de vida
+                const hpPercent = (enemy.userData.hp / enemy.userData.maxHP) * 100;
+                hpFill.style.width = `${hpPercent}%`;
+            });
+        }
+
+        // NOVO: Função para atualizar os labels dos Power-ups
+        function updatePowerUpLabels() {
+            powerUps.forEach(powerUp => {
+                const label = powerUpLabels.get(powerUp.uuid);
+                if (!label) return;
+
+                // 1. Projeta a Posição 3D (como antes)
+                // Posição base acima do item
+                const height = powerUp.userData.geometry.parameters.height || 0.5;
+                tempV.set(powerUp.position.x, powerUp.position.y + height, powerUp.position.z); 
+                tempV.project(camera);
+
+                // 2. Converte para coordenadas de tela
+                const x = (tempV.x * 0.5 + 0.5) * window.innerWidth;
+                const y = (-tempV.y * 0.5 + 0.5) * window.innerHeight;
+
+                // 3. Aplica posição ao Label
+                label.style.left = `${x}px`;
+                label.style.top = `${y}px`;
+            });
+        }
+
+        function handlePlayerMovement() {
+            let dx = 0;
+            let dz = 0;
+
+            if (keys['w'] || keys['W'] || keys['ArrowUp']) dz = -1;
+            if (keys['s'] || keys['S'] || keys['ArrowDown']) dz = 1;
+            if (keys['a'] || keys['A'] || keys['ArrowLeft']) dx = -1;
+            if (keys['d'] || keys['D'] || keys['ArrowRight']) dx = 1;
+
+            if (dx !== 0 || dz !== 0) {
+                const movementVector = new THREE.Vector2(dx, dz).normalize();
+                const currentMovement = new THREE.Vector3(movementVector.x, 0, movementVector.y).multiplyScalar(playerSpeed);
+                
+                // Rotação do jogador para a direção do movimento
+                const angle = Math.atan2(movementVector.x, movementVector.y); 
+                player.rotation.y = angle;
+                
+                const newPosition = player.position.clone().add(currentMovement);
+                
+                // Bounding box do player na nova posição
+                const tempPlayerBBox = new THREE.Box3();
+                
+                let collisionDetected = false;
+                
+                // Usa o player temporário para checar a colisão antes de mover o player real
+                tempPlayer.position.copy(newPosition);
+                tempPlayer.updateMatrixWorld();
+                tempPlayerBBox.setFromObject(tempPlayer);
+
+                for (const obstacle of obstacles) {
+                    obstacle.updateMatrixWorld();
+                    
+                    let obstacleBBox;
+
+                    // NOVO: Usa a malha de colisão pequena se for uma árvore
+                    if (obstacle.userData.collisionMesh) {
+                        obstacle.userData.collisionMesh.updateWorldMatrix(true, false);
+                        obstacleBBox = new THREE.Box3().setFromObject(obstacle.userData.collisionMesh);
+                    } else {
+                        // Usa o BBox completo para paredes
+                        obstacleBBox = new THREE.Box3().setFromObject(obstacle);
+                    }
+                    
+                    if (tempPlayerBBox.intersectsBox(obstacleBBox)) {
+                        collisionDetected = true;
+                        break;
+                    }
+                }
+
+                if (!collisionDetected) {
+                    // Aplica o movimento real
+                    player.position.copy(newPosition);
+                    
+                    // Mantém o player dentro dos limites do mapa
+                    player.position.x = Math.max(-mapSize, Math.min(mapSize, player.position.x));
+                    player.position.z = Math.max(-mapSize, Math.min(mapSize, player.position.z));
+                    
+                    targetRing.position.x = player.position.x;
+                    targetRing.position.z = player.position.z;
+                }
+            }
+        }
+
+        function updateAiming() {
+            raycaster.setFromCamera(pointer, camera);
+
+            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            const intersection = new THREE.Vector3();
+            
+            raycaster.ray.intersectPlane(plane, intersection);
+
+            if (intersection.x !== 0 && intersection.z !== 0) {
+                const direction = new THREE.Vector3().subVectors(intersection, player.position);
+                direction.y = 0; 
+                
+                targetRing.position.copy(intersection);
+                targetRing.position.y = 0.01;
+                
+                // Ataque Automático
+                if (projectileCooldown <= 0) {
+                    // NOVO: Lógica de Tiro Triplo
+                    if (tripleShotTimer > 0) {
+                        const angle = 0.1745; // 10 graus em radianos
+                        const dirLeft = direction.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+                        const dirRight = direction.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -angle);
+                        
+                        createProjectile('weak', direction, player.position);
+                        createProjectile('weak', dirLeft, player.position);
+                        createProjectile('weak', dirRight, player.position);
+                    } else {
+                        // Disparo normal
+                        createProjectile('weak', direction, player.position);
+                    }
+                    
+                    projectileCooldown = baseCooldown;
+                }
+            }
+        }
+
+        function attemptSpecialAttack() {
+            // PRIORIDADE 1: Checa Cargas de Explosão
+            if (explosionCharges > 0 && specialCooldown <= 0) {
+                // Dispara uma granada de explosão
+                raycaster.setFromCamera(pointer, camera);
+                const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                const intersection = new THREE.Vector3();
+                raycaster.ray.intersectPlane(plane, intersection);
+                
+                if (intersection.x !== 0 && intersection.z !== 0) {
+                    const direction = new THREE.Vector3().subVectors(intersection, player.position);
+                    direction.y = 0; 
+                    
+                    // NOVO TIPO: 'explosion'
+                    createProjectile('explosion', direction, player.position); 
+                    
+                    explosionCharges--;
+                    specialCooldown = 60; // Cooldown de 1s para explosivos
+                    updateUI();
+                }
+            } 
+            // PRIORIDADE 2: Checa Especial por Kills (só se não tiver explosão)
+            else if (killPoints >= maxKillPoints && specialCooldown <= 0) {
+                // Dispara o ataque forte normal
+                killPoints = 0;
+                specialCooldown = 180; // Cooldown normal
+
+                raycaster.setFromCamera(pointer, camera);
+                const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                const intersection = new THREE.Vector3();
+                raycaster.ray.intersectPlane(plane, intersection);
+                
+                if (intersection.x !== 0 && intersection.z !== 0) {
+                    const direction = new THREE.Vector3().subVectors(intersection, player.position);
+                    direction.y = 0; 
+                    
+                    createProjectile('strong', direction, player.position);
+                }
+                
+                updateUI(); 
+            }
+        }
+
+        function updatePowerUps() {
+            // A BBox do player já foi atualizada em animate()
+            const playerBBox = new THREE.Box3().setFromObject(player);
+            
+            for (let i = powerUps.length - 1; i >= 0; i--) {
+                const powerUp = powerUps[i];
+                powerUp.updateMatrixWorld();
+                const powerUpBBox = new THREE.Box3().setFromObject(powerUp);
+
+                if (playerBBox.intersectsBox(powerUpBBox)) {
+                    // Colisão detectada - Coletar item
+                    const data = powerUp.userData;
+                    
+                    switch(data.type) {
+                        case 'potion':
+                            const healValue = data.healAmount;
+                            const oldHP = playerHP;
+                            playerHP = Math.min(maxHP, playerHP + healValue);
+                            const actualHeal = playerHP - oldHP;
+                            if (actualHeal > 0) {
+                                displayHealingMessage(actualHeal);
+                            }
+                            break;
+                        
+                        case 'tripleShot':
+                            // NOVO: Acumula (soma) o tempo
+                            tripleShotTimer += data.duration;
+                            break;
+                        
+                        case 'shield':
+                            // NOVO: Adiciona uma nova camada ao escudo
+                            createShield(shieldLayers.length + 1); // +1 para o raio
+                            break;
+
+                        case 'repulsionBubble':
+                            // NOVO: Ativa a bolha de repulsão
+                            repulsionBubbleTimer += data.duration;
+                            break;
+                        
+                        case 'explosion':
+                            // NOVO: Acumula (soma) as cargas
+                            explosionCharges += data.charges;
+                            break;
+                    }
+
+                    // Remove o item do mapa
+                    scene.remove(powerUp);
+                    removePowerUpLabel(powerUp); // NOVO: Remove o label do item
+                    powerUps.splice(i, 1);
+                    updateUI();
+                }
+            }
+        }
+        
+        function displayHealingMessage(amount) {
+            healingMessage.textContent = `+${amount} HP!`;
+            healingMessage.style.opacity = 1;
+            healingMessage.classList.add('transition-none'); // Desliga transição para resetar
+            
+            // Reinicia a animação de opacidade
+            setTimeout(() => {
+                healingMessage.classList.remove('transition-none');
+                healingMessage.style.transition = 'opacity 1.5s ease-out, transform 1.5s ease-out';
+                healingMessage.style.opacity = 0;
+                healingMessage.style.transform = 'translate(-50%, -150%)'; // Move para cima enquanto desaparece
+            }, 10);
+            
+            // Reseta a posição após a animação
+             setTimeout(() => {
+                healingMessage.style.transform = 'translate(-50%, -50%)';
+            healingMessage.style.transition = 'none';
+        }, 1510);
+    }
+    
+    // NOVO: Feedback visual de Level Up
+    function displayLevelUpMessage() {
+        levelUpMessage.textContent = `LEVEL ${playerLevel}!`;
+        levelUpMessage.style.opacity = 1;
+        levelUpMessage.classList.add('transition-none');
+        
+        // Reinicia a animação
+        setTimeout(() => {
+            levelUpMessage.classList.remove('transition-none');
+            levelUpMessage.style.transition = 'opacity 1.5s ease-out, transform 1.5s ease-out';
+            levelUpMessage.style.opacity = 0;
+            levelUpMessage.style.transform = 'translate(-50%, -150%)'; // Move para cima
+        }, 10);
+        
+        // Reseta a posição
+         setTimeout(() => {
+            levelUpMessage.style.transform = 'translate(-50%, -50%)';
+            levelUpMessage.style.transition = 'none';
+        }, 1510);
+    }
+
+    // NOVO: Lógica da Explosão (usada pelo projétil)
+    function triggerBigExplosion(position, radius, damage) {
+            // Efeito visual simples (Flash)
+            const flashGeometry = new THREE.SphereGeometry(radius * 0.5, 16, 16);
+            const flashMaterial = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.8 });
+            const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+            flash.position.copy(position);
+            scene.add(flash);
+            
+            // Animação do Flash (cresce e desaparece)
+            let scale = 1.0;
+            const interval = setInterval(() => {
+                scale += 0.5;
+                flash.scale.set(scale, scale, scale);
+                flash.material.opacity -= 0.1;
+                if (flash.material.opacity <= 0) {
+                    clearInterval(interval);
+                    scene.remove(flash);
+                }
+            }, 30);
+
+            // Causa dano em área
+            const radiusSq = radius * radius;
+            enemies.forEach(enemy => {
+                if (enemy.position.distanceToSquared(position) <= radiusSq) {
+                    enemy.userData.hp -= damage;
+                    enemy.userData.hitTimer = 10; // Ativa o feedback de hit
+                }
+            });
+        }
+
+        // NOVO: Lógica do Escudo (Múltiplas Camadas)
+        function createShield(layerIndex) {
+            const numSpheres = 10;
+            const baseRadius = 3.6;
+            const radiusIncrement = 1.2;
+            const radius = baseRadius + (layerIndex - 1) * radiusIncrement;
+
+            const geometry = new THREE.SphereGeometry(0.2, 8, 8);
+            const material = new THREE.MeshLambertMaterial({ color: 0x00D7FE, emissive: 0x00D7FE, emissiveIntensity: 1 });
+            
+            const newLayer = {
+                spheres: [],
+                radius: radius,
+                angleOffset: Math.random() * Math.PI * 2 // Offset aleatório para cada camada
+            };
+
+            for (let i = 0; i < numSpheres; i++) {
+                const sphere = new THREE.Mesh(geometry, material);
+                newLayer.spheres.push(sphere);
+                scene.add(sphere);
+            }
+            shieldLayers.push(newLayer);
+        }
+
+        // NOVO: Lógica de atualização do Escudo
+        function updateShield() {
+            if (shieldLayers.length === 0) return;
+
+            const time = Date.now() * 0.001; // Tempo para órbita
+
+            for (let l = shieldLayers.length - 1; l >= 0; l--) {
+                const layer = shieldLayers[l];
+                
+                // Checa se a camada está vazia
+                if (layer.spheres.length === 0) {
+                    shieldLayers.splice(l, 1);
+                    continue;
+                }
+
+                const numSpheres = layer.spheres.length;
+
+                for (let i = numSpheres - 1; i >= 0; i--) {
+                    const sphere = layer.spheres[i];
+                    
+                    // 1. Atualiza Posição da Esfera (Órbita)
+                    const angle = (time * (l % 2 === 0 ? 1 : -1)) + layer.angleOffset + (i * (Math.PI * 2 / numSpheres));
+                    sphere.position.x = player.position.x + Math.cos(angle) * layer.radius;
+                    sphere.position.z = player.position.z + Math.sin(angle) * layer.radius;
+                    sphere.position.y = 0.5; // Altura do Mago
+
+                    // CORREÇÃO: Força a atualização da posição 3D ANTES da checagem
+                    sphere.updateMatrixWorld();
+
+                    // 2. Checa Colisão com Inimigos
+                    const sphereBBox = new THREE.Box3().setFromObject(sphere);
+                    let hitEnemy = null;
+
+                    for (const enemy of enemies) {
+                        const enemyBBox = new THREE.Box3().setFromObject(enemy);
+                        
+                        if (sphereBBox.intersectsBox(enemyBBox)) {
+                            // Causa dano
+                            enemy.userData.hp -= projectileProps.weak.damage; // 10 de dano
+                            enemy.userData.hitTimer = 10; // Ativa o feedback de hit
+                            hitEnemy = enemy;
+                            break; // Esfera só acerta um inimigo
+                        }
+                    }
+
+                    // 3. Remove a esfera se ela atingiu algo
+                    if (hitEnemy) {
+                        scene.remove(sphere);
+                        layer.spheres.splice(i, 1);
+                        updateUI(); // Atualiza a contagem de esferas
+                    }
+                }
+            }
+        }
+        
+        // NOVO: Função para remover todas as camadas do escudo (chamada no restart)
+        function removeShield() {
+            if (shieldLayers.length > 0) {
+                shieldLayers.forEach(layer => {
+                    layer.spheres.forEach(sphere => {
+                        scene.remove(sphere);
+                    });
+                });
+                shieldLayers = []; // Limpa o array de camadas
+            }
+            // A UI será atualizada na próxima chamada updateUI()
+        }
+
+        function updateEnemies() {
+            const playerPos = player.position;
+            // CORREÇÃO: Posição do BBox do Player atualizada em checkPlayerCollisions
+            
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                const enemyData = enemy.userData;
+
+                // NOVO: Feedback de Hit (Piscar Branco)
+                if (enemyData.hitTimer > 0) {
+                    enemy.material.color.setHex(0xffffff);
+                    enemyData.hitTimer--;
+                } else {
+                    enemy.material.color.setHex(entityProps[enemyData.type].color); // Volta à cor normal
+                }
+                
+                // NOVO: Lógica da Bolha de Repulsão
+                if (repulsionBubbleTimer > 0) {
+                    const distanceToPlayer = enemy.position.distanceTo(playerPos);
+                    const repulsionRadius = 4; // Raio da bolha
+                    if (distanceToPlayer < repulsionRadius) {
+                        // Calcula a direção para empurrar o inimigo para longe
+                        const pushDirection = new THREE.Vector3().subVectors(enemy.position, playerPos).normalize();
+                        const pushSpeed = 0.1; // Força com que são empurrados
+                        enemy.position.addScaledVector(pushDirection, pushSpeed);
+                        continue; // Pula o resto da lógica de movimento normal
+                    }
+                }
+
+
+                const direction = new THREE.Vector3().subVectors(playerPos, enemy.position).normalize();
+                
+                // --- INÍCIO DA CORREÇÃO DE COLISÃO (WALL SLIDING) ---
+                
+                // 1. Tenta a posição completa (X e Z)
+                const newPosition = enemy.position.clone().addScaledVector(direction, enemyData.speed);
+                
+                // Checa a colisão na posição completa
+                tempPlayer.position.copy(newPosition);
+                tempPlayer.updateMatrixWorld();
+                let fullEnemyBBox = new THREE.Box3().setFromObject(tempPlayer);
+                let fullCollisionDetected = false;
+                
+                for (const obstacle of obstacles) {
+                    obstacle.updateMatrixWorld();
+                    let obstacleBBox;
+                    if (obstacle.userData.collisionMesh) {
+                        obstacle.userData.collisionMesh.updateWorldMatrix(true, false);
+                        obstacleBBox = new THREE.Box3().setFromObject(obstacle.userData.collisionMesh);
+                    } else {
+                        obstacleBBox = new THREE.Box3().setFromObject(obstacle);
+                    }
+                    if (fullEnemyBBox.intersectsBox(obstacleBBox)) {
+                        fullCollisionDetected = true;
+                        break;
+                    }
+                }
+
+                // Se não houver colisão diagonal, move-se normalmente
+                if (!fullCollisionDetected) {
+                    enemy.position.copy(newPosition);
+                
+                } else {
+                    // --- HOUVE COLISÃO: Tentar "deslizar" (Sliding) ---
+                    
+                    // 2. Tentar mover SÓ no eixo X
+                    const newPositionX = enemy.position.clone();
+                    newPositionX.x += direction.x * enemyData.speed;
+
+                    tempPlayer.position.copy(newPositionX);
+                    tempPlayer.updateMatrixWorld();
+                    let enemyBBoxX = new THREE.Box3().setFromObject(tempPlayer);
+                    let collisionOnX = false;
+                    
+                    for (const obstacle of obstacles) {
+                        obstacle.updateMatrixWorld();
+                        let obstacleBBox;
+                        if (obstacle.userData.collisionMesh) {
+                            obstacle.userData.collisionMesh.updateWorldMatrix(true, false);
+                            obstacleBBox = new THREE.Box3().setFromObject(obstacle.userData.collisionMesh);
+                        } else {
+                            obstacleBBox = new THREE.Box3().setFromObject(obstacle);
+                        }
+                        if (enemyBBoxX.intersectsBox(obstacleBBox)) {
+                            collisionOnX = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!collisionOnX) {
+                        enemy.position.x = newPositionX.x;
+                    }
+
+                    // 3. Tentar mover SÓ no eixo Z
+                    const newPositionZ = enemy.position.clone();
+                    newPositionZ.z += direction.z * enemyData.speed;
+                    
+                    tempPlayer.position.copy(newPositionZ);
+                    tempPlayer.updateMatrixWorld();
+                    let enemyBBoxZ = new THREE.Box3().setFromObject(tempPlayer);
+                    let collisionOnZ = false;
+
+                    for (const obstacle of obstacles) {
+                        obstacle.updateMatrixWorld();
+                        let obstacleBBox;
+                        if (obstacle.userData.collisionMesh) {
+                            obstacle.userData.collisionMesh.updateWorldMatrix(true, false);
+                            obstacleBBox = new THREE.Box3().setFromObject(obstacle.userData.collisionMesh);
+                        } else {
+                            obstacleBBox = new THREE.Box3().setFromObject(obstacle);
+                        }
+                        if (enemyBBoxZ.intersectsBox(obstacleBBox)) {
+                            collisionOnZ = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!collisionOnZ) {
+                        enemy.position.z = newPositionZ.z;
+                    }
+                }
+                // --- FIM DA CORREÇÃO ---
+                
+                // 4. Colisão com o Mago (Causar Dano)
+                // NOVO: Apenas atualiza a matrix. A checagem de dano foi movida para uma nova função.
+                enemy.updateMatrixWorld();
+                
+                if (enemyData.hp <= 0) {
+                    score += enemyData.score;
+                    // NOVO: Ganha XP ao matar inimigo
+                    gainExperience(enemyData.score); 
+                    
+                    killPoints = Math.min(maxKillPoints, killPoints + 1);
+                    killsSinceLastPotion++; // NOVO: Incrementa contador de poção
+
+                    // NOVO: Incrementa estatísticas de abates
+                    if (killStats[enemyData.type] !== undefined) {
+                        killStats[enemyData.type]++;
+                    }
+
+                    // NOVO: Lógica da Nova Mágica (Level 2+)
+                    if (playerLevel >= 2) {
+                        novaBombKills++;
+                        if (novaBombKills >= killsForNovaBomb) {
+                            triggerNovaBomb();
+                            novaBombKills = 0;
+                        }
+                    }
+                    
+                    scene.remove(enemy);
+                    removeEnemyUI(enemy); // Remove o label e a barra de vida
+                    enemies.splice(i, 1);
+                    updateUI();
+                }
+            }
+        }
+
+        // NOVO: Funções de Level Up
+        function gainExperience(amount) {
+            experiencePoints += amount;
+            
+            // Permite múltiplos level ups de uma vez (ex: explosão)
+            while (experiencePoints >= experienceForNextLevel) {
+                levelUp();
+            }
+        }
+        
+        function levelUp() {
+            experiencePoints -= experienceForNextLevel; // Subtrai o custo e mantém o excesso
+            playerLevel++;
+            
+            // Aumenta o custo para o próximo nível (500, 1000, 1500, etc.)
+            experienceForNextLevel = baseExperience * playerLevel;
+            
+            displayLevelUpMessage();
+            updateUI(); // Atualiza o display do level
+        }
+
+        function updateProjectiles() {
+            const tempBBox = new THREE.Box3();
+
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const projectile = projectiles[i];
+                const projData = projectile.userData;
+
+                projectile.position.addScaledVector(projData.direction, projData.speed);
+                projectile.updateMatrixWorld();
+
+                if (Math.abs(projectile.position.x) > mapSize + 5 || Math.abs(projectile.position.z) > mapSize + 5) {
+                    scene.remove(projectile);
+                    projectiles.splice(i, 1);
+                    continue;
+                }
+
+                tempBBox.setFromObject(projectile);
+                let hit = false;
+                
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const enemy = enemies[j];
+
+                    // NOVO CHECK: Inimigos só podem ser atingidos dentro do mapa (mapSize)
+                    const inBounds = Math.abs(enemy.position.x) < mapSize && Math.abs(enemy.position.z) < mapSize;
+
+                    // Só checa colisão se o inimigo estiver visível/dentro do mapa
+                    if (inBounds) {
+                        const enemyBBox = new THREE.Box3().setFromObject(enemy);
+                        
+                        if (tempBBox.intersectsBox(enemyBBox)) {
+                            
+                            if (projData.isExplosive) {
+                                // Se for explosivo, para o projétil e causa explosão
+                                hit = true;
+                            } else {
+                                // Dano normal
+                                enemy.userData.hp -= projData.damage;
+                                enemy.userData.hitTimer = 10; // Ativa o feedback de hit
+                                hit = true;
+                            }
+                            
+                            if (hit) break; // Projétil só acerta um inimigo
+                        }
+                    }
+                }
+
+                // --- INÍCIO DA CORREÇÃO DE COLISÃO DO PROJETÉTIL ---
+                if (!hit) { // Só checa obstáculos se não atingiu um inimigo
+                    for (const obstacle of obstacles) {
+                        obstacle.updateMatrixWorld();
+                        let obstacleBBox;
+
+                        if (obstacle.userData.collisionMesh) {
+                            obstacle.userData.collisionMesh.updateWorldMatrix(true, false);
+                            obstacleBBox = new THREE.Box3().setFromObject(obstacle.userData.collisionMesh);
+                        } else {
+                            obstacleBBox = new THREE.Box3().setFromObject(obstacle);
+                        }
+                        
+                        if (tempBBox.intersectsBox(obstacleBBox)) {
+                            hit = true;
+                            break;
+                        }
+                    }
+                }
+                // --- FIM DA CORREÇÃO ---
+
+                if (hit) {
+                    // NOVO: Checa se deve explodir
+                    if (projData.isExplosive) {
+                        triggerBigExplosion(projectile.position, projData.explosionRadius, projData.explosionDamage);
+                    }
+                    
+                    scene.remove(projectile);
+                    projectiles.splice(i, 1);
+                }
+            }
+        }
+
+        // NOVO: Função dedicada para checar dano NO JOGADOR
+        // Isso garante que o escudo rode primeiro
+        function checkPlayerCollisions() {
+            if (isGameOver) return; // Não checa se já morreu
+
+            const playerBBox = new THREE.Box3().setFromObject(player);
+            let tookDamage = false;
+
+            for (const enemy of enemies) {
+                // Inimigo já teve sua matrix atualizada em updateEnemies()
+                const enemyBBox = new THREE.Box3().setFromObject(enemy);
+                
+                if (playerBBox.intersectsBox(enemyBBox)) {
+                    playerHP = Math.max(0, playerHP - enemy.userData.damage);
+                    tookDamage = true;
+                }
+            }
+
+            if (tookDamage) {
+                 // Feedback visual de dano no Mago (pisca o robe)
+                 player.children[0].material.color.setHex(0xff0000);
+                 setTimeout(() => {
+                     if (player && player.children[0]) {
+                         player.children[0].material.color.setHex(0x5b3c8f); // Cor original do robe
+                     }
+                 }, 100);
+                 updateUI(); // Atualiza a UI imediatamente
+            }
+            
+            if (playerHP <= 0) {
+                endGame();
+            }
+        }
+
+        function updateUI() {
+            // NOVO: Checagem de segurança (UI não carregada)
+            if (!playerNameDisplay) return; 
+
+            playerNameDisplay.textContent = playerName; // NOVO: Atualiza o nome do jogador
+            scoreDisplay.textContent = `Pontuação: ${score}`;
+
+            // NOVO: Atualiza o display de Level
+            playerLevelDisplay.textContent = playerLevel;
+
+            const hpPercent = Math.max(0, playerHP / maxHP) * 100;
+            hpBar.style.width = `${hpPercent}%`;
+            
+            const specialPercent = Math.min(100, (killPoints / maxKillPoints) * 100);
+            specialBar.style.width = `${specialPercent}%`;
+            killPointsDisplay.textContent = `${killPoints}`;
+
+            if (killPoints >= maxKillPoints) {
+                specialBar.classList.add('bg-green-500');
+                specialBar.classList.remove('bg-blue-500');
+            } else {
+                specialBar.classList.add('bg-blue-500');
+                specialBar.classList.remove('bg-green-500');
+            }
+
+            // NOVO: Atualiza display de timers dos power-ups
+            const timerDisplay = document.getElementById('powerup-timers-display');
+            let timersHTML = '';
+            if (tripleShotTimer > 0) {
+                timersHTML += `<span class="powerup-active">Tiro Triplo! (${Math.ceil(tripleShotTimer/60)}s)</span>`;
+            }
+            if (repulsionBubbleTimer > 0) {
+                timersHTML += `<span class="powerup-active">Bolha Repulsora! (${Math.ceil(repulsionBubbleTimer/60)}s)</span>`;
+            }
+
+            // NOVO: Calcula o total de esferas em todas as camadas
+            const totalSpheres = shieldLayers.reduce((acc, layer) => acc + layer.spheres.length, 0);
+            if (totalSpheres > 0) {
+                timersHTML += `<span class="powerup-active">Escudo Ativo! (${totalSpheres} esferas)</span>`;
+            }
+            timerDisplay.innerHTML = timersHTML;
+
+            // NOVO: Atualiza display de Cargas de Explosão
+            const explosionDisplay = document.getElementById('explosion-charges-display');
+            if (explosionCharges > 0) {
+                document.getElementById('explosion-charges-count').textContent = explosionCharges;
+                explosionDisplay.classList.remove('hidden');
+            } else {
+                explosionDisplay.classList.add('hidden');
+            }
+
+            // NOVO: Atualiza display da Nova Mágica
+            const novaBombDisplay = document.getElementById('nova-bomb-display');
+            if (playerLevel >= 2) {
+                document.getElementById('nova-bomb-kills-count').textContent = novaBombKills;
+                novaBombDisplay.classList.remove('hidden');
+            } else {
+                novaBombDisplay.classList.add('hidden');
+            }
+
+        }
+
+        // --- Ciclo de Jogo (Game Loop) ---
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // CORREÇÃO: Checa se 'renderer' existe. Se não, o jogo não pode rodar.
+            // O erro 'Cannot read properties of undefined (reading 'position')' 
+            // acontece se 'player' não for definido, o que ocorre se 'startGame' falhar.
+            // Mas 'startGame' só falha se 'removeShield' não existir.
+            
+            // CORREÇÃO 2: O erro 'Cannot read properties of undefined (reading 'position')'
+            // acontece se 'player' for 'undefined' E 'isGameOver' for 'false'.
+            // Isso acontece se 'startGame' falhar (por causa de 'removeShield').
+            // A correção é garantir que 'removeShield' exista.
+            
+            if (isGameOver) {
+                // Mesmo em "Game Over", precisamos renderizar a cena (para o menu)
+                // mas não devemos tentar ler a posição do 'player' se ele não existir
+                if (renderer) {
+                    renderer.render(scene, camera);
+                }
+                return;
+            }
+
+            // A partir daqui, isGameOver = false, então 'player' DEVE existir.
+            // O erro 'Cannot read properties of undefined (reading 'position')'
+            // indica que 'player' é nulo.
+            if (!player) return; // Proteção extra se 'startGame' falhar
+
+            // 1. Lógica da Câmera: A câmera acompanha o jogador (Afastada +50%)
+            camera.position.x = player.position.x + 18; // 12 * 1.5
+            camera.position.z = player.position.z + 18; // 12 * 1.5
+            camera.position.y = player.position.y + 27; // 18 * 1.5
+            camera.lookAt(player.position.x, player.position.y, player.position.z);
+            
+            // Atualiza Cooldowns
+            projectileCooldown = Math.max(0, projectileCooldown - 1);
+            specialCooldown = Math.max(0, specialCooldown - 1);
+            if (tripleShotTimer > 0) tripleShotTimer--; // NOVO: Decrementa timer
+            if (repulsionBubbleTimer > 0) repulsionBubbleTimer--; // NOVO: Decrementa timer da bolha
+
+            // NOVO: Atualiza a visibilidade e posição da bolha de repulsão
+            if (repulsionBubbleTimer > 0) {
+                repulsionBubbleMesh.visible = true;
+                // Centraliza a bolha no jogador
+                repulsionBubbleMesh.position.copy(player.position);
+            } else {
+                repulsionBubbleMesh.visible = false;
+            }
+
+
+            // 2. Lógica do Jogador
+            handlePlayerMovement();
+            
+            // NOVO: Força a atualização da matriz 3D do jogador
+            // Isso garante que o escudo e os inimigos usem a posição ATUAL
+            player.updateMatrixWorld(true);
+
+            updateAiming();
+            updatePowerUps(); // Checa colisão com poções e poderes
+
+            // 3. Lógica de Inimigos e Spawning
+            spawnEnemies();
+            spawnPowerUps(); // Tenta spawnar poção
+            
+            // CORREÇÃO DE ORDEM:
+            // 1. Move os inimigos
+            updateEnemies();
+            
+            // 2. O Escudo ataca (e pode matar o inimigo que acabou de se mover)
+            updateShield(); 
+
+            // 3. O Inimigo (que sobreviveu ao escudo) ataca o jogador
+            checkPlayerCollisions();
+
+            // 4. Lógica dos Projéteis
+            updateProjectiles();
+            
+            // 5. Atualiza a posição dos labels 2D e HP
+            updateEnemyUI();
+            updatePowerUpLabels(); // NOVO: Atualiza labels dos itens
+
+            // 6. Renderização
+            renderer.render(scene, camera);
+        }
+
+        // Função startGame agora recebe o nome do jogador
+        window.startGame = function (name) {
+            playerName = name || 'Mago Anônimo';
+
+            // Limpa o estado anterior
+            isGameOver = false;
+            score = 0;
+            playerHP = maxHP;
+            
+            // NOVO: Reseta o Level
+            playerLevel = 1;
+            experiencePoints = 0;
+            experienceForNextLevel = baseExperience;
+
+            killPoints = 0;
+            killStats = { goblin: 0, orc: 0, troll: 0 }; // NOVO: Reseta killStats
+            killsSinceLastPotion = 0; // NOVO: Reseta contador de poção
+            
+            // NOVO: Reseta timers e estados dos novos poderes
+            tripleShotTimer = 0;
+            removeShield(); // Garante que o escudo seja removido
+            repulsionBubbleTimer = 0; // NOVO: Reseta timer da bolha
+            novaBombKills = 0; // NOVO: Reseta contador da nova
+            explosionCharges = 0; // NOVO: Reseta cargas
+
+            waveLevel = 0;
+            waveTimer = 0; 
+            powerUpTimer = 0; 
+            projectileCooldown = 0;
+            specialCooldown = 0;
+            
+            // Limpa as entidades 3D e seus labels
+            enemies.forEach(e => { scene.remove(e); removeEnemyUI(e); });
+            projectiles.forEach(p => scene.remove(p));
+            powerUps.forEach(p => { scene.remove(p); removePowerUpLabel(p); }); // Limpa labels dos itens
+            enemies.length = 0;
+            projectiles.length = 0;
+            powerUps.length = 0; 
+            enemyLabelsContainer.innerHTML = '';
+            enemyLabels.clear();
+            powerUpLabels.clear(); // NOVO: Limpa o mapa de labels dos itens
+            
+            // Garante que os obstáculos não sejam removidos
+            // Obstáculos são criados/repopulados dentro de init/populateObstacles
+
+            if (player) scene.remove(player);
+            if (targetRing) scene.remove(targetRing);
+            createPlayer();
+            
+            // Reset UI
+            document.getElementById('start-menu-modal').classList.add('hidden');
+            gameOverModal.classList.add('hidden');
+            
+            // NOVO: Spawna um power-up especial obrigatório no início
+            const specialPowers = ['tripleShot', 'shield', 'explosion'];
+            const randomType = specialPowers[Math.floor(Math.random() * specialPowers.length)];
+            // Spawna perto do jogador
+            createPowerUp(randomType, new THREE.Vector3(3, 0, 3)); 
+
+            updateUI();
+
+            // CORREÇÃO: Define como "jogo iniciado" APENAS DEPOIS que tudo foi criado
+            isGameOver = false;
+        }
+
+        function endGame() {
+            isGameOver = true;
+            
+            finalScoreDisplay.textContent = score;
+            gameOverModal.classList.remove('hidden');
+
+            // Salva a pontuação com o nome do jogador e as estatísticas de abates
+            window.saveScore(score, playerName, killStats);
+            
+            // NOVO: Garante que a bolha desapareça no fim do jogo
+            if (repulsionBubbleMesh) {
+                repulsionBubbleMesh.visible = false;
+            }
+
+            // Remove todos os labels quando o jogo termina
+            enemyLabelsContainer.innerHTML = '';
+            enemyLabels.clear();
+            powerUpLabels.clear(); // NOVO: Limpa o mapa de labels dos itens
+        }
+
+        // Inicia a aplicação Three.js quando a janela estiver carregada
+        window.onload = function () {
+            setupUIElements(); // NOVO: Inicializa referências da UI
+            init();
+            animate();
+            // A tela de menu fica visível no início (isGameOver = true)
+        };
+
+    </script>
+    
+    <!-- Script para garantir o foco correto ao pressionar ENTER -->
+    <script>
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !document.getElementById('game-over-modal').classList.contains('hidden')) {
+                document.getElementById('restart-button').click();
+            }
+        });
+    </script>
+</body>
+</html>
