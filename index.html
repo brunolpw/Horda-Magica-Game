@@ -2589,6 +2589,9 @@
             while (experiencePoints >= experienceForNextLevel) {
                 levelUp();
             }
+
+            // CORREÇÃO: Atualiza a UI para refletir a mudança na barra de XP
+            updateUI();
         }
         
         function levelUp() {
@@ -2696,48 +2699,34 @@
                 }
 
 
-                projectile.position.addScaledVector(projData.direction, projData.speed);
-                projectile.updateMatrixWorld();
-
-                if (Math.abs(projectile.position.x) > mapSize + 5 || Math.abs(projectile.position.z) > mapSize + 5) {
-                    scene.remove(projectile);
-                    projectiles.splice(i, 1);
-                    continue;
-                }
-
-                tempBBox.setFromObject(projectile);
                 let hit = false;
                 
-                for (let j = enemies.length - 1; j >= 0; j--) {
-                    const enemy = enemies[j];
+                // CORREÇÃO: Projéteis do jogador só colidem com inimigos
+                if (projData.type !== 'necro_bolt' && projData.type !== 'arrow') {
+                    for (let j = enemies.length - 1; j >= 0; j--) {
+                        const enemy = enemies[j];
 
-                    // NOVO CHECK: Inimigos só podem ser atingidos dentro do mapa (mapSize)
-                    const inBounds = Math.abs(enemy.position.x) < mapSize && Math.abs(enemy.position.z) < mapSize;
-
-                    // Só checa colisão se o inimigo estiver visível/dentro do mapa
-                    if (inBounds) {
-                        const enemyBBox = new THREE.Box3().setFromObject(enemy);
-                        
-                        if (tempBBox.intersectsBox(enemyBBox)) {
+                        // Só checa colisão se o inimigo estiver visível/dentro do mapa
+                        if (Math.abs(enemy.position.x) < mapSize && Math.abs(enemy.position.z) < mapSize) {
+                            const enemyBBox = new THREE.Box3().setFromObject(enemy);
                             
-                            if (projData.isExplosive) {
-                                // Se for explosivo, para o projétil e causa explosão
-                                hit = true;
-                            } else if (chainLightningCharged && projData.type === 'weak') {
-                                // NOVO: Ativa a Corrente de Raios
-                                triggerChainLightning(enemy);
-                                chainLightningCharged = false;
-                                updateUI();
-                                hit = true;
-                            } else {
-                                // Dano normal
-                                enemy.userData.hp -= projData.damage;
-                                createFloatingText(projData.damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
-                                enemy.userData.hitTimer = 10; // Ativa o feedback de hit
-                                hit = true;
+                            if (tempBBox.intersectsBox(enemyBBox)) {
+                                if (projData.isExplosive) {
+                                    hit = true;
+                                } else if (chainLightningCharged && projData.type === 'weak') {
+                                    triggerChainLightning(enemy);
+                                    chainLightningCharged = false;
+                                    updateUI();
+                                    hit = true;
+                                } else {
+                                    enemy.userData.hp -= projData.damage;
+                                    createFloatingText(projData.damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
+                                    enemy.userData.hitTimer = 10;
+                                    hit = true;
+                                }
+                                
+                                if (hit) break;
                             }
-                            
-                            if (hit) break; // Projétil só acerta um inimigo
                         }
                     }
                 }
@@ -2807,6 +2796,10 @@
 
             // NOVO: Atualiza o display de Level
             playerLevelDisplay.textContent = playerLevel;
+
+            // NOVO: Atualiza a barra de experiência
+            const xpPercent = (experiencePoints / experienceForNextLevel) * 100;
+            document.getElementById('xp-bar').style.width = `${xpPercent}%`;
 
             // NOVO: Atualiza o display da Onda
             waveLevelDisplay.textContent = currentWave;
