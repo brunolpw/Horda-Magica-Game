@@ -1182,7 +1182,8 @@
                 modelHeight: props.modelHeight, // Guarda a altura para o label
                 isSummon: isSummon, // NOVO: Marca se é uma invocação
                 freezeLingerTimer: 0, // NOVO: Timer para o efeito de congelamento persistente
-                damageCooldown: 0 // NOVO: Cooldown para o ataque do monstro
+                damageCooldown: 0, // NOVO: Cooldown para o ataque do monstro
+                auraDamageAccumulator: 0 // NOVO: Acumula dano da aura para feedback visual
             };
 
             // NOVO: Adiciona propriedades específicas para o Necromante
@@ -2271,32 +2272,40 @@
             const targetPos = target.position;
 
             // Lógica de congelamento persistente e dano por segundo
-            if (enemyData.type !== 'ghost') {
-                if (enemyData.freezeLingerTimer > 0) {
-                    enemyData.freezeLingerTimer--;
+            if (enemyData.type !== 'ghost') { // Fantasmas são imunes
+                const isInAura = freezingAuraTimer > 0 && enemy.position.distanceTo(player.position) < 6;
+
+                if (isInAura) {
+                    enemyData.freezeLingerTimer = 300; // 5 segundos
                 }
 
-                // Lógica da Aura Congelante
-                if (freezingAuraTimer > 0) {
-                    const distanceToPlayer = enemy.position.distanceTo(player.position);
-                    const auraRadius = 6;
-                    if (distanceToPlayer < auraRadius) {
-                        // Efeito de congelamento e dano por segundo
-                        enemyData.freezeLingerTimer = 300; // Reseta o timer para 5 segundos
-                        if (enemyData.hp > 0) createFloatingText(1, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#87CEFA', '0.8rem');
-                        enemyData.hp -= 5 / 60; // 5 de dano por segundo (a 60fps)
-                    }
-                }
-                
                 if (enemyData.freezeLingerTimer > 0) {
-                    enemyData.isFrozen = true; // Para o ícone da UI
-                    // Aplica lentidão
-                    const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                    enemy.position.addScaledVector(direction, enemyData.speed * 0.5); // 50% da velocidade
+                    enemyData.freezeLingerTimer--;
+                    enemyData.isFrozen = true;
+
+                    // Aplica dano contínuo
+                    const damagePerFrame = 5 / 60;
+                    enemyData.hp -= damagePerFrame;
+                    enemyData.auraDamageAccumulator += damagePerFrame;
+
+                    // Mostra o dano acumulado a cada segundo
+                    if (enemyData.auraDamageAccumulator >= 5) {
+                        createFloatingText(Math.floor(enemyData.auraDamageAccumulator), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#87CEFA');
+                        enemyData.auraDamageAccumulator = 0;
+                    }
+
+                    // Aplica lentidão e pula o movimento normal
+                    const slowDirection = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                    enemy.position.addScaledVector(slowDirection, enemyData.speed * 0.5);
                     continue;
-                } else {
-                    enemyData.isFrozen = false; // Desmarca se o timer acabar
                 }
+            }
+            // Se chegou aqui, não está congelado
+            enemyData.isFrozen = false;
+
+            // Lógica de invocação do Necromante
+            if (enemyData.type === 'necromancer') {
+                enemyData.summonCooldown = Math.max(0, enemyData.summonCooldown - 1);
             }
 
             // Lógica de invocação do Necromante
