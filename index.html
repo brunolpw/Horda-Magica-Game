@@ -1065,7 +1065,8 @@
                 damage: props.damage,
                 hitTimer: 0, // NOVO: Timer para feedback de hit
                 modelHeight: props.modelHeight, // Guarda a altura para o label
-                isSummon: isSummon // NOVO: Marca se é uma invocação
+                isSummon: isSummon, // NOVO: Marca se é uma invocação
+                freezeLingerTimer: 0 // NOVO: Timer para o efeito de congelamento persistente
             };
 
             // NOVO: Adiciona propriedades específicas para o Necromante
@@ -2065,45 +2066,51 @@
                         continue; // Pula o resto da lógica de movimento normal
                     }
             }
+            
+            // CORREÇÃO: Toda a lógica abaixo foi movida para dentro do loop 'for'
 
-            // NOVO: Lógica da Aura Congelante
+            // Lógica de congelamento persistente e dano por segundo
+            if (enemyData.freezeLingerTimer > 0) {
+                enemyData.freezeLingerTimer--;
+            }
+
+            // Lógica da Aura Congelante
             if (freezingAuraTimer > 0) {
                 const distanceToPlayer = enemy.position.distanceTo(player.position);
                 const auraRadius = 6;
                 if (distanceToPlayer < auraRadius) {
-                    enemyData.isFrozen = true; // NOVO: Marca como congelado
-                    // Aplica lentidão
-                    const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                    enemy.position.addScaledVector(direction, enemyData.speed * 0.5); // 50% da velocidade
-                    continue;
-                } else {
-                    enemyData.isFrozen = false; // NOVO: Desmarca se sair da aura
+                    // Efeito de congelamento e dano por segundo
+                    enemyData.freezeLingerTimer = 300; // Reseta o timer para 5 segundos
+                    enemyData.hp -= 5 / 60; // 5 de dano por segundo (a 60fps)
                 }
             }
+            
+            if (enemyData.freezeLingerTimer > 0) {
+                enemyData.isFrozen = true; // Para o ícone da UI
+                // Aplica lentidão
+                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                enemy.position.addScaledVector(direction, enemyData.speed * 0.5); // 50% da velocidade
+                continue;
+            } else {
+                enemyData.isFrozen = false; // Desmarca se o timer acabar
+            }
 
-            // NOVO: Lógica de invocação do Necromante
+            // Lógica de invocação do Necromante
             if (enemyData.type === 'necromancer') {
                 enemyData.summonCooldown = Math.max(0, enemyData.summonCooldown - 1);
                 
-                // Se o cooldown acabou e não estamos no limite de inimigos
                 if (enemyData.summonCooldown <= 0 && enemies.length < maxActiveEnemies) {
-                    // Invoca um goblin perto do necromante
                     const offset = new THREE.Vector3((Math.random() - 0.5) * 4, 0, (Math.random() - 0.5) * 4);
                     const spawnPosition = enemy.position.clone().add(offset);
-                    createEnemy('goblin', spawnPosition, true); // NOVO: Marca como invocação
-                    
-                    enemyData.summonCooldown = enemyData.summonInterval; // Reseta o cooldown
+                    createEnemy('goblin', spawnPosition, true);
+                    enemyData.summonCooldown = enemyData.summonInterval;
                 }
             }
 
             const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
             
-            // --- INÍCIO DA CORREÇÃO DE COLISÃO (WALL SLIDING) ---
-            
-            // 1. Tenta a posição completa (X e Z)
+            // Lógica de movimento com colisão (Wall Sliding)
             const newPosition = enemy.position.clone().addScaledVector(direction, enemyData.speed);
-            
-            // Checa a colisão na posição completa
             tempPlayer.position.copy(newPosition);
             tempPlayer.updateMatrixWorld();
             let fullEnemyBBox = new THREE.Box3().setFromObject(tempPlayer);
@@ -2111,102 +2118,57 @@
             
             for (const obstacle of obstacles) {
                 obstacle.updateMatrixWorld();
-                let obstacleBBox;
-                if (obstacle.userData.collisionMesh) {
-                    obstacle.userData.collisionMesh.updateWorldMatrix(true, false);
-                    obstacleBBox = new THREE.Box3().setFromObject(obstacle.userData.collisionMesh);
-                } else {
-                    obstacleBBox = new THREE.Box3().setFromObject(obstacle);
-                }
+                let obstacleBBox = obstacle.userData.collisionMesh ? new THREE.Box3().setFromObject(obstacle.userData.collisionMesh) : new THREE.Box3().setFromObject(obstacle);
                 if (fullEnemyBBox.intersectsBox(obstacleBBox)) {
                     fullCollisionDetected = true;
                     break;
                 }
             }
 
-            // Se não houver colisão diagonal, move-se normalmente
             if (!fullCollisionDetected) {
                 enemy.position.copy(newPosition);
-            
             } else {
-                // --- HOUVE COLISÃO: Tentar "deslizar" (Sliding) ---
-                
-                // 2. Tentar mover SÓ no eixo X
+                // Tenta deslizar no eixo X
                 const newPositionX = enemy.position.clone();
                 newPositionX.x += direction.x * enemyData.speed;
-
                 tempPlayer.position.copy(newPositionX);
                 tempPlayer.updateMatrixWorld();
                 let enemyBBoxX = new THREE.Box3().setFromObject(tempPlayer);
-                let collisionOnX = false;
-                
-                for (const obstacle of obstacles) {
-                    obstacle.updateMatrixWorld();
-                    let obstacleBBox;
-                    if (obstacle.userData.collisionMesh) {
-                        obstacle.userData.collisionMesh.updateWorldMatrix(true, false);
-                        obstacleBBox = new THREE.Box3().setFromObject(obstacle.userData.collisionMesh);
-                    } else {
-                        obstacleBBox = new THREE.Box3().setFromObject(obstacle);
-                    }
-                    if (enemyBBoxX.intersectsBox(obstacleBBox)) {
-                        collisionOnX = true;
-                        break;
-                    }
-                }
-                
+                let collisionOnX = obstacles.some(o => enemyBBoxX.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
                 if (!collisionOnX) {
                     enemy.position.x = newPositionX.x;
                 }
 
-                // 3. Tentar mover SÓ no eixo Z
+                // Tenta deslizar no eixo Z
                 const newPositionZ = enemy.position.clone();
                 newPositionZ.z += direction.z * enemyData.speed;
-                
                 tempPlayer.position.copy(newPositionZ);
                 tempPlayer.updateMatrixWorld();
                 let enemyBBoxZ = new THREE.Box3().setFromObject(tempPlayer);
-                let collisionOnZ = false;
-
-                for (const obstacle of obstacles) {
-                    obstacle.updateMatrixWorld();
-                    let obstacleBBox;
-                    if (obstacle.userData.collisionMesh) {
-                        obstacle.userData.collisionMesh.updateWorldMatrix(true, false);
-                        obstacleBBox = new THREE.Box3().setFromObject(obstacle.userData.collisionMesh);
-                    } else {
-                        obstacleBBox = new THREE.Box3().setFromObject(obstacle);
-                    }
-                    if (enemyBBoxZ.intersectsBox(obstacleBBox)) {
-                        collisionOnZ = true;
-                        break;
-                    }
-                }
-                
+                let collisionOnZ = obstacles.some(o => enemyBBoxZ.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
                 if (!collisionOnZ) {
                     enemy.position.z = newPositionZ.z;
                 }
             }
-            // --- FIM DA CORREÇÃO ---
             
-            // 4. Colisão com o Mago (Causar Dano)
-            // NOVO: Apenas atualiza a matrix. A checagem de dano foi movida para uma nova função.
+            // NOVO: Checa colisão com o jogador APÓS o movimento
+            const playerBBox = new THREE.Box3().setFromObject(player);
+            if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(enemy))) {
+                damagePlayer(enemyData.damage);
+            }
+
             enemy.updateMatrixWorld();
             
             if (enemyData.hp <= 0) {
                 score += enemyData.score;
-                // NOVO: Ganha XP ao matar inimigo
                 gainExperience(enemyData.score); 
-                
                 killPoints = Math.min(maxKillPoints, killPoints + 1);
-                killsSinceLastPotion++; // NOVO: Incrementa contador de poção
+                killsSinceLastPotion++;
 
-                // NOVO: Incrementa estatísticas de abates
                 if (killStats[enemyData.type] !== undefined) {
                     killStats[enemyData.type]++;
                 }
 
-                // NOVO: Lógica da Nova Mágica (Level 2+)
                 if (playerLevel >= 2) {
                     novaBombKills++;
                     if (novaBombKills >= killsForNovaBomb) {
@@ -2215,7 +2177,6 @@
                     }
                 }
 
-                // NOVO: Lógica do Raio de Energia (Level 4+)
                 if (playerLevel >= 4) {
                     energyBeamKills++;
                     if (energyBeamKills >= killsForEnergyBeam) {
@@ -2224,7 +2185,6 @@
                     }
                 }
 
-                // NOVO: Lógica da Corrente de Raios
                 chainLightningKills++;
                 if (chainLightningKills >= killsForChainLightning) {
                     chainLightningCharged = true;
@@ -2232,12 +2192,12 @@
                 }
                 
                 scene.remove(enemy);
-                removeEnemyUI(enemy); // Remove o label e a barra de vida
+                removeEnemyUI(enemy);
                 enemies.splice(i, 1);
                 updateUI();
             }
-            }
         }
+    }
 
         // NOVO: Funções de Level Up
         function gainExperience(amount) {
@@ -2407,38 +2367,21 @@
 
         // NOVO: Função dedicada para checar dano NO JOGADOR
         // Isso garante que o escudo rode primeiro
-        function checkPlayerCollisions() {
-            if (isGameOver) return; // Não checa se já morreu
+        function damagePlayer(amount) {
+            if (isGameOver) return;
 
-            const playerBBox = new THREE.Box3().setFromObject(player);
-            let tookDamage = false;
-
-            for (const enemy of enemies) {
-                // Inimigo já teve sua matrix atualizada em updateEnemies()
-                const enemyBBox = new THREE.Box3().setFromObject(enemy);
-                
-                if (playerBBox.intersectsBox(enemyBBox)) {
-                    playerHP = Math.max(0, playerHP - enemy.userData.damage);
-                    tookDamage = true;
+            playerHP = Math.max(0, playerHP - amount);
+            
+            // Feedback visual de dano no Mago (pisca o robe)
+            const robe = player.children[0];
+            const originalColor = robe.material.color.getHex();
+            robe.material.color.setHex(0xff0000);
+            setTimeout(() => {
+                if (player && player.children[0] && !isGameOver) {
+                    player.children[0].material.color.setHex(originalColor);
                 }
-            }
-
-            if (tookDamage) {
-                 // Feedback visual de dano no Mago (pisca o robe)
-                 const robe = player.children[0];
-                 const originalColor = robe.material.color.getHex();
-                 robe.material.color.setHex(0xff0000);
-
-                 setTimeout(() => {
-                     // Garante que o jogador e o robe ainda existem
-                     // (o jogo pode ter reiniciado)
-                     if (player && player.children[0] && !isGameOver) {
-                         // Volta para a cor original
-                         player.children[0].material.color.setHex(originalColor);
-                     }
-                 }, 100);
-                 updateUI(); // Atualiza a UI imediatamente
-            }
+            }, 100);
+            updateUI();
             
             if (playerHP <= 0) {
                 endGame();
@@ -2644,9 +2587,6 @@
             
             // 2. O Escudo ataca (e pode matar o inimigo que acabou de se mover)
             updateShield(); 
-
-            // 3. O Inimigo (que sobreviveu ao escudo) ataca o jogador
-            checkPlayerCollisions();
 
             // 4. Lógica dos Projéteis
             updateProjectiles();
