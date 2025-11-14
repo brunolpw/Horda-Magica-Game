@@ -29,7 +29,7 @@
             width: 100%;
             height: 100%; /* Para que os elementos inferiores funcionem */
             pointer-events: none; /* Permite interagir com a tela 3D por baixo */
-            z-index: 10;
+            z-index: 5; /* Reduzido para ficar abaixo dos modais */
         }
         /* O ui-panel agora é um estilo base para modais e barras */
         .ui-panel {
@@ -37,7 +37,7 @@
             border-radius: 0.75rem;
             padding: 1rem;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-            border: 2px solid #ff6b6b;
+            border: 2px solid #ff6b6b; /* Mantido para consistência */
             pointer-events: auto; /* Permite cliques em botões/inputs no modal */
         }
         /* Estilo da barra superior de HUD */
@@ -46,8 +46,8 @@
             color: white;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
             border-bottom: 2px solid #ff6b6b;
-            border-radius: 0 0 0.75rem 0.75rem;
-            padding: 0.5rem 1.5rem; /* Reduzido de 0.75rem para 0.5rem */
+            border-radius: 0 0 0.5rem 0.5rem;
+            padding: 0.25rem 1.5rem; /* Reduzido para ficar menor */
         }
 
         /* NOVO: Estilo para o display de timers de power-ups */
@@ -71,58 +71,71 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
-        /* NOVO: Estilos para a nova HUD de Habilidades */
-        #ability-hud {
+/* NOVO: Estilos para a nova HUD de Habilidade Ativa ("Grimório Ativo") */
+        #active-ability-hud {
             position: absolute;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
             gap: 16px;
-            pointer-events: auto;
-        }
-        .ability-icon {
-            width: 64px;
-            height: 64px;
-            background-color: rgba(20, 20, 30, 0.8);
+            align-items: center;
+            background-color: rgba(20, 20, 30, 0.85);
+            border-radius: 50px;
             border: 2px solid #4a5568;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            padding: 5px;
+            height: 54px; /* Reduzido de 68px */
+        }
+        #active-ability-icon {
+            width: 44px;  /* Reduzido de 58px */
+            height: 44px; /* Reduzido de 58px */
             border-radius: 50%;
-            position: relative;
+            background-color: #1a1a2e;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem; /* Tamanho do emoji/ícone */
+            font-size: 1.8rem; /* Reduzido de 2.2rem */
+            color: white;
+            border: 2px solid #4a5568;
         }
-        /* NOVO: Estilo para o texto de contagem de abates dentro do ícone */
-        .ability-kill-count {
+        #active-ability-progress-container {
+            flex-grow: 1;
+            height: 18px; /* Reduzido de 20px */
+            background-color: #1a1a2e;
+            border-radius: 20px;
+            margin: 0 15px;
+            width: 220px; /* Reduzido de 250px para ser menos alongado */
+            position: relative;
+            overflow: hidden;
+        }
+        #active-ability-progress-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #34d399, #2dd4bf);
+            transition: width 0.3s ease;
+            border-radius: 20px;
+        }
+        #active-ability-kill-count {
             position: absolute;
-            bottom: 2px;
-            font-size: 0.7rem;
-            color: #a0aec0; /* Cinza claro */
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.75rem; /* Reduzido de 0.8rem */
             font-weight: bold;
+            color: white;
+            text-shadow: 0 0 3px black;
         }
-        .ability-icon.ready {
+        #active-ability-hud.ready {
             border-color: #ffc700;
-            box-shadow: 0 0 15px #ffc700;
-            animation: pulse 1.5s infinite;
+            box-shadow: 0 0 20px #ffc700;
         }
-        .progress-ring {
-            position: absolute;
-            top: -4px; left: -4px;
-            width: 72px; height: 72px;
-            border-radius: 50%;
-            background: conic-gradient(
-                #34d399 var(--progress), /* Cor do progresso (verde) */
-                transparent var(--progress)
-            );
-            transition: background 0.2s;
+        #active-ability-hud.ready #active-ability-icon {
+            border-color: #ffc700;
         }
-        @keyframes pulse {
-            0% { box-shadow: 0 0 10px #ffc700; }
-            50% { box-shadow: 0 0 25px #ffc700; }
-            100% { box-shadow: 0 0 10px #ffc700; }
+        #active-ability-hud.ready #active-ability-progress-bar {
+            background: linear-gradient(90deg, #fbbF24, #fde047);
         }
-
 
         .hp-bar-fill {
             transition: width 0.3s ease;
@@ -278,7 +291,7 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
-            z-index: 100; /* Acima de tudo */
+            z-index: 40; /* Abaixo dos modais (z-index: 50) */
         }
         .floating-text {
             position: absolute;
@@ -300,6 +313,53 @@
             z-index: 101; /* Acima do tooltip do ranking */
             max-width: 250px;
         }
+
+        /* NOVO: Estilos para o Modal de Level Up */
+        #level-up-modal .upgrade-card {
+            background: rgba(43, 45, 66, 0.95);
+            border: 2px solid #a0aec0;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            width: 280px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        }
+        #level-up-modal .upgrade-card:hover {
+            border-color: #ffc700;
+            transform: translateY(-10px);
+            box-shadow: 0 8px 25px rgba(255, 199, 0, 0.3);
+        }
+        .upgrade-icon {
+            font-size: 3rem;
+            line-height: 1;
+            margin-bottom: 0.75rem;
+        }
+        .upgrade-title {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #ffc700;
+            margin-bottom: 0.5rem;
+        }
+        .upgrade-description {
+            font-size: 0.85rem;
+            color: #cbd5e0;
+            min-height: 40px; /* Garante alinhamento vertical */
+        }
+        /* NOVO: Estilo para o nível da melhoria */
+        .upgrade-level {
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: #a0aec0;
+        }
+        /* NOVO: Estilo para o texto de substituição */
+        .upgrade-replace-text {
+            font-size: 0.7rem;
+            color: #f87171; /* Vermelho claro */
+            margin-top: 0.5rem;
+        }
+
     </style>
 </head>
 <body>
@@ -322,20 +382,20 @@
 
             <!-- NOVO: Display de Level -->
             <div class="text-center pointer-events-auto px-4">
-                <label class="text-xs font-medium text-gray-300">LEVEL</label>
-                <div id="player-level-display" class="text-2xl font-bold text-green-400">1</div>
+                <label class="text-xs font-medium text-gray-300">NÍVEL</label>
+                <div id="player-level-display" class="text-xl font-bold text-green-400">1</div>
                 <!-- CORREÇÃO: Adiciona a barra de experiência que estava faltando -->
                 <div class="w-16 bg-gray-600 rounded-full h-1.5 mx-auto mt-1">
                     <div id="xp-bar" class="bg-green-400 h-1.5 rounded-full" style="width: 0%"></div>
                 </div>
                 <!-- NOVO: Display de texto da EXP -->
-                <div id="xp-text-display" class="text-xs text-gray-300 mt-1">0/500</div>
+                <div id="xp-text-display" class="text-xs text-gray-300 mt-1">0/100</div>
             </div>
 
             <!-- NOVO: Display de Onda -->
             <div class="text-center pointer-events-auto px-4">
-                <label class="text-xs font-medium text-gray-300">ONDA</label>
-                <div id="wave-level-display" class="text-2xl font-bold text-red-400">0</div>
+                <label class="text-xs font-medium text-gray-300">ONDA</label> 
+                <div id="wave-level-display" class="text-xl font-bold text-red-400">0</div>
             </div>
 
             <!-- 2. Centro: Pontuação (RE-ADICIONADO) -->
@@ -343,16 +403,9 @@
             
             <!-- 3. Direita: Barra de Especial E Cargas de Explosão -->
             <div class="flex flex-col items-end pointer-events-auto w-40">
-                <!-- Barra de Especial (Kills) -->
-                <label class="text-xs font-medium text-right">Especial (Kills: <span id="kill-points-display">0</span>/5) | Clique</label>
-                <div class="w-full bg-gray-600 rounded-full h-2">
-                    <div id="special-bar" class="special-bar-fill h-2 rounded-full bg-blue-500" style="width: 0%;"></div>
-                </div>
-                <!-- NOVO: Cargas de Explosão -->
-                <div id="explosion-charges-display" class="text-xs font-bold text-orange-400 mt-1 hidden">
+                <div id="explosion-charges-display" class="text-xs font-bold text-orange-400 mt-1">
                     EXPLOSÃO: <span id="explosion-charges-count">0</span>
                 </div>
-                <!-- REMOVIDO: Os textos de progresso das habilidades foram substituídos pelos ícones -->
             </div>
         </div>
     </div>
@@ -365,25 +418,12 @@
     <!-- Container para os labels 2D dos inimigos -->
     <div id="enemy-labels-container"></div>
 
-    <!-- NOVO: HUD de Habilidades com Ícones -->
-    <div id="ability-hud" class="hidden">
-        <!-- Habilidade 1: Explosão de Energia (Nova) -->
-        <div id="nova-bomb-icon" class="ability-icon">
-            <div class="progress-ring"></div>
-            <span class="ability-kill-count">0/10</span>
-            🌀
-        </div>
-        <!-- Habilidade 2: Corrente de Raios -->
-        <div id="chain-lightning-icon" class="ability-icon">
-            <div class="progress-ring"></div>
-            <span class="ability-kill-count">0/20</span>
-            ⚡️
-        </div>
-        <!-- Habilidade 3: Raio de Energia -->
-        <div id="energy-beam-icon" class="ability-icon">
-            <div class="progress-ring"></div>
-            <span class="ability-kill-count">0/25</span>
-            💥
+    <!-- NOVO: HUD da Habilidade Ativa (Grimório Ativo) -->
+    <div id="active-ability-hud" class="hidden">
+        <div id="active-ability-icon">?</div>
+        <div id="active-ability-progress-container">
+            <div id="active-ability-progress-bar"></div>
+            <span id="active-ability-kill-count">0/0</span>
         </div>
     </div>
     
@@ -456,6 +496,26 @@
     <!-- NOVO: Tooltip para as Habilidades -->
     <div id="ability-tooltip"></div>
 
+    <!-- NOVO: Modal de Level Up -->
+    <div id="level-up-modal" class="modal fixed inset-0 flex-col items-center justify-center hidden z-50">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-yellow-300 mb-2">Santuário do Conhecimento</h1>
+            <p class="text-lg text-gray-300">Escolha uma melhoria para o seu mago!</p>
+        </div>
+        <div id="upgrade-options-container" class="flex gap-8">
+            <!-- As 3 opções de upgrade serão inseridas aqui via JS -->
+            <!-- Exemplo de card:
+            <div class="upgrade-card" onclick="selectUpgrade('ID_DA_MELHORIA')">
+                ...
+            </div>
+            -->
+        </div>
+        <!-- NOVO: Seção para Melhorar Habilidades Ativas Conhecidas -->
+        <div id="known-upgrades-container" class="mt-8">
+            <h2 class="text-xl font-bold text-gray-400 text-center mb-4 border-t border-gray-600 pt-4">Melhorar Grimório</h2>
+            <!-- Cards de melhoria de habilidades conhecidas serão inseridos aqui -->
+        </div>
+    </div>
 
     <!-- Firebase Imports -->
     <script type="module">
@@ -726,31 +786,11 @@
         // NOVO: Variáveis de Level
         let playerLevel = 1;
         let experiencePoints = 0;
-        const baseExperience = 500; // XP base para o Lvl 2
-        let experienceForNextLevel = baseExperience;
+        const baseExperience = 100; // XP base para o Lvl 2
         // NOVO: Cura passiva (Lvl 3+)
         let passiveHealTimer = 0;
         const passiveHealInterval = 300; // 5 segundos (60fps)
 
-        
-        // NOVO: Habilidade do Level 2
-        let novaBombKills = 0;
-        const killsForNovaBomb = 10;
-        let repulsionBubbleTimer = 0; // Timer para o novo power-up
-        let repulsionBubbleMesh; // NOVO: Malha para o efeito visual da bolha
-
-        // NOVO: Habilidade da Corrente de Raios
-        let chainLightningKills = 0;
-        const killsForChainLightning = 20;
-        let chainLightningCharged = false;
-
-        // NOVO: Habilidade do Clone
-        let clone = null;
-        let cloneTimer = 0;
-
-        // NOVO: Habilidade do Level 4
-        let energyBeamKills = 0;
-        const killsForEnergyBeam = 25;
 
         // NOVO: Power-up Aura Congelante
         let freezingAuraTimer = 0;
@@ -759,17 +799,28 @@
         // NOVO: Partículas de fumaça para a aura
         let smokeParticles = [];
         const numSmokeParticles = 50;
+        
+        // REMOVIDO: As habilidades de combate agora são gerenciadas pelo novo sistema de upgrades
+        // let novaBombKills = 0;
+        // const killsForNovaBomb = 10;
+        let repulsionBubbleTimer = 0; // Timer para o novo power-up
+        let repulsionBubbleMesh; // NOVO: Malha para o efeito visual da bolha
 
-        // NOVO: Partículas de carregamento de habilidade
-        let abilityChargeParticles = [];
+        // let chainLightningKills = 0;
+        // const killsForChainLightning = 20;
+        // let chainLightningCharged = false;
+
+        let clone = null;
+        let cloneTimer = 0;
 
         // NOVO: Variáveis do Camera Shake
         let cameraShakeIntensity = 0;
         let cameraShakeDuration = 0;
 
         let isGameOver = true; // Inicia como TRUE para mostrar o menu
+        let isGamePaused = false; // NOVO: Flag para pausar o jogo durante o level up
         let keys = {};
-        const playerSpeed = 0.15;
+        let playerSpeed = 0.15;
         const mapSize = 40; // AUMENTADO: Tamanho do mapa (X/Z)
 
         // Variáveis de Jogo
@@ -778,10 +829,10 @@
         const powerUps = []; 
         const obstacles = []; // NOVO: Array para guardar obstáculos
         let projectileCooldown = 0; // Cooldown do ataque básico
-        const baseCooldown = 30; // Cooldown base do ataque
+        let baseCooldown = 30; // Cooldown base do ataque
         let specialCooldown = 0; // Cooldown do ataque especial
 
-        // NOVO: Variáveis do Sistema de Ondas
+        // Variáveis do Sistema de Ondas
         let currentWave = 0;
         let enemiesToSpawnThisWave = 0;
         let enemiesAliveThisWave = 0;
@@ -808,7 +859,6 @@
             potion: { healAmount: 30, color: 0xff4d4d, geometry: new THREE.CylinderGeometry(0.2, 0.2, 0.5, 8) },
             tripleShot: { color: 0x00A8FF, geometry: new THREE.TorusGeometry(0.3, 0.1, 8, 16) }, // Duração dinâmica
             shield: { color: 0xFFD700, geometry: new THREE.IcosahedronGeometry(0.3, 0) }, // REMOVIDO: duration
-            explosion: { charges: 3, color: 0x9400D3, geometry: new THREE.DodecahedronGeometry(0.3), explosionDamage: 100, explosionRadius: 10 }, // AUMENTADO: 3 para 5
             repulsionBubble: { duration: 900, color: 0xADD8E6, geometry: new THREE.SphereGeometry(0.3, 16, 16) }, // 15 segundos (900 / 60)
             clone: { duration: 1200, color: 0x87CEEB, geometry: new THREE.OctahedronGeometry(0.4) }, // NOVO: 20 segundos
             freezingAura: { duration: 1200, color: 0x87CEFA, geometry: new THREE.TorusKnotGeometry(0.3, 0.1, 64, 8) }, // NOVO: 20 segundos
@@ -819,18 +869,17 @@
         let scoreDisplay, hpBar, specialBar, killPointsDisplay, gameOverModal, finalScoreDisplay, playerNameDisplay, healingMessage, startMenuModal, waveLevelDisplay;
         
         // NOVO: Elementos da UI de Level
-        let playerLevelDisplay, levelUpMessage, xpTextDisplay;
+        let playerLevelDisplay, levelUpMessage, xpTextDisplay, levelUpModal, upgradeOptionsContainer, knownUpgradesContainer;
 
-        // NOVO: Elementos da nova HUD de Habilidades
-        let abilityHud, novaBombIcon, chainLightningIcon, energyBeamIcon;
-        let novaProgressRing, chainProgressRing, beamProgressRing, abilityTooltip, novaKillCount, chainKillCount, beamKillCount;
+        // NOVO: Elementos da HUD de Habilidade Ativa
+        let activeAbilityHud, activeAbilityIcon, activeAbilityProgressBar, activeAbilityKillCount;
 
         // NOVO: Função para inicializar os elementos da UI (Evita erros de 'null')
         function setupUIElements() {
-            scoreDisplay = document.getElementById('score-display');
-            hpBar = document.getElementById('hp-bar');
-            specialBar = document.getElementById('special-bar');
-            killPointsDisplay = document.getElementById('kill-points-display');
+            scoreDisplay = document.getElementById('score-display'); // Removido
+            hpBar = document.getElementById('hp-bar'); // Removido
+            specialBar = document.getElementById('special-bar'); // Removido
+            killPointsDisplay = document.getElementById('kill-points-display'); // Removido
             gameOverModal = document.getElementById('game-over-modal');
             finalScoreDisplay = document.getElementById('final-score');
             playerNameDisplay = document.getElementById('player-name-display');
@@ -841,24 +890,21 @@
             playerLevelDisplay = document.getElementById('player-level-display');
             levelUpMessage = document.getElementById('level-up-message');
             xpTextDisplay = document.getElementById('xp-text-display');
+            // NOVO: Mapeia o modal de Level Up
+            levelUpModal = document.getElementById('level-up-modal');
+            upgradeOptionsContainer = document.getElementById('upgrade-options-container');
+            knownUpgradesContainer = document.getElementById('known-upgrades-container');
 
             // NOVO: Mapeia UI da Onda
             waveLevelDisplay = document.getElementById('wave-level-display');
 
-            // NOVO: Mapeia a nova HUD de Habilidades
-            abilityHud = document.getElementById('ability-hud');
-            novaBombIcon = document.getElementById('nova-bomb-icon');
-            chainLightningIcon = document.getElementById('chain-lightning-icon');
-            energyBeamIcon = document.getElementById('energy-beam-icon');
-            novaProgressRing = novaBombIcon.querySelector('.progress-ring');
-            chainProgressRing = chainLightningIcon.querySelector('.progress-ring');
-            beamProgressRing = energyBeamIcon.querySelector('.progress-ring');
-            // NOVO: Mapeia os contadores de abates
-            novaKillCount = novaBombIcon.querySelector('.ability-kill-count');
-            chainKillCount = chainLightningIcon.querySelector('.ability-kill-count');
-            beamKillCount = energyBeamIcon.querySelector('.ability-kill-count');
+            // NOVO: Mapeia a HUD de Habilidade Ativa
+            activeAbilityHud = document.getElementById('active-ability-hud');
+            activeAbilityIcon = document.getElementById('active-ability-icon');
+            activeAbilityProgressBar = document.getElementById('active-ability-progress-bar');
+            activeAbilityKillCount = document.getElementById('active-ability-kill-count');
 
-            abilityTooltip = document.getElementById('ability-tooltip');
+            // abilityTooltip = document.getElementById('ability-tooltip'); // Removido por enquanto
         }
 
 
@@ -932,9 +978,6 @@
             // NOVO: Cria as partículas de fumaça
             createSmokeParticles();
 
-            // NOVO: Cria as partículas de carregamento de habilidade
-            createAbilityChargeParticles();
-            
             // NOVO: Cria a malha da aura de EXP
             createExpBoostAuraMesh();
 
@@ -1019,24 +1062,6 @@
             }
         }
 
-        // NOVO: Função para criar as partículas de carregamento de habilidade
-        function createAbilityChargeParticles() {
-            const particleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
-            const numParticles = 30; // Total de partículas no pool
-
-            for (let i = 0; i < numParticles; i++) {
-                // O material será definido quando a partícula for ativada
-                const particle = new THREE.Mesh(particleGeometry, new THREE.MeshBasicMaterial({ transparent: true }));
-                particle.visible = false; // Começa invisível
-                particle.userData = {
-                    life: 0,
-                    velocity: new THREE.Vector3()
-                };
-                abilityChargeParticles.push(particle);
-                scene.add(particle);
-            }
-        }
-
         // NOVO: Função para criar a malha visual da Aura de EXP
         function createExpBoostAuraMesh() {
             const geometry = new THREE.TorusGeometry(0.7, 0.05, 16, 100);
@@ -1071,6 +1096,12 @@
                     attemptSpecialAttack();
                 }
             });
+
+            // NOVO: Ataque Explosivo com clique do mouse (botão direito)
+            document.addEventListener('contextmenu', (e) => {
+                e.preventDefault(); // Impede o menu de contexto de aparecer
+                if (!isGameOver) fireExplosion();
+            });
         }
 
         function onWindowResize() {
@@ -1085,53 +1116,7 @@
         }
 
         // NOVO: Função para configurar os tooltips das habilidades
-        function setupAbilityTooltips() {
-            const abilities = [
-                {
-                    element: novaBombIcon,
-                    title: "🌀 Explosão de Energia",
-                    description: "A cada 10 abates, libera uma explosão de projéteis em todas as direções."
-                },
-                {
-                    element: chainLightningIcon,
-                    title: "⚡️ Corrente de Raios",
-                    description: "A cada 20 abates, seu próximo projétil que atingir um inimigo irá ricochetear para até 5 alvos próximos."
-                },
-                {
-                    element: energyBeamIcon,
-                    title: "💥 Raio de Energia",
-                    description: "A cada 25 abates, dispara um raio de energia concentrado na direção da mira, perfurando todos os inimigos."
-                }
-            ];
-
-            abilities.forEach(ability => {
-                ability.element.addEventListener('mouseover', () => {
-                    abilityTooltip.innerHTML = `
-                        <strong class="text-green-400">${ability.title}</strong><br>
-                        <span class="text-gray-300">${ability.description}</span>
-                    `;
-                    abilityTooltip.style.display = 'block';
-                });
-
-                ability.element.addEventListener('mousemove', (e) => {
-                    // Posiciona o tooltip acima do ícone
-                    const rect = ability.element.getBoundingClientRect();
-                    const tooltipRect = abilityTooltip.getBoundingClientRect();
-                    
-                    // Centraliza o tooltip horizontalmente com o ícone
-                    const left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
-                    // Posiciona acima do ícone com um pequeno espaço
-                    const top = rect.top - tooltipRect.height - 10; 
-
-                    abilityTooltip.style.left = `${left}px`;
-                    abilityTooltip.style.top = `${top}px`;
-                });
-
-                ability.element.addEventListener('mouseout', () => {
-                    abilityTooltip.style.display = 'none';
-                });
-            });
-        }
+        function setupAbilityTooltips() { /* Temporariamente desativado */ }
 
         // --- Funções de Entidade e Spawning ---
         
@@ -1724,8 +1709,7 @@
             switch(type) {
                 case 'potion': text = 'Cura'; break;
                 case 'tripleShot': text = 'Tiro Múltiplo'; break;
-                case 'shield': text = 'Escudo'; break;
-                case 'explosion': text = 'Explosão'; break;
+                case 'shield': text = 'Escudo'; break;                
                 case 'repulsionBubble': text = 'Bolha Repulsora'; break;
                 case 'clone': text = 'Clone'; break; // NOVO: Adiciona o nome correto
                 case 'freezingAura': text = 'Aura Congelante'; break; // NOVO
@@ -2227,55 +2211,73 @@
             }
         }
 
+        // NOVO: Função de ativação da HABILIDADE ATIVA
         function attemptSpecialAttack() {
-            // PRIORIDADE 1: Checa Cargas de Explosão
-            if (explosionCharges > 0 && specialCooldown <= 0) {
-                // Dispara uma granada de explosão
-                raycaster.setFromCamera(pointer, camera);
-                const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-                const intersection = new THREE.Vector3();
-                raycaster.ray.intersectPlane(plane, intersection);
-                
-                if (intersection.x !== 0 && intersection.z !== 0) {
-                    const direction = new THREE.Vector3().subVectors(intersection, player.position);
-                    direction.y = 0; 
-                    
-                    // NOVO TIPO: 'explosion'
-                    createProjectile('explosion', direction, player.position); 
-                    
-                    explosionCharges--;
-                    specialCooldown = 60; // Cooldown de 1s para explosivos
-                    updateUI();
-                }
-            } 
-            // PRIORIDADE 2: Checa Especial por Kills (só se não tiver explosão)
-            else if (killPoints >= maxKillPoints && specialCooldown <= 0) {
-                // Dispara o ataque forte normal
-                killPoints = 0;
-                specialCooldown = 180; // Cooldown normal
+            const activeAbilityId = player.userData.activeAbility;
+            if (!activeAbilityId) return; // Não faz nada se não houver habilidade equipada
 
-                raycaster.setFromCamera(pointer, camera);
-                const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-                const intersection = new THREE.Vector3();
-                raycaster.ray.intersectPlane(plane, intersection);
-                
-                if (intersection.x !== 0 && intersection.z !== 0) {
-                    // NOVO: Comportamento do especial muda com o nível
-                    if (playerLevel >= 3) {
-                        // Nível 3+: Pequena explosão em área
-                        const specialExplosionRadius = 3; // Raio menor que a explosão normal
-                        const specialExplosionDamage = projectileProps.strong.damage; // Dano do projétil forte (50)
-                        triggerBigExplosion(intersection, specialExplosionRadius, specialExplosionDamage);
-                    } else {
-                        // Nível 1-2: Projétil único e forte
-                        const direction = new THREE.Vector3().subVectors(intersection, player.position);
-                        direction.y = 0; 
-                        createProjectile('strong', direction, player.position);
+            // Checa se o especial está carregado (5 abates) e se não está em cooldown
+            if (killPoints >= maxKillPoints && specialCooldown <= 0) {
+                const searchRadius = 25;
+                const searchRadiusSq = searchRadius * searchRadius;
+
+                // 1. Encontra todos os inimigos dentro do raio de busca
+                const enemiesInRange = enemies.filter(enemy => 
+                    enemy.position.distanceToSquared(player.position) <= searchRadiusSq
+                );
+
+                if (enemiesInRange.length === 0) return; // Não faz nada se não houver alvos
+
+                // 2. Ordena os inimigos para encontrar o "mais forte"
+                // Critério 1: Maior vida máxima (maxHP)
+                // Critério 2 (desempate): Maior vida atual (hp)
+                enemiesInRange.sort((a, b) => {
+                    if (b.userData.maxHP !== a.userData.maxHP) {
+                        return b.userData.maxHP - a.userData.maxHP;
                     }
-                }
+                    return b.userData.hp - a.userData.hp;
+                });
+
+                const target = enemiesInRange[0]; // O alvo é o primeiro da lista ordenada
+
+                // 3. Dispara o projétil teleguiado
+                const direction = new THREE.Vector3().subVectors(target.position, player.position).normalize();
+                
+                // O dano aumenta com o nível da habilidade
+                const specialAttackLevel = player.userData.upgrades.special_attack || 0;
+                const damage = projectileProps.strong.damage + ((specialAttackLevel - 1) * 15);
+                createProjectile('strong', direction, player.position);
+                // Atualiza o dano do último projétil criado
+                projectiles[projectiles.length - 1].userData.damage = damage;
+
+                // 4. Reseta os contadores
+                killPoints = 0;
+                specialCooldown = 180; // 3 segundos de cooldown
                 updateUI();
             }
         }
+
+        // NOVO: Função para disparar a Carga Explosiva
+        function fireExplosion() {
+            // Só funciona se o jogador tiver cargas e não estiver em cooldown
+            if (explosionCharges > 0 && specialCooldown <= 0) {
+                raycaster.setFromCamera(pointer, camera);
+                const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                const intersection = new THREE.Vector3();
+                if (!raycaster.ray.intersectPlane(plane, intersection)) return;
+
+                const direction = new THREE.Vector3().subVectors(intersection, player.position).normalize();
+                
+                // Cria o projétil explosivo
+                createProjectile('explosion', direction, player.position); 
+                
+                // Consome uma carga e inicia o cooldown
+                explosionCharges--;
+                specialCooldown = 60; // Cooldown de 1s para explosivos
+                updateUI();
+            }
+        }
+
 
         function updatePowerUps() {
             // A BBox do player já foi atualizada em animate()
@@ -2324,11 +2326,6 @@
                         case 'repulsionBubble':
                             // NOVO: Ativa a bolha de repulsão
                             repulsionBubbleTimer += data.duration;
-                            break;
-                        
-                        case 'explosion':
-                            // NOVO: Acumula (soma) as cargas
-                            explosionCharges += data.charges;
                             break;
                         
                         case 'clone':
@@ -2801,42 +2798,6 @@
                     killStats[enemyData.type]++;
                 }
 
-                // NOVO: Lógica de partículas ao matar inimigo
-                const novaProgress = playerLevel >= 2 ? (novaBombKills / killsForNovaBomb) : 0;
-                const beamProgress = playerLevel >= 4 ? (energyBeamKills / killsForEnergyBeam) : 0;
-                const lightningProgress = !chainLightningCharged ? (chainLightningKills / killsForChainLightning) : 0;
-
-                // Ativa partículas para a habilidade que está mais perto de carregar
-                if (playerLevel >= 2 && novaProgress >= beamProgress && novaProgress >= lightningProgress) {
-                    spawnAbilityChargeParticle(enemy.position, 0x00FFFF); // Ciano para Nova
-                } else if (playerLevel >= 4 && beamProgress >= novaProgress && beamProgress >= lightningProgress) {
-                    spawnAbilityChargeParticle(enemy.position, 0x00aaff); // Azul para Raio
-                } else if (lightningProgress > 0) {
-                    spawnAbilityChargeParticle(enemy.position, 0xFFFF00); // Amarelo para Corrente
-                }
-
-                if (playerLevel >= 2) {
-                    novaBombKills++;
-                    if (novaBombKills >= killsForNovaBomb) {
-                        triggerNovaBomb();
-                        novaBombKills = 0;
-                    }
-                }
-
-                if (playerLevel >= 4) {
-                    energyBeamKills++;
-                    if (energyBeamKills >= killsForEnergyBeam) {
-                        fireEnergyBeam();
-                        energyBeamKills = 0;
-                    }
-                }
-
-                chainLightningKills++;
-                if (chainLightningKills >= killsForChainLightning) {
-                    chainLightningCharged = true;
-                    chainLightningKills = 0;
-                }
-                
                 scene.remove(enemy);
                 removeEnemyUI(enemy);
                 enemies.splice(i, 1);
@@ -2850,14 +2811,28 @@
 
         // NOVO: Funções de Level Up
         function gainExperience(amount) {
-            // NOVO: Dobra a experiência se o power-up estiver ativo
-            const finalAmount = amount * (expBoostTimer > 0 ? 2 : 1);
+            let finalAmount = amount;
+
+            // NOVO: Aplica o bônus da Sede de Conhecimento, arredondando para cima
+            const xpGainLevel = player.userData.upgrades.increase_xp_gain || 0;
+            if (xpGainLevel > 0) {
+                const bonusPercentage = xpGainLevel * 0.20; // 20% por nível
+                const bonusAmount = Math.ceil(finalAmount * bonusPercentage);
+                finalAmount += bonusAmount;
+            }
+
+            // NOVO: Aplica o bônus do Power-up de EXP em Dobro
+            if (expBoostTimer > 0) {
+                finalAmount *= 2;
+            }
+
+
             createFloatingText(`+${finalAmount} EXP`, player.position.clone().setY(2.0), '#FFFF00', '1.2rem');
 
             experiencePoints += finalAmount;
             
             // Permite múltiplos level ups de uma vez (ex: explosão)
-            while (experiencePoints >= experienceForNextLevel) {
+            while (experiencePoints >= player.userData.experienceForNextLevel) {
                 levelUp();
             }
 
@@ -2866,91 +2841,209 @@
         }
         
         function levelUp() {
-            experiencePoints -= experienceForNextLevel; // Subtrai o custo e mantém o excesso
+            experiencePoints -= player.userData.experienceForNextLevel; // Subtrai o custo e mantém o excesso
             playerLevel++;
-
-            // NOVO: Invoca Espíritos Vingativos ao subir de nível
-            const targets = findClosestEnemies(player.position, 3);
-            targets.forEach(target => createVengefulSpirit(target));
-
             
+            // Aumenta a vida máxima em 10 a cada nível como bônus base
+            maxHP += 10;
+            playerHP += 10;
+
             // Aumenta o custo para o próximo nível (500, 1000, 1500, etc.)
-            experienceForNextLevel = baseExperience * playerLevel;
+            player.userData.experienceForNextLevel = baseExperience * playerLevel;
             
-            displayLevelUpMessage();
-            updateUI(); // Atualiza o display do level
+            // NOVO: Pausa o jogo e mostra as opções de melhoria
+            showLevelUpOptions();
         }
 
-        // NOVO: Função para criar um Espírito Vingativo
-        function createVengefulSpirit(target) {
-            const geometry = new THREE.SphereGeometry(0.4, 8, 4);
-            const material = new THREE.MeshBasicMaterial({ color: 0x98FB98, transparent: true, opacity: 0.7 });
-            const spirit = new THREE.Mesh(geometry, material);
-            spirit.position.copy(player.position);
-
-            spirit.userData = {
-                isSpirit: true,
-                target: target,
-                speed: 0.2,
-                damage: 35,
-                life: 300 // Vida útil de 5 segundos
-            };
-            projectiles.push(spirit); // Adiciona aos projéteis para ser atualizado
-            scene.add(spirit);
-        }
-
-        // NOVO: Função para encontrar os inimigos mais próximos
-        function findClosestEnemies(position, count) {
-            return enemies
-                .map(enemy => ({
-                    enemy,
-                    distanceSq: enemy.position.distanceToSquared(position)
-                }))
-                .sort((a, b) => a.distanceSq - b.distanceSq)
-                .slice(0, count)
-                .map(item => item.enemy);
-        }
-
-        // NOVO: Funções para as partículas de carregamento de habilidade
-        function spawnAbilityChargeParticle(startPosition, color) {
-            const particle = abilityChargeParticles.find(p => !p.visible);
-            if (particle) {
-                particle.position.copy(startPosition);
-                particle.position.y = 0.5;
-                particle.material.color.setHex(color);
-                particle.material.opacity = 1.0;
-                particle.visible = true;
-                particle.userData.life = 90; // 1.5 segundos de vida
+        // NOVO: Estrutura de dados REFORMULADA para as melhorias com níveis
+        const upgrades = {
+            // --- MELHORIAS DE ATRIBUTOS (PASSIVAS) ---
+            increase_damage: {
+                type: 'attribute',
+                icon: '💥',
+                title: "Poder Arcano",
+                maxLevel: 5,
+                description: (level) => `Aumenta o dano do ataque básico em +10% (arredondado para cima).`,
+                apply: () => { /* O dano é calculado dinamicamente agora */ }
+            },
+            increase_attack_speed: {
+                type: 'attribute',
+                icon: '⚡️',
+                title: "Celeridade",
+                maxLevel: 5,
+                description: (level) => `Aumenta a velocidade de ataque em +10%.`,
+                apply: () => { baseCooldown = Math.max(5, baseCooldown * 0.90); } // Multiplicativo é bom aqui
+            },
+            increase_move_speed: {
+                type: 'attribute',
+                icon: '🏃',
+                title: "Passos Ligeiros",
+                maxLevel: 5,
+                description: (level) => `Aumenta sua velocidade de movimento em +7%.`,
+                apply: () => { playerSpeed *= 1.07; }
+            },
+            increase_max_hp: {
+                type: 'attribute',
+                icon: '❤️',
+                title: "Vigor",
+                maxLevel: 5,
+                description: (level) => `Aumenta a vida máxima em +20 e cura a mesma quantidade.`,
+                apply: () => { maxHP += 20; playerHP += 20; }
+            },
+            increase_xp_gain: {
+                type: 'attribute',
+                icon: '🎓',
+                title: "Sede de Conhecimento",
+                maxLevel: 3,
+                description: (level) => `Aumenta o ganho de experiência em +20% (arredondado para cima).`,
+                apply: () => { /* A EXP é calculada dinamicamente agora */ }
+            },
+            // --- HABILIDADES ATIVAS (SÓ PODE TER UMA EQUIPADA) ---
+            special_attack: {
+                type: 'active',
+                icon: '🔥',
+                title: "Míssil Mágico",
+                maxLevel: 5,
+                killCost: 5,
+                description: (level) => `Dispara um míssil teleguiado no inimigo mais forte. Dano aumenta com o nível.`,
+                apply: () => { /* A lógica será gerenciada em `attemptSpecialAttack` */ }
+            },
+            nova_bomb: {
+                type: 'active',
+                icon: '🌀',
+                title: "Explosão de Energia",
+                maxLevel: 5,
+                killCost: 10,
+                description: (level) => `Libera uma explosão de projéteis em todas as direções. Mais projéteis com o nível.`,
+                apply: () => { /* A lógica será gerenciada no loop `animate` */ }
+            },
+            chain_lightning: {
+                type: 'active',
+                icon: '⛓️',
+                title: "Corrente de Raios",
+                maxLevel: 5,
+                killCost: 8,
+                description: (level) => `Eletrifica seu próximo ataque, fazendo-o ricochetear para outros inimigos. Mais saltos com o nível.`,
+                apply: () => { /* A lógica será gerenciada em `updateProjectiles` */ }
+            },
+            // NOVO: Habilidade de Carga Explosiva
+            explosion_charge: {
+                type: 'passive_charge', // Tipo especial para cargas
+                icon: '💣',
+                title: "Carga Explosiva",
+                maxLevel: 10, // Pode acumular muitas cargas
+                description: (level) => `Ganha +1 carga de um projétil explosivo (Botão Direito).`,
+                apply: () => { explosionCharges++; }
+            },
+            // NOVO: Habilidade de Auto-Cura
+            auto_heal: {
+                type: 'attribute', // É um atributo passivo
+                icon: '✨',
+                title: "Regeneração (Passiva)",
+                maxLevel: 3,
+                description: (level) => `Recupera 2 de HP a cada 5 segundos. A frequência aumenta com o nível.`,
+                apply: () => { /* A lógica será gerenciada no loop `animate` */ }
             }
-        }
+        };
 
-        function updateAbilityChargeParticles() {
-            if (!player) return;
+        // NOVO: Função para mostrar as opções de level up
+        function showLevelUpOptions() {
+            isGamePaused = true;
+            upgradeOptionsContainer.innerHTML = '';
+            knownUpgradesContainer.innerHTML = '';
 
-            for (const particle of abilityChargeParticles) {
-                if (particle.visible) {
-                    particle.userData.life--;
+            const playerUpgrades = player.userData.upgrades;
+            const activeAbility = player.userData.activeAbility;
 
-                    if (particle.userData.life <= 0) {
-                        particle.visible = false;
-                    } else {
-                        // Move a partícula em direção ao jogador
-                        const direction = new THREE.Vector3().subVectors(player.position, particle.position).normalize();
-                        particle.position.addScaledVector(direction, 0.15); // Velocidade de atração
-                        particle.material.opacity = particle.userData.life / 90;
+            // --- 1. Gerar 3 Opções Aleatórias (Topo) ---
+            const availableUpgradeKeys = Object.keys(upgrades).filter(key => {
+                const currentLevel = playerUpgrades[key] || 0;
+                return currentLevel < upgrades[key].maxLevel;
+            });
+            const chosenUpgrades = [];
+            while (chosenUpgrades.length < 3 && availableUpgradeKeys.length > 0) {
+                const randomIndex = Math.floor(Math.random() * availableUpgradeKeys.length);
+                const upgradeId = availableUpgradeKeys.splice(randomIndex, 1)[0];
+                chosenUpgrades.push(upgradeId);
+            }
+            chosenUpgrades.forEach(upgradeId => {
+                const upgrade = upgrades[upgradeId];
+                const currentLevel = playerUpgrades[upgradeId] || 0;
+                const nextLevel = currentLevel + 1;
+                const card = document.createElement('div');
+                card.className = 'upgrade-card';
+                card.onclick = () => selectUpgrade(upgradeId);
+                let cardHTML = `
+                    <div class="upgrade-icon">${upgrade.icon}</div>
+                    <div class="upgrade-title">${upgrade.title}</div>
+                    <div class="upgrade-description">${upgrade.description(nextLevel)}</div>`;
 
-                        // Desativa se chegar perto o suficiente
-                        if (particle.position.distanceTo(player.position) < 0.5) {
-                            particle.visible = false;
-                        }
+                if (upgrade.type === 'active') {
+                    if (activeAbility && activeAbility !== upgradeId) {
+                        cardHTML += `<div class="upgrade-replace-text">Substitui ${upgrades[activeAbility].title}</div>`;
                     }
+                    cardHTML += `<div class="upgrade-level">${currentLevel > 0 ? `Nível ${currentLevel} ➔ ${nextLevel}` : 'APRENDER'}</div>`;
+                } else {
+                    cardHTML += `<div class="upgrade-level">${currentLevel > 0 ? `Nível ${currentLevel} ➔ ${nextLevel}` : 'NOVO!'}</div>`;
                 }
+                cardHTML += `</div>`;
+                card.innerHTML = cardHTML;
+                upgradeOptionsContainer.appendChild(card);
+            });
+
+            // --- 2. Gerar Opções para Melhorar Habilidades Conhecidas (Embaixo) ---
+            const knownActiveAbilities = Object.keys(playerUpgrades).filter(key => upgrades[key].type === 'active');
+            if (knownActiveAbilities.length > 0) {
+                knownUpgradesContainer.style.display = 'block';
+                knownActiveAbilities.forEach(upgradeId => {
+                    const upgrade = upgrades[upgradeId];
+                    const currentLevel = playerUpgrades[upgradeId];
+                    if (currentLevel >= upgrade.maxLevel) return; // Não mostra se já estiver no nível máximo
+
+                    const nextLevel = currentLevel + 1;
+                    const card = document.createElement('div');
+                    card.className = 'upgrade-card';
+                    card.onclick = () => selectUpgrade(upgradeId);
+                    card.innerHTML = `
+                        <div class="upgrade-icon">${upgrade.icon}</div>
+                        <div class="upgrade-title">${upgrade.title}</div>
+                        <div class="upgrade-description">${upgrade.description(nextLevel)}</div>
+                        <div class="upgrade-level">Melhorar: Nível ${currentLevel} ➔ ${nextLevel}</div>
+                    `;
+                    knownUpgradesContainer.appendChild(card);
+                });
+            } else {
+                knownUpgradesContainer.style.display = 'none';
             }
+
+            levelUpModal.classList.remove('hidden');
         }
 
+        // NOVO: Função chamada quando o jogador escolhe uma melhoria
+        function selectUpgrade(upgradeId) {
+            const upgrade = upgrades[upgradeId];
+            if (upgrade && upgrade.apply) {
+                // Se for uma habilidade ativa, equipa ela
+                if (upgrade.type === 'active') {
+                    player.userData.activeAbility = upgradeId;
+                }
 
+                // Incrementa o nível da habilidade no estado do jogador
+                player.userData.upgrades[upgradeId] = (player.userData.upgrades[upgradeId] || 0) + 1;
+                
+                // Executa o efeito da melhoria
+                upgrade.apply();
+            }
 
+            // Esconde o modal e continua o jogo
+            levelUpModal.classList.add('hidden');
+            isGamePaused = false;
+            
+            // Atualiza a UI para refletir qualquer mudança
+            updateUI();
+        }
 
+        // NOVO: Função restaurada para atualizar os projéteis
         function updateProjectiles() {
             const tempBBox = new THREE.Box3();
 
@@ -2958,65 +3051,29 @@
                 const projectile = projectiles[i];
                 const projData = projectile.userData;
                 
-                // Flag para checar se o projétil atingiu algo nesta frame
                 let hit = false;
 
-                // NOVO: Lógica para Espíritos Vingativos
-                if (projData.isSpirit) {
-                    projData.life--;
-                    if (projData.life <= 0 || !projData.target || projData.target.userData.hp <= 0) {
-                        scene.remove(projectile);
-                        projectiles.splice(i, 1);
-                        continue;
-                    }
-                    // Persegue o alvo
-                    const direction = new THREE.Vector3().subVectors(projData.target.position, projectile.position).normalize();
-                    projectile.position.addScaledVector(direction, projData.speed);
-
-                    // Checa colisão com o alvo
-                    if (projectile.position.distanceTo(projData.target.position) < 0.8) {
-                        projData.target.userData.hp -= projData.damage;
-                        // NOVO: Adiciona o texto flutuante para o dano do espírito
-                        createFloatingText(
-                            projData.damage, 
-                            projData.target.position.clone().setY(projData.target.userData.modelHeight || 1.5), 
-                            '#98FB98' // Cor verde claro
-                        );
-                        createFloatingText(projData.damage, projData.target.position.clone().setY(projData.target.userData.modelHeight || 1.5), '#98FB98');
-                        projData.target.userData.hitTimer = 10;
-                        projData.life = 0; // Marca para remoção
-                    }
-                    continue; // Pula a lógica de projétil normal
-                }
-
-                // NOVO: Lógica de reflexão da Bolha Repulsora
+                // Lógica de reflexão da Bolha Repulsora
                 if (repulsionBubbleTimer > 0 && projData.hasBeenReflected === null) {
                     const distanceToPlayerSq = projectile.position.distanceToSquared(player.position);
-                    const repulsionRadius = 4; // Mesmo raio da bolha
+                    const repulsionRadius = 4;
                     if (distanceToPlayerSq < repulsionRadius * repulsionRadius) {
-                        // Reflete o projétil
                         const reflectionVector = new THREE.Vector3().subVectors(projectile.position, player.position).normalize();
-                        
-                        projData.direction.copy(reflectionVector); // A nova direção é para longe do jogador
-                        projData.type = 'weak'; // Transforma em um projétil do jogador
-                        projData.damage = 20; // Dano aumentado para recompensar a reflexão
-                        projData.speed *= 1.5; // Acelera o projétil refletido
-                        projData.hasBeenReflected = true; // Marca para não refletir de novo
-                        
-                        // Muda a cor para indicar que foi refletido
-                        projectile.material.color.setHex(0x00D7FE); // Cor ciano/azul
-                        
-                        continue; // Pula o resto da lógica para este projétil neste frame
+                        projData.direction.copy(reflectionVector);
+                        projData.type = 'weak';
+                        projData.damage = 20;
+                        projData.speed *= 1.5;
+                        projData.hasBeenReflected = true;
+                        projectile.material.color.setHex(0x00D7FE);
+                        continue;
                     }
                 }
 
-                // CORREÇÃO: A lógica de movimento e a BBox devem ser atualizadas para TODOS os projéteis no início.
                 projectile.position.addScaledVector(projData.direction, projData.speed);
                 projectile.updateMatrixWorld();
                 tempBBox.setFromObject(projectile);
 
-
-                // NOVO: Checa colisão de projéteis inimigos com o jogador
+                // Checa colisão de projéteis inimigos com o jogador
                 if (projData.type === 'necro_bolt' || projData.type === 'arrow') {
                     const playerBBox = new THREE.Box3().setFromObject(player);
                     if (tempBBox.intersectsBox(playerBBox)) {
@@ -3028,33 +3085,30 @@
                     }
                 }
 
-                // Checa colisão com inimigos
-                // CORREÇÃO: Movido para depois da atualização da posição do projétil
-                for (const enemy of enemies) {
-                    // Só checa colisão se o projétil for do jogador
-                    if (projData.type !== 'necro_bolt' && projData.type !== 'arrow') {
-                        // CORREÇÃO: Usa a BBox atualizada do projétil
+                // Checa colisão com inimigos (apenas projéteis do jogador)
+                if (projData.type !== 'necro_bolt' && projData.type !== 'arrow') {
+                    for (const enemy of enemies) {
                         const enemyBBox = new THREE.Box3().setFromObject(enemy);
                         if (tempBBox.intersectsBox(enemyBBox)) {
-                            enemy.userData.hp -= projData.damage;
-
-                            // NOVO: Ativa a Corrente de Raios se estiver carregada
-                            if (chainLightningCharged) {
-                                triggerChainLightning(enemy);
-                                chainLightningCharged = false; // Descarrega a habilidade
-                                chainLightningKills = 0; // Reseta a contagem
+                            // Calcula o dano final com bônus do Poder Arcano
+                            const damageLevel = player.userData.upgrades.increase_damage || 0;
+                            let finalDamage = projData.damage; // Usa o dano base do projétil
+                            if (damageLevel > 0) {
+                                const bonusPercentage = damageLevel * 0.10; // 10% por nível
+                                const bonusAmount = Math.ceil(finalDamage * bonusPercentage);
+                                finalDamage += bonusAmount;
                             }
 
-                            createFloatingText(projData.damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
+                            enemy.userData.hp -= finalDamage;
+                            createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
                             enemy.userData.hitTimer = 10;
                             hit = true;
-                            break; // Projétil só acerta um inimigo
+                            break;
                         }
                     }
                 }
 
-
-                // NOVO: Rotaciona a flecha para apontar na direção do movimento
+                // Rotaciona a flecha
                 if (projData.type === 'arrow') {
                     projectile.lookAt(projectile.position.clone().add(projData.direction));
                     projectile.rotateX(Math.PI / 2);
@@ -3067,33 +3121,23 @@
                     continue;
                 }
 
-                // --- INÍCIO DA CORREÇÃO DE COLISÃO DO PROJETÉTIL ---
-                if (!hit) { // Só checa obstáculos se não atingiu um inimigo
+                // Checa colisão com obstáculos
+                if (!hit) {
                     for (const obstacle of obstacles) {
                         obstacle.updateMatrixWorld();
-                        let obstacleBBox;
-
-                        if (obstacle.userData.collisionMesh) {
-                            obstacle.userData.collisionMesh.updateWorldMatrix(true, false);
-                            obstacleBBox = new THREE.Box3().setFromObject(obstacle.userData.collisionMesh);
-                        } else {
-                            obstacleBBox = new THREE.Box3().setFromObject(obstacle);
-                        }
-                        
+                        let obstacleBBox = obstacle.userData.collisionMesh ? new THREE.Box3().setFromObject(obstacle.userData.collisionMesh) : new THREE.Box3().setFromObject(obstacle);
                         if (tempBBox.intersectsBox(obstacleBBox)) {
                             hit = true;
                             break;
                         }
                     }
                 }
-                // --- FIM DA CORREÇÃO ---
 
+                // Remove o projétil se ele atingiu algo
                 if (hit) {
-                    // NOVO: Checa se deve explodir
                     if (projData.isExplosive) {
                         triggerBigExplosion(projectile.position, projData.explosionRadius, projData.explosionDamage);
                     }
-                    
                     scene.remove(projectile);
                     projectiles.splice(i, 1);
                 }
@@ -3137,13 +3181,14 @@
             // NOVO: Checagem de segurança (UI não carregada)
             if (!playerNameDisplay) return; 
 
-            playerNameDisplay.textContent = playerName; // NOVO: Atualiza o nome do jogador
+            playerNameDisplay.textContent = playerName;
             scoreDisplay.textContent = `Pontuação: ${score}`;
 
             // NOVO: Atualiza o display de Level
             playerLevelDisplay.textContent = playerLevel;
 
             // NOVO: Atualiza a barra de experiência
+            const experienceForNextLevel = player.userData.experienceForNextLevel || baseExperience;
             const xpPercent = (experiencePoints / experienceForNextLevel) * 100;
             document.getElementById('xp-bar').style.width = `${xpPercent}%`;
             xpTextDisplay.textContent = `${Math.floor(experiencePoints)}/${experienceForNextLevel}`;
@@ -3154,16 +3199,25 @@
             const hpPercent = Math.max(0, playerHP / maxHP) * 100;
             hpBar.style.width = `${hpPercent}%`;
             
-            const specialPercent = Math.min(100, (killPoints / maxKillPoints) * 100);
-            specialBar.style.width = `${specialPercent}%`;
-            killPointsDisplay.textContent = `${killPoints}`;
+            // NOVO: Lógica da HUD de Habilidade Ativa
+            const activeAbilityId = player.userData.activeAbility;
+            if (activeAbilityId) {
+                activeAbilityHud.classList.remove('hidden');
+                const ability = upgrades[activeAbilityId];
+                const maxKills = ability.killCost;
+                const progressPercent = Math.min(100, (killPoints / maxKills) * 100);
 
-            if (killPoints >= maxKillPoints) {
-                specialBar.classList.add('bg-green-500');
-                specialBar.classList.remove('bg-blue-500');
+                activeAbilityIcon.textContent = ability.icon;
+                activeAbilityProgressBar.style.width = `${progressPercent}%`;
+                activeAbilityKillCount.textContent = `${killPoints}/${maxKills}`;
+
+                if (killPoints >= maxKills) {
+                    activeAbilityHud.classList.add('ready');
+                } else {
+                    activeAbilityHud.classList.remove('ready');
+                }
             } else {
-                specialBar.classList.add('bg-blue-500');
-                specialBar.classList.remove('bg-green-500');
+                activeAbilityHud.classList.add('hidden');
             }
 
             // NOVO: Atualiza display de timers dos power-ups
@@ -3194,60 +3248,24 @@
 
             // NOVO: Atualiza display de Cargas de Explosão
             const explosionDisplay = document.getElementById('explosion-charges-display');
-            if (explosionCharges > 0) {
+            if (player.userData.upgrades.explosion_charge > 0) { // Mostra se a habilidade foi aprendida
                 document.getElementById('explosion-charges-count').textContent = explosionCharges;
-                explosionDisplay.classList.remove('hidden');
+                explosionDisplay.style.display = 'block';
             } else {
-                explosionDisplay.classList.add('hidden');
+                explosionDisplay.style.display = 'none';
             }
 
-            // NOVO: Lógica da nova HUD de Habilidades
-            // A HUD geral fica visível se qualquer habilidade estiver desbloqueada
-            if (playerLevel >= 2) { 
-                abilityHud.classList.remove('hidden'); 
-            } else { 
-                abilityHud.classList.add('hidden'); 
-            }
-
-            // Habilidade 1: Explosão de Energia (Nova) - Desbloqueada no Nível 2
-            if (playerLevel >= 2) {
-                novaBombIcon.style.display = 'flex';
-                const novaProgress = (novaBombKills / killsForNovaBomb) * 360;
-                novaProgressRing.style.setProperty('--progress', `${novaProgress}deg`);
-            } else {
-                novaBombIcon.style.display = 'none';
-            }
-
-            // Habilidade 2: Corrente de Raios - Desbloqueada no Nível 2
-            if (playerLevel >= 2) {
-                chainLightningIcon.style.display = 'flex';
-                const lightningProgress = !chainLightningCharged ? (chainLightningKills / killsForChainLightning) * 360 : 360;
-                chainProgressRing.style.setProperty('--progress', `${lightningProgress}deg`);
-                // NOVO: Atualiza o contador de abates
-                chainKillCount.textContent = chainLightningCharged ? 'PRONTO!' : `${chainLightningKills}/${killsForChainLightning}`;
-
-                chainLightningIcon.classList.toggle('ready', chainLightningCharged);
-            } else {
-                chainLightningIcon.style.display = 'none';
-            }
-
-            // Habilidade 3: Raio de Energia - Desbloqueada no Nível 4
-            if (playerLevel >= 4) {
-                energyBeamIcon.style.display = 'flex';
-                const beamProgress = (energyBeamKills / killsForEnergyBeam) * 360;
-                beamProgressRing.style.setProperty('--progress', `${beamProgress}deg`);
-                // NOVO: Atualiza o contador de abates
-                beamKillCount.textContent = `${energyBeamKills}/${killsForEnergyBeam}`;
-
-            } else {
-                energyBeamIcon.style.display = 'none';
-            }
+            // REMOVIDO: A HUD de habilidades de abates não é mais necessária
+            // abilityHud.classList.add('hidden');
         }
 
         // --- Ciclo de Jogo (Game Loop) ---
 
         function animate() {
             requestAnimationFrame(animate);
+
+            // NOVO: Pausa o jogo se a flag estiver ativa
+            if (isGamePaused) return;
 
             // CORREÇÃO: Checa se 'renderer' existe. Se não, o jogo não pode rodar.
             // O erro 'Cannot read properties of undefined (reading 'position')' 
@@ -3350,19 +3368,6 @@
                 expBoostAuraMesh.visible = false;
             }
 
-
-            // NOVO: Cura passiva a partir do Nível 3
-            if (playerLevel >= 3) {
-                passiveHealTimer++;
-                if (passiveHealTimer >= passiveHealInterval) {
-                    playerHP = Math.min(maxHP, playerHP + 1);
-                    createFloatingText('+1', player.position.clone().setY(1.5), '#00ff00', '1.5rem');
-                    updateUI(); // Apenas atualiza a barra de vida
-                    passiveHealTimer = 0;
-                }
-            }
-
-
             // 2. Lógica do Jogador
             handlePlayerMovement();
             
@@ -3388,9 +3393,6 @@
             // 4. Lógica dos Projéteis
             updateProjectiles();
             
-            // NOVO: Atualiza as partículas de carregamento
-            updateAbilityChargeParticles();
-
             // 5. Atualiza a posição dos labels 2D e HP
             updateEnemyUI();
             updateFloatingText(); // NOVO: Atualiza o texto flutuante
@@ -3398,6 +3400,18 @@
 
             // NOVO: Garante que a UI seja atualizada a cada frame
             updateUI();
+
+            // NOVO: Lógica da habilidade de Auto-Cura
+            const autoHealLevel = player.userData.upgrades.auto_heal || 0;
+            if (autoHealLevel > 0) {
+                passiveHealTimer++;
+                // O intervalo diminui com o nível da habilidade
+                const currentHealInterval = passiveHealInterval - ((autoHealLevel - 1) * 60); // -1s por nível
+                if (passiveHealTimer >= currentHealInterval) {
+                    playerHP = Math.min(maxHP, playerHP + 2); // CORREÇÃO: Cura 2 de HP
+                    passiveHealTimer = 0;
+                }
+            }
 
             // 6. Renderização
             renderer.render(scene, camera);
@@ -3415,7 +3429,7 @@
             // NOVO: Reseta o Level
             playerLevel = 1;
             experiencePoints = 0;
-            experienceForNextLevel = baseExperience;
+            playerSpeed = 0.15; 
 
             killPoints = 0;
             killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 }; // NOVO: Reseta killStats
@@ -3424,22 +3438,14 @@
             // NOVO: Reseta timers e estados dos novos poderes
             tripleShotTimer = 0;
             removeShield(); // Garante que o escudo seja removido
-            repulsionBubbleTimer = 0; // NOVO: Reseta timer da bolha
-            novaBombKills = 0; // NOVO: Reseta contador da nova
+            repulsionBubbleTimer = 0; 
             if (clone) scene.remove(clone); // NOVO: Remove clone se existir
-            clone = null; cloneTimer = 0; // NOVO: Reseta clone
-            energyBeamKills = 0; // NOVO: Reseta contador do raio
-            explosionCharges = 0; // NOVO: Reseta cargas
-            chainLightningKills = 0; chainLightningCharged = false; // NOVO: Reseta corrente
-            freezingAuraTimer = 0; // NOVO: Reseta aura
+            clone = null; cloneTimer = 0; 
+            explosionCharges = 0; 
+            freezingAuraTimer = 0; 
             if (freezingAuraMesh) freezingAuraMesh.visible = false; // NOVO: Esconde a aura
             if (expBoostAuraMesh) expBoostAuraMesh.visible = false; // NOVO: Esconde a aura de EXP
             expBoostTimer = 0; // NOVO: Reseta timer de EXP
-
-            // NOVO: Remove as partículas de fumaça da cena
-            smokeParticles.forEach(p => {
-                if (p.parent) scene.remove(p);
-            });
 
             // NOVO: Reseta o estado das ondas
             currentWave = 0;
@@ -3469,6 +3475,7 @@
             if (player) scene.remove(player);
             if (targetRing) scene.remove(targetRing);
             createPlayer();
+            player.userData = { maxHP: 100, upgrades: {}, activeAbility: null, experienceForNextLevel: baseExperience }; // Reseta os atributos e upgrades do jogador
             
             // Reset UI
             startMenuModal.classList.add('hidden');
@@ -3581,6 +3588,7 @@
             loadInitialRankingFromCache(); // NOVO: Carrega o ranking do cache
             // A configuração dos tooltips é chamada dentro de init()
             init();
+            createPlayer(); // Cria o jogador uma vez para ter a referência em `startGame`
             animate();
             // A tela de menu fica visível no início (isGameOver = true)
         };
