@@ -2940,8 +2940,11 @@
                 type: 'attribute', // É um atributo passivo
                 icon: '✨',
                 title: "Regeneração (Passiva)",
-                maxLevel: 3,
-                description: (level) => `Recupera 2 de HP a cada 5 segundos. A frequência aumenta com o nível.`,
+                maxLevel: 5,
+                description: (level) => {
+                    if (level < 5) return `Recupera ${level + 1} de HP a cada 5 segundos.`;
+                    return `Recupera 5 de HP a cada 3 segundos.`;
+                },
                 apply: () => { /* A lógica será gerenciada no loop `animate` */ }
             }
         };
@@ -3405,10 +3408,16 @@
             const autoHealLevel = player.userData.upgrades.auto_heal || 0;
             if (autoHealLevel > 0) {
                 passiveHealTimer++;
-                // O intervalo diminui com o nível da habilidade
-                const currentHealInterval = passiveHealInterval - ((autoHealLevel - 1) * 60); // -1s por nível
+
+                const healAmount = Math.min(5, autoHealLevel + 1); // Nível 1 cura 2, Nível 2 cura 3, etc.
+                const currentHealInterval = autoHealLevel < 5 ? 300 : 180; // 5 segundos para Nv 1-4, 3 segundos para Nv 5
+
                 if (passiveHealTimer >= currentHealInterval) {
-                    playerHP = Math.min(maxHP, playerHP + 2); // CORREÇÃO: Cura 2 de HP
+                    const oldHP = playerHP;
+                    playerHP = Math.min(maxHP, playerHP + healAmount);
+                    if (playerHP > oldHP) {
+                        createFloatingText(`+${healAmount}`, player.position.clone().setY(1.5), '#00ff00');
+                    }
                     passiveHealTimer = 0;
                 }
             }
