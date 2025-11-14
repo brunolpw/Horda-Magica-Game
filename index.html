@@ -1633,7 +1633,7 @@
             
             } else if (type === 'nova') {
                 // NOVO: Projétil da Nova Mágica
-                geometry = new THREE.SphereGeometry(0.25, 8, 8);
+                geometry = new THREE.SphereGeometry(0.2, 8, 8);
                 material = new THREE.MeshBasicMaterial({ color: 0xf0f0f0 }); // Branco
                 props = { damage: 20, speed: 0.25 };
                 isExplosive = false;
@@ -2256,6 +2256,21 @@
                         createProjectile('strong', direction, player.position);
                         projectiles[projectiles.length - 1].userData.damage = damage;
                     });
+                    break;
+                }
+                case 'explosao_energia': { // Explosão de Energia
+                    const sphereCounts = [10, 12, 12, 15, 20];
+                    const damages = [10, 10, 15, 20, 25];
+                    const numProjectiles = sphereCounts[level - 1];
+                    const damage = damages[level - 1];
+
+                    for (let i = 0; i < numProjectiles; i++) {
+                        const angle = (i / numProjectiles) * Math.PI * 2;
+                        const direction = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
+                        // O tipo 'nova' é usado para o projétil da explosão
+                        createProjectile('nova', direction, player.position);
+                        projectiles[projectiles.length - 1].userData.damage = damage;
+                    }
                     break;
                 }
             }
@@ -2917,12 +2932,12 @@
                 description: (level) => `Dispara ${level < 4 ? 1 : (level === 4 ? 2 : 3)} míssil(eis) teleguiado(s) no(s) inimigo(s) mais forte(s).`,
                 apply: () => { /* A lógica será gerenciada em `attemptSpecialAttack` */ }
             },
-            nova_bomb: {
+            explosao_energia: {
                 type: 'active',
                 icon: '🌀',
                 title: "Explosão de Energia",
                 maxLevel: 5,
-                killCost: 10,
+                getKillCost: () => 10,
                 description: (level) => `Libera uma explosão de projéteis em todas as direções. Mais projéteis com o nível.`,
                 apply: () => { /* A lógica será gerenciada no loop `animate` */ }
             },
