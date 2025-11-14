@@ -420,9 +420,7 @@
             
             <!-- 3. Direita: Barra de Especial E Cargas de Explosão -->
             <div class="flex flex-col items-end pointer-events-auto w-40">
-                <div id="explosion-charges-display" class="text-xs font-bold text-orange-400 mt-1">
-                    EXPLOSÃO: <span id="explosion-charges-count">0</span>
-                </div>
+                <!-- Conteúdo da direita foi removido ou integrado em outras partes da HUD -->
             </div>
         </div>
     </div>
@@ -795,8 +793,7 @@
         let tripleShotTimer = 0;
         // let shieldTimer = 0; // REMOVIDO: O escudo não usa mais timer
         // let shieldSpheres = []; // Antigo
-        let shieldLayers = []; // NOVO: Array de camadas
-        let explosionCharges = 0; // NOVO: Cargas de Explosão
+        let shieldLayers = []; // NOVO: Array de camadas        
         let expBoostAuraMesh; // NOVO: Efeito visual para o bônus de EXP
         let expBoostTimer = 0; // NOVO: Timer para o EXP em dobro
 
@@ -1133,12 +1130,6 @@
                 if (e.button === 0 && !isGameOver) { // 0 é o botão esquerdo
                     attemptSpecialAttack();
                 }
-            });
-
-            // NOVO: Ataque Explosivo com clique do mouse (botão direito)
-            document.addEventListener('contextmenu', (e) => {
-                e.preventDefault(); // Impede o menu de contexto de aparecer
-                if (!isGameOver) fireExplosion();
             });
         }
 
@@ -1652,7 +1643,7 @@
 
             if (type === 'explosion') {
                 // Granada Explosiva (Roxa)
-                geometry = new THREE.SphereGeometry(0.3, 8, 8); // Um pouco maior
+                geometry = new THREE.SphereGeometry(0.4, 8, 8); // Um pouco maior
                 material = new THREE.MeshBasicMaterial({ color: powerUpProps.explosion.color }); 
                 props = { damage: 0, speed: 0.25 }; // Dano direto é 0, velocidade mais lenta (granada)
                 isExplosive = true;
@@ -2320,33 +2311,22 @@
                     // Não consome os abates até o projétil acertar
                     return; 
                 }
+                case 'carga_explosiva': { // Carga Explosiva
+                    const radii = [5, 7, 8, 9, 10];
+                    const damages = [50, 60, 70, 80, 100];
+                    const radius = radii[level - 1];
+                    const damage = damages[level - 1];
+                    
+                    // A lógica de explosão já existe, só precisamos chamá-la
+                    triggerBigExplosion(player.position, radius, damage, level);
+                    break;
+                }
             }
 
             // Reseta o cooldown e os pontos de abate
             killPoints = 0;
             specialCooldown = 180; // 3 segundos
             updateUI();
-        }
-
-        // NOVO: Função para disparar a Carga Explosiva
-        function fireExplosion() {
-            // Só funciona se o jogador tiver cargas e não estiver em cooldown
-            if (explosionCharges > 0 && specialCooldown <= 0) {
-                raycaster.setFromCamera(pointer, camera);
-                const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-                const intersection = new THREE.Vector3();
-                if (!raycaster.ray.intersectPlane(plane, intersection)) return;
-
-                const direction = new THREE.Vector3().subVectors(intersection, player.position).normalize();
-                
-                // Cria o projétil explosivo
-                createProjectile('explosion', direction, player.position); 
-                
-                // Consome uma carga e inicia o cooldown
-                explosionCharges--;
-                specialCooldown = 60; // Cooldown de 1s para explosivos
-                updateUI();
-            }
         }
 
 
@@ -2467,18 +2447,19 @@
     }
 
     // NOVO: Lógica da Explosão (usada pelo projétil)
-    function triggerBigExplosion(position, radius, damage) {
+    function triggerBigExplosion(position, radius, damage, level = 1) {
             // Efeito visual simples (Flash)
             const flashGeometry = new THREE.SphereGeometry(radius * 0.5, 16, 16);
             const flashMaterial = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.8 });
             const flash = new THREE.Mesh(flashGeometry, flashMaterial);
             flash.position.copy(position);
+            flash.position.y = 0.5;
             scene.add(flash);
             
             // Animação do Flash (cresce e desaparece)
             let scale = 1.0;
             const interval = setInterval(() => {
-                scale += 0.5;
+                scale += 0.8;
                 flash.scale.set(scale, scale, scale);
                 flash.material.opacity -= 0.1;
                 if (flash.material.opacity <= 0) {
@@ -2496,6 +2477,21 @@
                     enemy.userData.hitTimer = 10; // Ativa o feedback de hit
                 }
             });
+
+            // NOVO: Gera fragmentos para níveis 4 e 5
+            const spawnShards = level >= 4;
+            if (spawnShards) {
+                const numShards = level === 4 ? 3 : 5;
+                for (let i = 0; i < numShards; i++) {
+                    const shardDirection = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
+                    // Cria um projétil do tipo 'explosion', que explode ao colidir
+                    createProjectile('explosion', shardDirection, position);
+                    const shard = projectiles[projectiles.length - 1];
+                    // Define que a explosão do fragmento é menor e causa metade do dano
+                    shard.userData.explosionRadius = radius / 2;
+                    shard.userData.explosionDamage = damage / 2;
+                }
+            }
         }
 
         // NOVO: Lógica do Escudo (Múltiplas Camadas)
@@ -3007,14 +3003,15 @@
                 description: (level) => `Eletrifica seu próximo ataque, ricocheteando e aplicando dano contínuo.`,
                 apply: () => { /* A lógica será gerenciada em `updateProjectiles` */ }
             },
-            // NOVO: Habilidade de Carga Explosiva
-            explosion_charge: {
-                type: 'passive_charge', // Tipo especial para cargas
+            // Habilidade de Carga Explosiva agora é ATIVA
+            carga_explosiva: {
+                type: 'active',
                 icon: '💣',
                 title: "Carga Explosiva",
-                maxLevel: 10, // Pode acumular muitas cargas
-                description: (level) => `Ganha +1 carga de um projétil explosivo (Botão Direito).`,
-                apply: () => { explosionCharges++; }
+                maxLevel: 5,
+                getKillCost: () => 20,
+                description: (level) => `Cria uma grande explosão. Nv. 4+ libera fragmentos explosivos.`,
+                apply: () => { /* Lógica em attemptSpecialAttack */ }
             },
             // NOVO: Habilidade de Auto-Cura
             auto_heal: {
@@ -3216,7 +3213,7 @@
 
                 // Checa colisão com obstáculos
                 if (!hit) {
-                    for (const obstacle of obstacles) {
+                    for (const obstacle of obstacles) { // ...
                         obstacle.updateMatrixWorld();
                         let obstacleBBox = obstacle.userData.collisionMesh ? new THREE.Box3().setFromObject(obstacle.userData.collisionMesh) : new THREE.Box3().setFromObject(obstacle);
                         if (tempBBox.intersectsBox(obstacleBBox)) {
@@ -3339,16 +3336,7 @@
             timerDisplay.innerHTML = timersHTML;
 
             // NOVO: Atualiza display de Cargas de Explosão
-            const explosionDisplay = document.getElementById('explosion-charges-display');
-            if (player.userData.upgrades.explosion_charge > 0) { // Mostra se a habilidade foi aprendida
-                document.getElementById('explosion-charges-count').textContent = explosionCharges;
-                explosionDisplay.style.display = 'block';
-            } else {
-                explosionDisplay.style.display = 'none';
-            }
-
-            // REMOVIDO: A HUD de habilidades de abates não é mais necessária
-            // abilityHud.classList.add('hidden');
+            // Removido, pois agora é uma habilidade ativa
         }
 
         // --- Ciclo de Jogo (Game Loop) ---
@@ -3538,8 +3526,7 @@
             removeShield(); // Garante que o escudo seja removido
             repulsionBubbleTimer = 0; 
             if (clone) scene.remove(clone); // NOVO: Remove clone se existir
-            clone = null; cloneTimer = 0; 
-            explosionCharges = 0; 
+            clone = null; cloneTimer = 0;             
             freezingAuraTimer = 0; 
             if (freezingAuraMesh) freezingAuraMesh.visible = false; // NOVO: Esconde a aura
             if (expBoostAuraMesh) expBoostAuraMesh.visible = false; // NOVO: Esconde a aura de EXP
