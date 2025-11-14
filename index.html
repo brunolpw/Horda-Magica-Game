@@ -203,6 +203,23 @@
             transform: translate(-50%, -100%);
             z-index: 21; /* Acima de tudo */
         }
+        /* NOVO: Estilo para o ícone de eletrificado */
+        .electrified-marker {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            color: #fde047; /* Amarelo elétrico */
+            font-size: 16px;
+            line-height: 1;
+            text-shadow: 0 0 5px black;
+            transform: translate(-50%, -100%);
+            z-index: 21; /* Acima de tudo */
+            animation: flicker 0.5s infinite alternate;
+        }
+        @keyframes flicker {
+            from { opacity: 0.7; }
+            to { opacity: 1; }
+        }
 
         /* NOVO: Estilo para os Labels dos Power-ups */
         .powerup-label {
@@ -1461,7 +1478,8 @@
                 isSummon: isSummon, // NOVO: Marca se é uma invocação
                 freezeLingerTimer: 0, // NOVO: Timer para o efeito de congelamento persistente
                 damageCooldown: 0, // NOVO: Cooldown para o ataque do monstro
-                auraDamageAccumulator: 0 // NOVO: Acumula dano da aura para feedback visual
+                auraDamageAccumulator: 0, // NOVO: Acumula dano da aura para feedback visual
+                electrifiedTimer: 0 // NOVO: Timer para o status Eletrificado
             };
 
             // NOVO: Adiciona propriedades específicas para o Necromante
@@ -1526,8 +1544,15 @@
             frozenMarker.style.display = 'none';
             enemyLabelsContainer.appendChild(frozenMarker);
 
+            // NOVO: Cria o marcador de eletrificado (inicialmente oculto)
+            const electrifiedMarker = document.createElement('div');
+            electrifiedMarker.className = 'electrified-marker';
+            electrifiedMarker.innerHTML = '⚡';
+            electrifiedMarker.style.display = 'none';
+            enemyLabelsContainer.appendChild(electrifiedMarker);
+
             // 4. Armazena todas as referências
-            enemyLabels.set(enemy.uuid, { nameLabel: label, hpBar: hpBarContainer, hpFill: hpFill, summonMarker: summonMarker, frozenMarker: frozenMarker });
+            enemyLabels.set(enemy.uuid, { nameLabel: label, hpBar: hpBarContainer, hpFill: hpFill, summonMarker: summonMarker, frozenMarker: frozenMarker, electrifiedMarker: electrifiedMarker });
         }
         
         // Remove a UI do Inimigo
@@ -1545,6 +1570,9 @@
                 }
                 if (uiElements.frozenMarker) { // NOVO
                     enemyLabelsContainer.removeChild(uiElements.frozenMarker);
+                }
+                if (uiElements.electrifiedMarker) { // NOVO
+                    enemyLabelsContainer.removeChild(uiElements.electrifiedMarker);
                 }
                 enemyLabels.delete(enemy.uuid);
             }
@@ -1985,9 +2013,10 @@
         }
         // NOVO: Função para disparar a Corrente de Raios
         function triggerChainLightning(startEnemy) {
-            const maxJumps = 5;
-            const damage = 25; // Dano aumentado
-            const maxJumpDistanceSq = 25; // Raio de 5 unidades (5*5)
+            const level = player.userData.upgrades.corrente_raios || 1;
+            const configs = [[2, 3, 15], [3, 5, 15], [3, 5, 25], [4, 5, 35], [5, 7, 50]];
+            const [maxJumps, jumpDistance, damage] = configs[level - 1];
+            const maxJumpDistanceSq = jumpDistance * jumpDistance;
             const chain = [startEnemy];
             let currentEnemy = startEnemy;
 
@@ -2018,6 +2047,8 @@
             for (let i = 0; i < chain.length; i++) {
                 const enemy = chain[i];
                 enemy.userData.hp -= damage;
+                createFloatingText(damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
+                enemy.userData.electrifiedTimer = 300; // 5 segundos
                 enemy.userData.hitTimer = 10;
 
                 if (i > 0) {
@@ -2053,8 +2084,7 @@
             enemies.forEach(enemy => {
                 const uiElements = enemyLabels.get(enemy.uuid); // Pega o objeto
                 if (!uiElements) return;
-
-                const { nameLabel, hpBar, hpFill, summonMarker, frozenMarker } = uiElements;
+                const { nameLabel, hpBar, hpFill, summonMarker, frozenMarker, electrifiedMarker } = uiElements;
                 const modelHeight = enemy.userData.modelHeight || 1.0;
                 
                 // 1. Projeta a Posição 3D (como antes)
@@ -2092,6 +2122,17 @@
                         frozenMarker.style.top = `${y - 18}px`; // Acima do nome
                     } else {
                         frozenMarker.style.display = 'none';
+                    }
+                }
+
+                // NOVO: Atualiza a visibilidade do marcador de eletrificado
+                if (electrifiedMarker) {
+                    if (enemy.userData.electrifiedTimer > 0) {
+                        electrifiedMarker.style.display = 'block';
+                        electrifiedMarker.style.left = `${x + 10}px`; // Deslocado para o lado
+                        electrifiedMarker.style.top = `${y - 18}px`;
+                    } else {
+                        electrifiedMarker.style.display = 'none';
                     }
                 }
             });
@@ -2272,6 +2313,12 @@
                         projectiles[projectiles.length - 1].userData.damage = damage;
                     }
                     break;
+                }
+                case 'corrente_raios': { // Corrente de Raios
+                    // Apenas marca como carregado. A lógica acontece no projétil.
+                    player.userData.chainLightningCharged = true;
+                    // Não consome os abates até o projétil acertar
+                    return; 
                 }
             }
 
@@ -2675,6 +2722,16 @@
                 }
             }
 
+            // NOVO: Lógica do status Eletrificado
+            if (enemyData.electrifiedTimer > 0) {
+                enemyData.electrifiedTimer--;
+                if (enemyData.electrifiedTimer % 60 === 0) { // Causa dano a cada segundo
+                    enemyData.hp -= 5;
+                    createFloatingText('5', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
+                    enemyData.hitTimer = 5; // Pequeno feedback visual
+                }
+            }
+
             // --- LÓGICA DE MOVIMENTO ---
             if (isSlowed) { // Inimigos congelados têm prioridade de movimento
                 // Movimento lento se estiver congelado
@@ -2941,13 +2998,13 @@
                 description: (level) => `Libera uma explosão de projéteis em todas as direções. Mais projéteis com o nível.`,
                 apply: () => { /* A lógica será gerenciada no loop `animate` */ }
             },
-            chain_lightning: {
+            corrente_raios: {
                 type: 'active',
                 icon: '⛓️',
                 title: "Corrente de Raios",
                 maxLevel: 5,
-                killCost: 8,
-                description: (level) => `Eletrifica seu próximo ataque, fazendo-o ricochetear para outros inimigos. Mais saltos com o nível.`,
+                getKillCost: () => 8,
+                description: (level) => `Eletrifica seu próximo ataque, ricocheteando e aplicando dano contínuo.`,
                 apply: () => { /* A lógica será gerenciada em `updateProjectiles` */ }
             },
             // NOVO: Habilidade de Carga Explosiva
@@ -3122,13 +3179,22 @@
                             let finalDamage = projData.damage; // Usa o dano base do projétil
                             if (damageLevel > 0) {
                                 const bonusPercentage = damageLevel * 0.10; // 10% por nível
-                                const bonusAmount = Math.ceil(finalDamage * bonusPercentage);
+                                const bonusAmount = Math.ceil(projData.damage * bonusPercentage);
                                 finalDamage += bonusAmount;
                             }
 
                             enemy.userData.hp -= finalDamage;
                             createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
                             enemy.userData.hitTimer = 10;
+
+                            // Ativa a Corrente de Raios se estiver carregada
+                            if (player.userData.chainLightningCharged) {
+                                triggerChainLightning(enemy);
+                                player.userData.chainLightningCharged = false;
+                                killPoints = 0; // Consome os abates
+                                updateUI();
+                            }
+
                             hit = true;
                             break;
                         }
@@ -3230,8 +3296,7 @@
             const activeAbilityId = player.userData.activeAbility;
             if (activeAbilityId) {
                 activeAbilityHud.classList.remove('hidden');
-                const ability = upgrades[activeAbilityId];
-                const maxKills = ability.killCost;
+                const ability = upgrades[activeAbilityId];                const maxKills = ability.getKillCost(player.userData.upgrades[activeAbilityId] || 1);
                 const progressPercent = Math.min(100, (killPoints / maxKills) * 100);
 
                 activeAbilityIcon.textContent = ability.icon;
