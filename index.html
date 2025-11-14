@@ -1019,6 +1019,27 @@
             }
         }
 
+        // NOVO: Função para encontrar os inimigos mais próximos (ou mais fortes)
+        function findClosestEnemies(position, count, sortByStrength = false) {
+            let sortedEnemies = enemies
+                .map(enemy => ({
+                    enemy,
+                    distanceSq: enemy.position.distanceToSquared(position)
+                }));
+
+            if (sortByStrength) {
+                // Ordena por HP máximo (mais forte) e depois por HP atual
+                sortedEnemies.sort((a, b) => {
+                    if (b.enemy.userData.maxHP !== a.enemy.userData.maxHP) return b.enemy.userData.maxHP - a.enemy.userData.maxHP;
+                    return b.enemy.userData.hp - a.enemy.userData.hp;
+                });
+            } else {
+                sortedEnemies.sort((a, b) => a.distanceSq - b.distanceSq);
+            }
+
+            return sortedEnemies.slice(0, count).map(item => item.enemy);
+        }
+
         // NOVO: Função para criar a malha visual da bolha de repulsão
         function createRepulsionBubbleMesh() {
             const bubbleRadius = 4; // Deve ser o mesmo que repulsionRadius em updateEnemies
@@ -2213,48 +2234,36 @@
 
         // NOVO: Função de ativação da HABILIDADE ATIVA
         function attemptSpecialAttack() {
-            const activeAbilityId = player.userData.activeAbility;
-            if (!activeAbilityId) return; // Não faz nada se não houver habilidade equipada
+            const activeId = player.userData.activeAbility;
+            if (!activeId) return;
 
-            // Checa se o especial está carregado (5 abates) e se não está em cooldown
-            if (killPoints >= maxKillPoints && specialCooldown <= 0) {
-                const searchRadius = 25;
-                const searchRadiusSq = searchRadius * searchRadius;
+            const ability = upgrades[activeId];
+            const level = player.userData.upgrades[activeId] || 1;
 
-                // 1. Encontra todos os inimigos dentro do raio de busca
-                const enemiesInRange = enemies.filter(enemy => 
-                    enemy.position.distanceToSquared(player.position) <= searchRadiusSq
-                );
+            if (killPoints < ability.getKillCost(level) || specialCooldown > 0) return;
 
-                if (enemiesInRange.length === 0) return; // Não faz nada se não houver alvos
+            // Lógica específica para cada habilidade
+            switch (activeId) {
+                case 'missil_magico': { // Míssil Mágico
+                    const numMissiles = level >= 4 ? (level === 4 ? 2 : 3) : 1;
+                    const damage = level === 1 ? 25 : (level === 2 ? 35 : 50);
+                    const targets = findClosestEnemies(player.position, numMissiles, true);
+                    
+                    if (targets.length === 0) return; // Não gasta a habilidade se não houver alvos
 
-                // 2. Ordena os inimigos para encontrar o "mais forte"
-                // Critério 1: Maior vida máxima (maxHP)
-                // Critério 2 (desempate): Maior vida atual (hp)
-                enemiesInRange.sort((a, b) => {
-                    if (b.userData.maxHP !== a.userData.maxHP) {
-                        return b.userData.maxHP - a.userData.maxHP;
-                    }
-                    return b.userData.hp - a.userData.hp;
-                });
-
-                const target = enemiesInRange[0]; // O alvo é o primeiro da lista ordenada
-
-                // 3. Dispara o projétil teleguiado
-                const direction = new THREE.Vector3().subVectors(target.position, player.position).normalize();
-                
-                // O dano aumenta com o nível da habilidade
-                const specialAttackLevel = player.userData.upgrades.special_attack || 0;
-                const damage = projectileProps.strong.damage + ((specialAttackLevel - 1) * 15);
-                createProjectile('strong', direction, player.position);
-                // Atualiza o dano do último projétil criado
-                projectiles[projectiles.length - 1].userData.damage = damage;
-
-                // 4. Reseta os contadores
-                killPoints = 0;
-                specialCooldown = 180; // 3 segundos de cooldown
-                updateUI();
+                    targets.forEach(target => {
+                        const direction = new THREE.Vector3().subVectors(target.position, player.position).normalize();
+                        createProjectile('strong', direction, player.position);
+                        projectiles[projectiles.length - 1].userData.damage = damage;
+                    });
+                    break;
+                }
             }
+
+            // Reseta o cooldown e os pontos de abate
+            killPoints = 0;
+            specialCooldown = 180; // 3 segundos
+            updateUI();
         }
 
         // NOVO: Função para disparar a Carga Explosiva
@@ -2899,13 +2908,13 @@
                 apply: () => { /* A EXP é calculada dinamicamente agora */ }
             },
             // --- HABILIDADES ATIVAS (SÓ PODE TER UMA EQUIPADA) ---
-            special_attack: {
+            missil_magico: {
                 type: 'active',
                 icon: '🔥',
                 title: "Míssil Mágico",
                 maxLevel: 5,
-                killCost: 5,
-                description: (level) => `Dispara um míssil teleguiado no inimigo mais forte. Dano aumenta com o nível.`,
+                getKillCost: (level) => level < 4 ? 5 : 10,
+                description: (level) => `Dispara ${level < 4 ? 1 : (level === 4 ? 2 : 3)} míssil(eis) teleguiado(s) no(s) inimigo(s) mais forte(s).`,
                 apply: () => { /* A lógica será gerenciada em `attemptSpecialAttack` */ }
             },
             nova_bomb: {
