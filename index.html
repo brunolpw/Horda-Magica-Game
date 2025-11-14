@@ -93,6 +93,14 @@
             justify-content: center;
             font-size: 2rem; /* Tamanho do emoji/ícone */
         }
+        /* NOVO: Estilo para o texto de contagem de abates dentro do ícone */
+        .ability-kill-count {
+            position: absolute;
+            bottom: 2px;
+            font-size: 0.7rem;
+            color: #a0aec0; /* Cinza claro */
+            font-weight: bold;
+        }
         .ability-icon.ready {
             border-color: #ffc700;
             box-shadow: 0 0 15px #ffc700;
@@ -320,6 +328,8 @@
                 <div class="w-16 bg-gray-600 rounded-full h-1.5 mx-auto mt-1">
                     <div id="xp-bar" class="bg-green-400 h-1.5 rounded-full" style="width: 0%"></div>
                 </div>
+                <!-- NOVO: Display de texto da EXP -->
+                <div id="xp-text-display" class="text-xs text-gray-300 mt-1">0/500</div>
             </div>
 
             <!-- NOVO: Display de Onda -->
@@ -360,16 +370,19 @@
         <!-- Habilidade 1: Explosão de Energia (Nova) -->
         <div id="nova-bomb-icon" class="ability-icon">
             <div class="progress-ring"></div>
+            <span class="ability-kill-count">0/10</span>
             🌀
         </div>
         <!-- Habilidade 2: Corrente de Raios -->
         <div id="chain-lightning-icon" class="ability-icon">
             <div class="progress-ring"></div>
+            <span class="ability-kill-count">0/20</span>
             ⚡️
         </div>
         <!-- Habilidade 3: Raio de Energia -->
         <div id="energy-beam-icon" class="ability-icon">
             <div class="progress-ring"></div>
+            <span class="ability-kill-count">0/25</span>
             💥
         </div>
     </div>
@@ -806,11 +819,11 @@
         let scoreDisplay, hpBar, specialBar, killPointsDisplay, gameOverModal, finalScoreDisplay, playerNameDisplay, healingMessage, startMenuModal, waveLevelDisplay;
         
         // NOVO: Elementos da UI de Level
-        let playerLevelDisplay, levelUpMessage;
+        let playerLevelDisplay, levelUpMessage, xpTextDisplay;
 
         // NOVO: Elementos da nova HUD de Habilidades
         let abilityHud, novaBombIcon, chainLightningIcon, energyBeamIcon;
-        let novaProgressRing, chainProgressRing, beamProgressRing, abilityTooltip;
+        let novaProgressRing, chainProgressRing, beamProgressRing, abilityTooltip, novaKillCount, chainKillCount, beamKillCount;
 
         // NOVO: Função para inicializar os elementos da UI (Evita erros de 'null')
         function setupUIElements() {
@@ -827,6 +840,7 @@
             // NOVO: Mapeia UI de Level
             playerLevelDisplay = document.getElementById('player-level-display');
             levelUpMessage = document.getElementById('level-up-message');
+            xpTextDisplay = document.getElementById('xp-text-display');
 
             // NOVO: Mapeia UI da Onda
             waveLevelDisplay = document.getElementById('wave-level-display');
@@ -839,6 +853,11 @@
             novaProgressRing = novaBombIcon.querySelector('.progress-ring');
             chainProgressRing = chainLightningIcon.querySelector('.progress-ring');
             beamProgressRing = energyBeamIcon.querySelector('.progress-ring');
+            // NOVO: Mapeia os contadores de abates
+            novaKillCount = novaBombIcon.querySelector('.ability-kill-count');
+            chainKillCount = chainLightningIcon.querySelector('.ability-kill-count');
+            beamKillCount = energyBeamIcon.querySelector('.ability-kill-count');
+
             abilityTooltip = document.getElementById('ability-tooltip');
         }
 
@@ -2832,14 +2851,17 @@
         // NOVO: Funções de Level Up
         function gainExperience(amount) {
             // NOVO: Dobra a experiência se o power-up estiver ativo
-            experiencePoints += amount * (expBoostTimer > 0 ? 2 : 1);
+            const finalAmount = amount * (expBoostTimer > 0 ? 2 : 1);
+            createFloatingText(`+${finalAmount} EXP`, player.position.clone().setY(2.0), '#FFFF00', '1.2rem');
+
+            experiencePoints += finalAmount;
             
             // Permite múltiplos level ups de uma vez (ex: explosão)
             while (experiencePoints >= experienceForNextLevel) {
                 levelUp();
             }
 
-            // CORREÇÃO: Atualiza a UI para refletir a mudança na barra de XP
+            // A UI será atualizada no loop animate
             updateUI();
         }
         
@@ -3015,6 +3037,14 @@
                         const enemyBBox = new THREE.Box3().setFromObject(enemy);
                         if (tempBBox.intersectsBox(enemyBBox)) {
                             enemy.userData.hp -= projData.damage;
+
+                            // NOVO: Ativa a Corrente de Raios se estiver carregada
+                            if (chainLightningCharged) {
+                                triggerChainLightning(enemy);
+                                chainLightningCharged = false; // Descarrega a habilidade
+                                chainLightningKills = 0; // Reseta a contagem
+                            }
+
                             createFloatingText(projData.damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
                             enemy.userData.hitTimer = 10;
                             hit = true;
@@ -3116,6 +3146,7 @@
             // NOVO: Atualiza a barra de experiência
             const xpPercent = (experiencePoints / experienceForNextLevel) * 100;
             document.getElementById('xp-bar').style.width = `${xpPercent}%`;
+            xpTextDisplay.textContent = `${Math.floor(experiencePoints)}/${experienceForNextLevel}`;
 
             // NOVO: Atualiza o display da Onda
             waveLevelDisplay.textContent = currentWave;
@@ -3192,6 +3223,9 @@
                 chainLightningIcon.style.display = 'flex';
                 const lightningProgress = !chainLightningCharged ? (chainLightningKills / killsForChainLightning) * 360 : 360;
                 chainProgressRing.style.setProperty('--progress', `${lightningProgress}deg`);
+                // NOVO: Atualiza o contador de abates
+                chainKillCount.textContent = chainLightningCharged ? 'PRONTO!' : `${chainLightningKills}/${killsForChainLightning}`;
+
                 chainLightningIcon.classList.toggle('ready', chainLightningCharged);
             } else {
                 chainLightningIcon.style.display = 'none';
@@ -3202,6 +3236,9 @@
                 energyBeamIcon.style.display = 'flex';
                 const beamProgress = (energyBeamKills / killsForEnergyBeam) * 360;
                 beamProgressRing.style.setProperty('--progress', `${beamProgress}deg`);
+                // NOVO: Atualiza o contador de abates
+                beamKillCount.textContent = `${energyBeamKills}/${killsForEnergyBeam}`;
+
             } else {
                 energyBeamIcon.style.display = 'none';
             }
@@ -3358,6 +3395,9 @@
             updateEnemyUI();
             updateFloatingText(); // NOVO: Atualiza o texto flutuante
             updatePowerUpLabels(); // NOVO: Atualiza labels dos itens
+
+            // NOVO: Garante que a UI seja atualizada a cada frame
+            updateUI();
 
             // 6. Renderização
             renderer.render(scene, camera);
