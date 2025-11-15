@@ -3,33 +3,6 @@
         let raycaster, mouse;
         const pointer = new THREE.Vector2();
         
-        const killsPerItemSpawn = 30; // NOVO: Limite de abates para garantir um item aleatório
-
-        // NOVO: Timers e referências para os novos poderes
-        let tripleShotTimer = 0;
-        let shieldLayers = []; // NOVO: Array de camadas        
-        let expBoostAuraMesh; // NOVO: Efeito visual para o bônus de EXP
-        let expBoostTimer = 0; // NOVO: Timer para o EXP em dobro
-
-        // NOVO: Indicador de alcance da habilidade
-        let rangeIndicator;
-        let rangeIndicatorTimer = 0;
-
-        // NOVO: Power-up Aura Congelante
-        let freezingAuraTimer = 0;
-        let freezingAuraMesh;
-let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
-
-        // NOVO: Partículas de fumaça para a aura
-        let smokeParticles = [];
-        const numSmokeParticles = 50;
-        
-        let repulsionBubbleTimer = 0; // Timer para o novo power-up
-        let repulsionBubbleMesh; // NOVO: Malha para o efeito visual da bolha
-
-        let clone = null;
-        let cloneTimer = 0;
-
         // NOVO: Variáveis do Camera Shake
         let cameraShakeIntensity = 0;
         let cameraShakeDuration = 0;
@@ -38,8 +11,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         let isGamePaused = false; // NOVO: Flag para pausar o jogo durante o level up
         let keys = {};
         const enemies = []; const powerUps = [];
-
-        let powerUpTimer = 0; 
 
         // Variável temporária para checagem de colisão
         let tempPlayer; 
@@ -121,89 +92,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             return sortedEnemies.slice(0, count).map(item => item.enemy);
         }
 
-        // NOVO: Função para criar a malha visual da bolha de repulsão
-        function createRepulsionBubbleMesh() {
-            const bubbleRadius = 4; // Deve ser o mesmo que repulsionRadius em updateEnemies
-            const geometry = new THREE.SphereGeometry(bubbleRadius, 32, 32);
-            const material = new THREE.MeshBasicMaterial({
-                color: 0xADD8E6, // Azul claro, como no power-up
-                transparent: true,
-                opacity: 0.3,
-                side: THREE.DoubleSide // Para ver de dentro e de fora
-            });
-            repulsionBubbleMesh = new THREE.Mesh(geometry, material);
-            scene.add(repulsionBubbleMesh);
-        }
-
-        // NOVO: Função para criar a malha visual da Aura Congelante
-        function createFreezingAuraMesh() {
-            const auraRadius = 6; // Raio da aura
-            const geometry = new THREE.TorusGeometry(auraRadius, 0.1, 16, 100);
-            const material = new THREE.MeshBasicMaterial({
-                color: 0x87CEFA, // Azul Gelo
-                transparent: true,
-                opacity: 0.7
-            });
-            freezingAuraMesh = new THREE.Mesh(geometry, material);
-            freezingAuraMesh.rotation.x = Math.PI / 2; // Deita o anel no chão
-            scene.add(freezingAuraMesh);
-        }
-        
-        // NOVO: Função para criar a malha visual da Aura do Rei Goblin
-        function createGoblinKingAuraMesh() {
-            const auraRadius = 15; // Raio da aura de velocidade
-            const geometry = new THREE.TorusGeometry(auraRadius, 0.2, 16, 100);
-            const material = new THREE.MeshBasicMaterial({
-                color: 0x32CD32, // Verde Lima
-                transparent: true,
-                opacity: 0.5
-            });
-            goblinKingAuraMesh = new THREE.Mesh(geometry, material);
-            goblinKingAuraMesh.rotation.x = Math.PI / 2; // Deita o anel no chão
-            goblinKingAuraMesh.visible = false; // Começa invisível
-            scene.add(goblinKingAuraMesh);
-        }
-
-        // NOVO: Função para criar as partículas de fumaça
-        function createSmokeParticles() {
-            const smokeMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
-            const smokeGeometry = new THREE.PlaneGeometry(0.5, 0.5);
-
-            for (let i = 0; i < numSmokeParticles; i++) {
-                const particle = new THREE.Mesh(smokeGeometry, smokeMaterial.clone());
-                particle.userData = {
-                    velocity: new THREE.Vector3((Math.random() - 0.5) * 0.01, Math.random() * 0.02 + 0.01, (Math.random() - 0.5) * 0.01),
-                    life: Math.random() * 120
-                };
-                smokeParticles.push(particle);
-            }
-        }
-
-        // NOVO: Função para criar a malha visual da Aura de EXP
-        function createExpBoostAuraMesh() {
-            const geometry = new THREE.TorusGeometry(0.7, 0.05, 16, 100);
-            const material = new THREE.MeshBasicMaterial({
-                color: 0xFFFF00, // Amarelo, como no power-up
-                transparent: true,
-                opacity: 0.8
-            });
-            expBoostAuraMesh = new THREE.Mesh(geometry, material);
-            expBoostAuraMesh.rotation.x = Math.PI / 2; // Deita o anel no chão
-            expBoostAuraMesh.visible = false; // Começa invisível
-            scene.add(expBoostAuraMesh);
-        }
-
-        // NOVO: Função para criar o indicador de alcance
-        function createRangeIndicator() {
-            const geometry = new THREE.RingGeometry(1, 1.1, 64); // Raio inicial, será ajustado
-            const material = new THREE.MeshBasicMaterial({ color: 0xffc700, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
-            rangeIndicator = new THREE.Mesh(geometry, material);
-            rangeIndicator.rotation.x = -Math.PI / 2;
-            rangeIndicator.visible = false;
-            scene.add(rangeIndicator);
-        }
-
-
         function setupInputs() {
             // Teclas de Movimento
             document.addEventListener('keydown', (e) => {
@@ -241,21 +129,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         
         // --- Funções de Entidade e Spawning ---
         
-        function createPlayer() {
-            // Usa o novo modelo
-            player = createWizardModel();
-            player.position.set(0, 0, 0); // O modelo já está centralizado
-            player.userData = { maxHP: maxHP }; // Guarda os dados do player no grupo
-            scene.add(player);
-
-            const ringGeometry = new THREE.RingGeometry(1.5, 1.6, 32);
-            const ringMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-            targetRing = new THREE.Mesh(ringGeometry, ringMaterial);
-            targetRing.rotation.x = -Math.PI / 2;
-            targetRing.position.y = 0.01;
-            scene.add(targetRing);
-        }
-
         function createEnemy(type, position, isSummon = false) {
             const props = entityProps[type];
             const enemy = props.modelFn(); // Usa a função para criar o modelo
@@ -332,420 +205,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             createEnemyUI(enemy, props.name);
         }
         
-        // Cria a UI do Inimigo (Nome, HP, Marcador)
-        function createEnemyUI(enemy, name) {
-            // 1. Cria o Label do Nome
-            const label = document.createElement('div');
-            label.className = 'enemy-label';
-            label.textContent = name;
-            enemyLabelsContainer.appendChild(label);
-            
-            // 2. NOVO: Cria a Barra de Vida
-            const hpBarContainer = document.createElement('div');
-            hpBarContainer.className = 'enemy-hp-bar';
-            
-            const hpFill = document.createElement('div');
-            hpFill.className = 'enemy-hp-fill';
-            hpBarContainer.appendChild(hpFill);
-            
-            // NOVO: Cria a Barra de Armadura (se necessário)
-            const armorBarContainer = document.createElement('div');
-            armorBarContainer.className = 'enemy-armor-bar';
-            const armorFill = document.createElement('div');
-            armorFill.className = 'enemy-hp-fill'; // Reutiliza a classe, mas muda a cor
-            armorFill.style.backgroundColor = '#A9A9A9'; // Cinza
-            armorBarContainer.appendChild(armorFill);
-
-            enemyLabelsContainer.appendChild(hpBarContainer);
-            
-            // 3. NOVO: Cria o Marcador de Invocação (se necessário)
-            let summonMarker = null;
-            if (enemy.userData.isSummon) {
-                summonMarker = document.createElement('div');
-                summonMarker.className = 'summon-marker';
-                enemyLabelsContainer.appendChild(summonMarker);
-            }
-
-            // NOVO: Cria o marcador de congelado (inicialmente oculto)
-            const frozenMarker = document.createElement('div');
-            frozenMarker.className = 'frozen-marker';
-            frozenMarker.innerHTML = '❄️'; // Ícone de floco de neve
-            frozenMarker.style.display = 'none';
-            enemyLabelsContainer.appendChild(frozenMarker);
-
-            // NOVO: Cria o marcador de eletrificado (inicialmente oculto)
-            const electrifiedMarker = document.createElement('div');
-            electrifiedMarker.className = 'electrified-marker';
-            electrifiedMarker.innerHTML = '⚡';
-            electrifiedMarker.style.display = 'none';
-            enemyLabelsContainer.appendChild(electrifiedMarker);
-
-            // 4. Armazena todas as referências
-            enemyLabels.set(enemy.uuid, { nameLabel: label, hpBar: hpBarContainer, hpFill: hpFill, armorBar: armorBarContainer, armorFill: armorFill, summonMarker: summonMarker, frozenMarker: frozenMarker, electrifiedMarker: electrifiedMarker });
-        }
-        
-        // Remove a UI do Inimigo
-        function removeEnemyUI(enemy) {
-            const uiElements = enemyLabels.get(enemy.uuid);
-            if (uiElements) {
-                if (uiElements.nameLabel) {
-                    enemyLabelsContainer.removeChild(uiElements.nameLabel);
-                }
-                if (uiElements.hpBar) {
-                    enemyLabelsContainer.removeChild(uiElements.hpBar);
-                }
-                if (uiElements.armorBar && uiElements.armorBar.parentNode === enemyLabelsContainer) {
-                    enemyLabelsContainer.removeChild(uiElements.armorBar);
-                }
-                if (uiElements.summonMarker) { // NOVO
-                    enemyLabelsContainer.removeChild(uiElements.summonMarker);
-                }
-                if (uiElements.frozenMarker) { // NOVO
-                    enemyLabelsContainer.removeChild(uiElements.frozenMarker);
-                }
-                if (uiElements.electrifiedMarker) { // NOVO
-                    enemyLabelsContainer.removeChild(uiElements.electrifiedMarker);
-                }
-                enemyLabels.delete(enemy.uuid);
-            }
-        }
-
-        // Função para criar poção (AGORA CRIA QUALQUER POWER-UP)
-        function createPowerUp(type = 'potion', position = null) {
-            const props = powerUpProps[type];
-            if (!props) {
-                console.warn("Tipo de power-up desconhecido:", type);
-                return;
-            }
-            
-            const material = new THREE.MeshLambertMaterial({ color: props.color });
-            const powerUp = new THREE.Mesh(props.geometry, material);
-            
-            if (position) {
-                powerUp.position.copy(position);
-            } else {
-                // Posição aleatória dentro do mapa
-                const x = (Math.random() * mapSize * 2) - mapSize;
-                const z = (Math.random() * mapSize * 2) - mapSize;
-                powerUp.position.set(x, 0, z);
-            }
-            
-            // Posição Y baseada na altura da geometria
-            const height = props.geometry.parameters.height || 0.5;
-            powerUp.position.y = height / 2;
-            
-            powerUp.userData = {
-                type: type,
-                ...props // Copia todas as propriedades (healAmount, duration, damage, radius)
-            };
-
-            powerUps.push(powerUp);
-            scene.add(powerUp);
-            
-            // NOVO: Cria o label para o power-up
-            createPowerUpLabel(powerUp, type);
-        }
-        
-        // NOVO: Função para criar label do Power-up
-        function createPowerUpLabel(powerUp, type) {
-            let text = 'Item';
-            switch(type) {
-                case 'potion': text = 'Cura'; break;
-                case 'tripleShot': text = 'Tiro Múltiplo'; break;
-                case 'shield': text = 'Escudo'; break;                
-                case 'repulsionBubble': text = 'Bolha Repulsora'; break;
-                case 'clone': text = 'Clone'; break; // NOVO: Adiciona o nome correto
-                case 'freezingAura': text = 'Aura Congelante'; break; // NOVO
-                case 'expBoost': text = 'EXP em Dobro'; break; // NOVO
-            }
-
-            const label = document.createElement('div');
-            label.className = 'powerup-label';
-            label.textContent = text;
-            enemyLabelsContainer.appendChild(label); // Reutiliza o container
-            powerUpLabels.set(powerUp.uuid, label);
-        }
-
-        // NOVO: Função para remover label do Power-up
-        function removePowerUpLabel(powerUp) {
-            const label = powerUpLabels.get(powerUp.uuid);
-            if (label) {
-                enemyLabelsContainer.removeChild(label);
-                powerUpLabels.delete(powerUp.uuid);
-            }
-        }
-
-        // Lógica de spawn de poção
-        function spawnPowerUps() {
-            // --- Lógica por tempo (Chance de 20% a cada 5 segundos) ---
-            powerUpTimer++;
-            const timeSpawnInterval = 300; 
-
-            // NOVO: A chance de spawn aumenta com o nível do jogador
-            // Nível 1: 20%, Nível 2: 30%, Nível 3: 40%, etc. (limitado a 70%)
-            const baseSpawnChance = 0.2;
-            const spawnChancePerLevel = 0.1;
-            const spawnChance = Math.min(0.7, baseSpawnChance + (playerLevel - 1) * spawnChancePerLevel);
-
-            if (powerUpTimer >= timeSpawnInterval) {
-                if (Math.random() < spawnChance) { 
-                    // NOVO: Todos os itens agora têm a mesma chance de aparecer.
-                    const powerUpTypes = Object.keys(powerUpProps);
-                    const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
-                    createPowerUp(randomType);
-                }
-                powerUpTimer = 0;
-            }
-            
-            // --- NOVO: Lógica por kills (SÓ SPAWNA POÇÃO) ---
-            if (killsSinceLastPotion >= killsPerItemSpawn) {
-                spawnRandomItem();
-                killsSinceLastPotion = 0; // Reseta o contador
-            }
-        }
-        
-        // NOVO: Função para spawnar um item aleatório (usado pela lógica de kills)
-        function spawnRandomItem(position = null) {
-            // Pega todos os tipos de power-ups disponíveis (potion, tripleShot, etc.)
-            const powerUpTypes = Object.keys(powerUpProps);
-            // Escolhe um tipo aleatoriamente
-            const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
-            // Cria o power-up em uma posição aleatória
-            createPowerUp(randomType, position);
-        }
-
-        // NOVO: Função para criar o clone
-        function createClone() {
-            if (clone) { // Remove o clone antigo se existir
-                scene.remove(clone);
-            }
-
-            clone = createWizardModel();
-            clone.position.copy(player.position);
-
-            // Torna o clone semitransparente
-            clone.traverse((child) => {
-                if (child.isMesh) {
-                    child.material = child.material.clone(); // Clona o material para não afetar o jogador
-                    child.material.transparent = true;
-                    child.material.opacity = 0.5;
-                }
-            });
-
-            scene.add(clone);
-        }
-        // NOVO: Função para atualizar a lógica do clone
-        function updateClone() {
-            if (cloneTimer > 0 && clone) {
-                // Lógica de movimento do clone (idêntica à do jogador)
-                const direction = new THREE.Vector3().subVectors(clone.position, player.position).normalize();
-                const movementVector = new THREE.Vector2(direction.x, direction.z).normalize();
-                const currentMovement = new THREE.Vector3(movementVector.x, 0, movementVector.y).multiplyScalar(playerSpeed * 0.8);
-                
-                const newPosition = clone.position.clone().add(currentMovement);
-                
-                const tempCloneBBox = new THREE.Box3();
-                let collisionDetected = false;
-
-                tempPlayer.position.copy(newPosition);
-                tempPlayer.updateMatrixWorld();
-                tempCloneBBox.setFromObject(tempPlayer);
-
-                for (const obstacle of obstacles) {
-                    obstacle.updateMatrixWorld();
-                    let obstacleBBox;
-                    if (obstacle.userData.collisionMesh) {
-                        obstacle.userData.collisionMesh.updateWorldMatrix(true, false);
-                        obstacleBBox = new THREE.Box3().setFromObject(obstacle.userData.collisionMesh);
-                    } else {
-                        obstacleBBox = new THREE.Box3().setFromObject(obstacle);
-                    }
-                    
-                    if (tempCloneBBox.intersectsBox(obstacleBBox)) {
-                        collisionDetected = true;
-                        break;
-                    }
-                }
-
-                if (!collisionDetected) {
-                    clone.position.copy(newPosition);
-                } else {
-                    // Tenta deslizar no eixo X
-                    const newPositionX = clone.position.clone();
-                    newPositionX.x += currentMovement.x;
-                    tempPlayer.position.copy(newPositionX);
-                    tempPlayer.updateMatrixWorld();
-                    if (!obstacles.some(o => new THREE.Box3().setFromObject(tempPlayer).intersectsBox(new THREE.Box3().setFromObject(o.userData.collisionMesh || o)))) {
-                        clone.position.x = newPositionX.x;
-                    }
-
-                    // Tenta deslizar no eixo Z
-                    const newPositionZ = clone.position.clone();
-                    newPositionZ.z += currentMovement.z;
-                    tempPlayer.position.copy(newPositionZ);
-                    tempPlayer.updateMatrixWorld();
-                    if (!obstacles.some(o => new THREE.Box3().setFromObject(tempPlayer).intersectsBox(new THREE.Box3().setFromObject(o.userData.collisionMesh || o)))) {
-                        clone.position.z = newPositionZ.z;
-                    }
-                }
-                clone.position.x = Math.max(-mapSize, Math.min(mapSize, clone.position.x));
-                clone.position.z = Math.max(-mapSize, Math.min(mapSize, clone.position.z));
-            } else if (clone) {
-                // Remove o clone quando o tempo acaba
-                scene.remove(clone);
-                clone = null;
-            }
-        }
-
-        // NOVO: Função para disparar o Raio de Energia
-        function fireEnergyBeam() {
-            // 1. Pega a direção da mira
-            raycaster.setFromCamera(pointer, camera);
-            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-            const intersection = new THREE.Vector3();
-            if (!raycaster.ray.intersectPlane(plane, intersection)) return;
-
-            const direction = new THREE.Vector3().subVectors(intersection, player.position).normalize();
-
-            // 2. Configura o raycaster para a colisão do raio
-            const beamRaycaster = new THREE.Raycaster(player.position, direction);
-
-            // 3. Checa colisão com obstáculos para determinar o comprimento do raio
-            const obstacleIntersects = beamRaycaster.intersectObjects(obstacles, true);
-            let beamLength = mapSize * 2; // Comprimento máximo
-            if (obstacleIntersects.length > 0) {
-                beamLength = obstacleIntersects.distance;
-            }
-
-            // 4. Checa colisão com inimigos
-            const enemyIntersects = beamRaycaster.intersectObjects(enemies, true);
-            const beamDamage = 150;
-            enemyIntersects.forEach(intersect => {
-                // Atinge apenas inimigos dentro do comprimento efetivo do raio
-                if (intersect.distance < beamLength) {
-                    let enemyGroup = intersect.object;
-                    while (enemyGroup.parent && !enemyGroup.userData.hp) {
-                        enemyGroup = enemyGroup.parent;
-                    }
-                    if (enemyGroup && enemyGroup.userData.hp) {
-                        enemyGroup.userData.hp -= beamDamage;
-                        enemyGroup.userData.hitTimer = 10;
-                    }
-                }
-            });
-
-            // 5. Cria o efeito visual do raio
-            const beamStart = player.position.clone();
-            beamStart.y = 0.5; // Altura do centro do mago
-            const beamEnd = beamStart.clone().addScaledVector(direction, beamLength);
-            
-            const beamGeometry = new THREE.CylinderGeometry(0.2, 0.2, beamLength, 8);
-            const beamMaterial = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.8 });
-            const beamMesh = new THREE.Mesh(beamGeometry, beamMaterial);
-
-            beamMesh.position.copy(beamStart).add(beamEnd).divideScalar(2);
-            beamMesh.lookAt(beamEnd);
-            beamMesh.rotateX(Math.PI / 2);
-            scene.add(beamMesh);
-            setTimeout(() => scene.remove(beamMesh), 200);
-        }
-
-        // NOVO: Função para disparar a Corrente de Raios
-        function triggerChainLightning(startEnemy) {
-            const level = player.userData.upgrades.corrente_raios || 1;
-            const configs = [[2, 5, 20], [3, 8, 30], [5, 11, 40], [7, 14, 50], [10, 17, 55]];
-            const [maxJumps, jumpDistance, damage] = configs[level - 1];
-            const maxJumpDistanceSq = jumpDistance * jumpDistance;
-            const chain = [startEnemy];
-            let currentEnemy = startEnemy;
-
-            for (let i = 0; i < maxJumps - 1; i++) { // CORREÇÃO: O loop deve rodar (maxJumps - 1) vezes para encontrar os alvos *adicionais*.
-                let closestEnemy = null; // CORREÇÃO: A variável estava sendo redeclarada
-                let minDistanceSq = maxJumpDistanceSq; // Inicia com o alcance máximo
-
-                // Encontra o inimigo mais próximo DENTRO DO ALCANCE
-                enemies.forEach(enemy => {
-                    if (!chain.includes(enemy)) {
-                        const distanceSq = enemy.position.distanceToSquared(currentEnemy.position);
-                        if (distanceSq < minDistanceSq) {
-                            minDistanceSq = distanceSq;
-                            closestEnemy = enemy;
-                        }
-                    }
-                });
-
-                if (closestEnemy) { // Se encontrou um inimigo dentro do alcance
-                    chain.push(closestEnemy);
-                    currentEnemy = closestEnemy;
-                } else {
-                    break; // Não há mais inimigos para saltar
-                }
-            }
-
-            // Causa dano e cria o efeito visual
-            for (let i = 0; i < chain.length; i++) {
-                const enemy = chain[i];
-                
-                // CORREÇÃO: Aplica o dano a todos os alvos na corrente.
-                enemy.userData.hp -= damage;
-                createFloatingText(damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
-                enemy.userData.electrifiedTimer = 300; // 5 segundos
-                enemy.userData.hitTimer = 10;
-
-                let startPoint;
-                // O primeiro raio sai do jogador, os seguintes saem do inimigo anterior.
-                if (i > 0) {
-                    startPoint = chain[i - 1].position.clone();
-                } else {
-                    startPoint = player.position.clone();
-                }
-
-                const endPoint = enemy.position.clone();
-                startPoint.y = endPoint.y = 0.5; // Alinha os raios na altura do mago
-
-                const distance = startPoint.distanceTo(endPoint);
-                if (distance === 0) continue; // Evita criar um raio de comprimento zero
-
-                const geometry = new THREE.CylinderGeometry(0.05, 0.05, distance, 8);
-                const material = new THREE.MeshBasicMaterial({ color: 0xFFFF00, transparent: true, opacity: 0.9 });
-                const lightningSegment = new THREE.Mesh(geometry, material);
-
-                // Posiciona e orienta o cilindro para conectar os dois pontos
-                lightningSegment.position.copy(startPoint).lerp(endPoint, 0.5);
-                lightningSegment.lookAt(endPoint);
-                lightningSegment.rotateX(Math.PI / 2);
-
-                scene.add(lightningSegment);
-                // Animação de fade-out
-                setTimeout(() => {
-                    lightningSegment.material.opacity = 0;
-                    setTimeout(() => scene.remove(lightningSegment), 100);
-                }, 100);
-            }
-        }
-
-        // NOVO: Lógica do Escudo do Chefe
-        function createBossShield(charges) {
-            // Reutiliza a lógica do escudo do jogador, mas com esferas roxas
-            const numSpheres = charges;
-            const radius = 3.0;
-
-            const geometry = new THREE.SphereGeometry(0.3, 8, 8);
-            const material = new THREE.MeshLambertMaterial({ color: 0x8A2BE2, emissive: 0x8A2BE2, emissiveIntensity: 1 });
-            
-            const newLayer = { spheres: [], radius: radius, angleOffset: 0 };
-
-            for (let i = 0; i < numSpheres; i++) {
-                const sphere = new THREE.Mesh(geometry, material);
-                newLayer.spheres.push(sphere);
-                scene.add(sphere);
-            }
-            // Assume que só haverá um escudo de chefe por vez
-            shieldLayers.push(newLayer);
-        }
-
-
-
         // --- Funções de Lógica do Jogo ---
         
         function updateAiming() {
@@ -783,202 +242,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
                     projectileCooldown = currentCooldown;
                 }
             }
-        }
-
-        function updatePowerUps() {
-            if (!player) return; // Proteção
-            // A BBox do player já foi atualizada em animate()
-            const playerBBox = new THREE.Box3().setFromObject(player);
-            
-            for (let i = powerUps.length - 1; i >= 0; i--) {
-                const powerUp = powerUps[i];
-                powerUp.updateMatrixWorld();
-                
-                // NOVO: Aumenta a área de colisão do item para facilitar a coleta
-                // Cria uma BBox maior em torno do item para a checagem
-                const powerUpBBox = new THREE.Box3().setFromObject(powerUp);
-                const size = new THREE.Vector3();
-                powerUpBBox.getSize(size);
-                powerUpBBox.expandByVector(size.multiplyScalar(3.0)); // Aumenta a caixa em 300%
-
-                if (playerBBox.intersectsBox(powerUpBBox)) {
-                    // Colisão detectada - Coletar item
-                    const data = powerUp.userData;
-                    
-                    switch(data.type) {
-                        case 'potion':
-                            const healValue = data.healAmount;
-                            const oldHP = playerHP;
-                            playerHP = Math.min(maxHP, playerHP + healValue);
-                            const actualHeal = playerHP - oldHP;
-                            if (actualHeal > 0) {
-                                displayHealingMessage(actualHeal);
-                                createFloatingText(`+${actualHeal}`, player.position.clone().setY(1.5), '#00ff00', '1.5rem');
-                            }
-                            break;
-                        
-                        case 'tripleShot':
-                            // NOVO: A duração depende do nível do jogador
-                            const duration = playerLevel < 4 
-                                ? 1800  // 30 segundos
-                                : 3600; // 60 segundos
-                            tripleShotTimer += duration;
-                            break;
-                        
-                        case 'shield':
-                            // NOVO: Adiciona uma nova camada ao escudo
-                            createShield(shieldLayers.length + 1); // +1 para o raio
-                            break;
-
-                        case 'repulsionBubble':
-                            // NOVO: Ativa a bolha de repulsão
-                            repulsionBubbleTimer += data.duration;
-                            break;
-                        
-                        case 'clone':
-                            // NOVO: Ativa o clone
-                            if (!clone) createClone();
-                            cloneTimer += data.duration;
-                            break;
-                        
-                        case 'freezingAura':
-                            // NOVO: Ativa a aura congelante
-                            freezingAuraTimer += data.duration;
-                            break;
-
-                        case 'expBoost':
-                            // NOVO: Ativa o bônus de EXP
-                            expBoostTimer += data.duration;
-                            break;
-                    }
-
-                    // Remove o item do mapa
-                    scene.remove(powerUp);
-                    removePowerUpLabel(powerUp); // NOVO: Remove o label do item
-                    powerUps.splice(i, 1);
-                    updateUI();
-                }
-            }
-        }
-        
-        // NOVO: Lógica do Escudo (Múltiplas Camadas)
-        function createShield(layerIndex) {
-            const numSpheres = 10;
-            const baseRadius = 3.0; // Raio inicial de 3 unidades
-            const radiusIncrement = 1.0; // Cada camada adiciona 1 unidade
-            const radius = baseRadius + (layerIndex - 1) * radiusIncrement; // 3, 4, 5...
-
-            const geometry = new THREE.SphereGeometry(0.2, 8, 8);
-            const material = new THREE.MeshLambertMaterial({ color: 0x00D7FE, emissive: 0x00D7FE, emissiveIntensity: 1 });
-            
-            const newLayer = {
-                spheres: [],
-                radius: radius,
-                angleOffset: Math.random() * Math.PI * 2 // Offset aleatório para cada camada
-            };
-
-            for (let i = 0; i < numSpheres; i++) {
-                const sphere = new THREE.Mesh(geometry, material);
-                newLayer.spheres.push(sphere);
-                scene.add(sphere);
-            }
-            shieldLayers.push(newLayer);
-        }
-
-        // NOVO: Lógica de atualização do Escudo
-        function updateShield() {
-            if (shieldLayers.length === 0) return;
-
-            const time = Date.now() * 0.001; // Tempo para órbita
-
-            for (let l = shieldLayers.length - 1; l >= 0; l--) {
-                const layer = shieldLayers[l];
-                
-                // Checa se a camada está vazia
-                if (layer.spheres.length === 0) {
-                    shieldLayers.splice(l, 1);
-                    continue;
-                }
-
-                const numSpheres = layer.spheres.length;
-
-                for (let i = numSpheres - 1; i >= 0; i--) {
-                    const sphere = layer.spheres[i];
-                    
-                    // 1. Atualiza Posição da Esfera (Órbita)
-                    const angle = (time * (l % 2 === 0 ? 1 : -1)) + layer.angleOffset + (i * (Math.PI * 2 / numSpheres));
-                    sphere.position.x = player.position.x + Math.cos(angle) * layer.radius;
-                    sphere.position.z = player.position.z + Math.sin(angle) * layer.radius;
-                    sphere.position.y = 0.5; // Altura do Mago
-
-                    // CORREÇÃO: Força a atualização da posição 3D ANTES da checagem
-                    sphere.updateMatrixWorld();
-
-                    // NOVO: 2. Checa Colisão com Projéteis Inimigos
-                    const sphereBBoxForProjectiles = new THREE.Box3().setFromObject(sphere);
-                    for (let p_idx = projectiles.length - 1; p_idx >= 0; p_idx--) {
-                        const proj = projectiles[p_idx];
-                        const projData = proj.userData;
-
-                        // Checa apenas projéteis inimigos que não foram refletidos
-                        if (projData.hasBeenReflected === null) { // Checa se pode ser refletido
-                            const projBBox = new THREE.Box3().setFromObject(proj);
-                            if (sphereBBoxForProjectiles.intersectsBox(projBBox)) {
-                                // NOVO: Reflete o projétil em vez de destruir
-                                const reflectionVector = new THREE.Vector3().subVectors(proj.position, sphere.position).normalize();
-                                
-                                projData.direction.copy(reflectionVector);
-                                projData.type = 'weak'; // Transforma em projétil do jogador
-                                projData.damage = 15; // Dano de reflexão do escudo
-                                projData.speed *= 1.2; // Aumenta um pouco a velocidade
-                                projData.hasBeenReflected = true; // Marca para não refletir de novo
-
-                                // Muda a cor para a cor do escudo
-                                proj.material.color.setHex(0x00D7FE);
-
-                                // A esfera não é mais destruída, apenas reflete.
-                            }
-                        }
-                    }
-
-                    // 2. Checa Colisão com Inimigos
-                    const sphereBBox = new THREE.Box3().setFromObject(sphere);
-                    let hitEnemy = null;
-
-                    for (const enemy of enemies) {
-                        const enemyBBox = new THREE.Box3().setFromObject(enemy);
-                        
-                        if (sphereBBox.intersectsBox(enemyBBox)) {
-                            // Causa dano
-                            enemy.userData.hp -= projectileProps.weak.damage; // 10 de dano
-                            createFloatingText(projectileProps.weak.damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
-                            enemy.userData.hitTimer = 10; // Ativa o feedback de hit
-                            hitEnemy = enemy;
-                            break; // Esfera só acerta um inimigo
-                        }
-                    }
-
-                    // 3. Remove a esfera se ela atingiu algo
-                    if (hitEnemy) {
-                        scene.remove(sphere);
-                        layer.spheres.splice(i, 1);
-                        updateUI(); // Atualiza a contagem de esferas
-                    }
-                }
-            }
-        }
-        
-        // NOVO: Função para remover todas as camadas do escudo (chamada no restart)
-        function removeShield() {
-            if (shieldLayers.length > 0) {
-                shieldLayers.forEach(layer => {
-                    layer.spheres.forEach(sphere => {
-                        scene.remove(sphere);
-                    });
-                });
-                shieldLayers = []; // Limpa o array de camadas
-            }
-            // A UI será atualizada na próxima chamada updateUI()
         }
 
         function updateEnemies() {
@@ -1384,63 +647,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         }
     }
 
-    // MELHORIA: Função para o efeito visual do Terremoto
-    function triggerEarthquakeVisual(position, maxRadius) {
-        const geometry = new THREE.RingGeometry(0.1, 1, 64); // Começa pequeno
-        const material = new THREE.MeshBasicMaterial({
-            color: 0xff4500, // Cor inicial (dano máximo)
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.8
-        });
-        const ring = new THREE.Mesh(geometry, material);
-
-        ring.position.copy(position);
-        ring.position.y = 0.1;
-        ring.rotation.x = -Math.PI / 2;
-        scene.add(ring);
-
-        let scale = 1;
-        const animationDuration = 30; // frames
-        const expansionInterval = setInterval(() => {
-            scale += 1;
-            ring.scale.set(scale, scale, scale);
-
-            // Muda a cor para indicar a zona de dano
-            if (scale > 15 && scale <= 20) {
-                ring.material.color.setHex(0xff8c00); // Laranja
-            } else if (scale > 20) {
-                ring.material.color.setHex(0xffd700); // Amarelo
-            }
-
-            if (scale >= maxRadius) {
-                clearInterval(expansionInterval);
-                scene.remove(ring);
-            }
-        }, 20); // Velocidade da expansão
-    }
-
-    // NOVO: Função para a Prisão de Ossos
-    function triggerBonePrison() {
-        const numWalls = 12;
-        const radius = 5;
-        for (let i = 0; i < numWalls; i++) {
-            const angle = (i / numWalls) * Math.PI * 2;
-            const x = player.position.x + Math.cos(angle) * radius;
-            const z = player.position.z + Math.sin(angle) * radius;
-            
-            // Cria uma parede de "osso" temporária
-            const wall = createWall(new THREE.Vector3(x, 0, z), 0.5, 2.5);
-            wall.material.color.setHex(0xf0e68c); // Cor de osso
-            
-            // Remove a parede após 8 segundos
-            setTimeout(() => {
-                scene.remove(wall);
-                obstacles.splice(obstacles.indexOf(wall), 1);
-            }, 8000);
-        }
-    }
-
         // NOVO: Função para iniciar o tremor da câmera
         function triggerCameraShake(intensity, duration) {
             // Garante que um novo tremor mais forte substitua um mais fraco
@@ -1501,11 +707,9 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             specialCooldown = Math.max(0, specialCooldown - 1);
             if (tripleShotTimer > 0) tripleShotTimer--; // NOVO: Decrementa timer
             if (repulsionBubbleTimer > 0) repulsionBubbleTimer--; // NOVO: Decrementa timer da bolha
-            if (cloneTimer > 0) cloneTimer--; // NOVO: Decrementa timer do clone
             if (freezingAuraTimer > 0) freezingAuraTimer--; // NOVO: Decrementa timer da aura
             if (expBoostTimer > 0) expBoostTimer--; // NOVO: Decrementa timer do EXP
 
-            // NOVO: Atualiza a visibilidade e posição da bolha de repulsão
             if (repulsionBubbleTimer > 0) {
                 repulsionBubbleMesh.visible = true;
                 // Centraliza a bolha no jogador
@@ -1514,7 +718,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
                 repulsionBubbleMesh.visible = false;
             }
 
-            // NOVO: Atualiza a visibilidade e posição da aura congelante
             if (freezingAuraTimer > 0) {
                 freezingAuraMesh.visible = true;
                 freezingAuraMesh.position.copy(player.position);
@@ -1522,7 +725,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
                 freezingAuraMesh.visible = false;
             }
 
-            // NOVO: Atualiza as partículas de fumaça
             if (freezingAuraTimer > 0) {
                 smokeParticles.forEach(p => {
                     if (!p.parent) scene.add(p); // Adiciona à cena se não estiver
@@ -1543,7 +745,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
                 smokeParticles.forEach(p => { if (p.parent) scene.remove(p); });
             }
 
-            // NOVO: Atualiza a aura de EXP Boost
             if (expBoostTimer > 0) {
                 expBoostAuraMesh.visible = true;
                 expBoostAuraMesh.position.copy(player.position);
@@ -1553,12 +754,10 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
                 expBoostAuraMesh.visible = false;
             }
 
-            // MELHORIA: Atualiza o indicador de alcance
             if (rangeIndicator.visible) {
                 rangeIndicator.position.copy(player.position);
             }
 
-            // NOVO: Atualiza a aura do Rei Goblin
             if (goblinKingAuraMesh) {
                 if (isBossWave && currentBoss && currentBoss.userData.type === 'goblin_king' && currentBoss.userData.hp > 0) {
                     goblinKingAuraMesh.visible = true;
@@ -1580,8 +779,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             updateAiming();
             updateClone(); // NOVO: Atualiza a lógica do clone
             updatePowerUps(); // Checa colisão com poções e poderes
-
-            // 3. Lógica de Inimigos e Spawning
             spawnEnemies();
             spawnPowerUps(); // Tenta spawnar poção
             
@@ -1591,7 +788,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
 
             // 2. O Escudo ataca (e pode matar o inimigo que acabou de se mover)
             updateShield(); 
-
 
             // 4. Lógica dos Projéteis
             updateProjectiles();
@@ -1638,60 +834,9 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             if (rangeIndicator) rangeIndicator.visible = false; // NOVO: Esconde indicador de alcance
 
             resetWaveState();
-
-            powerUpTimer = 0; 
             
-            // Limpa as entidades 3D e seus labels
-            enemies.forEach(e => { scene.remove(e); removeEnemyUI(e); });
-            projectiles.forEach(p => scene.remove(p));
-            powerUps.forEach(p => { scene.remove(p); removePowerUpLabel(p); }); // Limpa labels dos itens
-            enemies.length = 0; projectiles.length = 0; powerUps.length = 0; 
-            enemyLabelsContainer.innerHTML = '';
-            enemyLabels.clear();
-            powerUpLabels.clear(); // NOVO: Limpa o mapa de labels dos itens
-            
-            // Reset UI
-            startMenuModal.classList.add('hidden');
-            gameOverModal.classList.add('hidden');
-            // NOVO: Garante que o botão de level up esteja escondido no início
-            document.getElementById('level-up-prompt-button').classList.add('hidden');
-
-            
-            // NOVO: Spawna um power-up especial obrigatório no início
-            const specialPowers = ['tripleShot', 'shield', 'explosion'];
-            const randomType = specialPowers[Math.floor(Math.random() * specialPowers.length)];
-            // Spawna perto do jogador
-            createPowerUp(randomType, new THREE.Vector3(3, 0, 3)); 
-
-            updateUI();
-
             // CORREÇÃO: Define como "jogo iniciado" APENAS DEPOIS que tudo foi criado
             isGameOver = false;
-        }
-
-        // NOVO: Função para a habilidade de "Chuva de Pedras" do Rei Goblin
-        function triggerRockFall(targetPosition) {
-            const fallRadius = 7;
-            const damage = 15;
-
-            const targetGeometry = new THREE.RingGeometry(fallRadius - 0.5, fallRadius, 32);
-            const targetMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
-            const targetMarker = new THREE.Mesh(targetGeometry, targetMaterial);
-            targetMarker.position.copy(targetPosition);
-            targetMarker.position.y = 0.1;
-            targetMarker.rotation.x = -Math.PI / 2;
-            scene.add(targetMarker);
-
-            setTimeout(() => {
-                if (player.position.distanceToSquared(targetPosition) < fallRadius * fallRadius) {
-                    damagePlayer(damage);
-                    createFloatingText(damage, player.position.clone().setY(1.5), '#ff4500', '1.5rem');
-                }
-                const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1), new THREE.MeshLambertMaterial({ color: 0x8B4513 }));
-                rock.position.copy(targetPosition); rock.position.y = 0.5; scene.add(rock);
-                scene.remove(targetMarker);
-                setTimeout(() => scene.remove(rock), 200);
-            }, 1000);
         }
 
         function endGame() {
@@ -1703,54 +848,16 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             // Salva a pontuação com o nome do jogador e as estatísticas de abates
             window.saveScore(score, playerName, killStats, playerLevel, currentWave);
             
-            // NOVO: Garante que a bolha desapareça no fim do jogo
-            if (repulsionBubbleMesh) {
-                repulsionBubbleMesh.visible = false;
-            }
-
-            // NOVO: Garante que a aura desapareça no fim do jogo
-            if (freezingAuraMesh) {
-                freezingAuraMesh.visible = false;
-            }
-
-            // NOVO: Garante que o clone desapareça no fim do jogo
-            if (clone) {
-                scene.remove(clone);
-                clone = null;
-            }
-            // NOVO: Garante que a aura de EXP desapareça no fim do jogo
-            if (expBoostAuraMesh) {
-                expBoostAuraMesh.visible = false;
-            }
-
-            // NOVO: Garante que a aura do chefe desapareça
-            if (goblinKingAuraMesh) {
-                goblinKingAuraMesh.visible = false;
-            }
+            if (repulsionBubbleMesh) repulsionBubbleMesh.visible = false;
+            if (freezingAuraMesh) freezingAuraMesh.visible = false;
+            if (clone) { scene.remove(clone); clone = null; }
+            if (expBoostAuraMesh) expBoostAuraMesh.visible = false;
+            if (goblinKingAuraMesh) goblinKingAuraMesh.visible = false;
 
             // Remove todos os labels quando o jogo termina
             enemyLabelsContainer.innerHTML = '';
             enemyLabels.clear();
             powerUpLabels.clear(); // NOVO: Limpa o mapa de labels dos itens
-        }
-
-        // --- Funções de Controle da UI (Menu) ---
-        function handleRestartClick() {
-            gameOverModal.classList.add('hidden');
-            startMenuModal.classList.remove('hidden');
-        }
-
-        function handleStartGameClick() {
-            const playerName = document.getElementById('mage-name').value.trim();
-            if (playerName.length === 0) {
-                const input = document.getElementById('mage-name');
-                input.placeholder = 'NOME OBRIGATÓRIO!';
-                input.classList.add('border-red-500', 'border-2');
-                setTimeout(() => input.classList.remove('border-red-500', 'border-2'), 1000);
-                return;
-            }
-            startMenuModal.classList.add('hidden');
-            startGame(playerName); // Chama a função diretamente
         }
 
         // Inicia a aplicação Three.js quando a janela estiver carregada
