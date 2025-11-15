@@ -49,12 +49,33 @@
             border-radius: 0 0 0.5rem 0.5rem;
             padding: 0.25rem 1.5rem; /* Reduzido para ficar menor */
         }
+        /* NOVO: Botão de Level Up */
+        #level-up-prompt-button {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            background: linear-gradient(45deg, #fbbF24, #fde047);
+            color: #333;
+            font-weight: bold;
+            font-size: 1.2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 50px;
+            border: 3px solid white;
+            box-shadow: 0 0 25px #fde047;
+            cursor: pointer;
+            pointer-events: auto;
+            z-index: 45; /* Acima da UI do jogo, abaixo dos modais */
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
 
         /* NOVO: Estilo para o display de timers de power-ups */
         #powerup-timers-display {
             position: absolute;
-            top: 75px; /* Ajustado para ficar abaixo da HUD */
-            left: 1.5rem; /* Movido para a esquerda */
+            top: 180px; /* Mais para baixo */
+            right: 20px; /* Movido para a direita */
+            align-items: flex-end; /* Alinha o texto à direita */
             display: flex;
             flex-direction: column;
             gap: 4px; /* Espaçamento entre os timers */
@@ -432,6 +453,10 @@
                     <div class="w-full bg-gray-600 rounded-full h-2">
                         <div id="hp-bar" class="hp-bar-fill h-2 rounded-full bg-red-500" style="width: 100%;"></div>
                     </div>
+                    <!-- NOVO: Display de texto do HP -->
+                    <div id="hp-text-display" class="text-xs text-center text-gray-300 mt-1">
+                        100/100
+                    </div>
                 </div>
             </div>
 
@@ -462,6 +487,11 @@
             </div>
         </div>
     </div>
+
+    <!-- NOVO: Botão para abrir o menu de Level Up -->
+    <button id="level-up-prompt-button" class="hidden">
+        LEVEL UP!
+    </button>
     
     <!-- NOVO: Display de Timers de Power-ups Ativos -->
     <div id="powerup-timers-display">
@@ -553,7 +583,7 @@
     <div id="ability-tooltip"></div>
 
     <!-- NOVO: Modal de Level Up -->
-    <div id="level-up-modal" class="modal fixed inset-0 flex-col items-center justify-center hidden z-50">
+    <div id="level-up-modal" class="modal fixed inset-0 flex flex-col items-center justify-center hidden z-50">
         <div class="text-center mb-8">
             <h1 class="text-4xl font-extrabold text-yellow-300 mb-2">Santuário do Conhecimento</h1>
             <p class="text-lg text-gray-300">Escolha uma melhoria para o seu mago!</p>
@@ -566,7 +596,7 @@
             </div>
             -->
         </div>
-        <!-- NOVO: Seção para Melhorar Habilidades Ativas Conhecidas -->
+        <!-- NOVO: Seção para Melhorar Habilidades Ativas Conhecidas (CORREÇÃO: Movido para dentro do flex-col) -->
         <div class="w-full max-w-4xl flex flex-col items-center">
             <h2 class="text-xl font-bold text-gray-400 text-center mb-4 border-t border-gray-600 pt-4">Melhorar Grimório</h2>
             <div id="known-upgrades-container" class="flex flex-wrap justify-center gap-4">
@@ -853,6 +883,7 @@
         let playerLevel = 1;
         let experiencePoints = 0;
         const baseExperience = 100; // XP base para o Lvl 2
+        let pendingLevelUps = 0; // NOVO: Contador para level ups pendentes
         // NOVO: Cura passiva (Lvl 3+)
         let passiveHealTimer = 0;
         const passiveHealInterval = 300; // 5 segundos (60fps)
@@ -956,6 +987,10 @@
             playerLevelDisplay = document.getElementById('player-level-display');
             levelUpMessage = document.getElementById('level-up-message');
             xpTextDisplay = document.getElementById('xp-text-display');
+            // NOVO: Botão de Level Up
+            document.getElementById('level-up-prompt-button').onclick = () => {
+                showLevelUpOptions();
+            };
             // NOVO: Mapeia o modal de Level Up
             levelUpModal = document.getElementById('level-up-modal');
             upgradeOptionsContainer = document.getElementById('upgrade-options-container');
@@ -1193,6 +1228,10 @@
             // Ataque Especial com clique do mouse (botão esquerdo)
             document.addEventListener('mousedown', (e) => {
                 if (e.button === 0 && !isGameOver) { // 0 é o botão esquerdo
+                    // CORREÇÃO: Impede o disparo se o jogo estiver pausado
+                    if (isGamePaused) {
+                        return;
+                    }
                     attemptSpecialAttack();
                 }
             });
@@ -2099,36 +2138,45 @@
                 }
             }
 
-            // Causa dano e cria o efeito visual (CORREÇÃO: O dano não estava sendo aplicado ao primeiro alvo)
+            // Causa dano e cria o efeito visual
             for (let i = 0; i < chain.length; i++) {
                 const enemy = chain[i];
-                // O primeiro inimigo já tomou o dano do projétil, então só aplicamos o efeito. Os demais tomam o dano aqui.
-                if (i > 0) {
-                    enemy.userData.hp -= damage;
-                    // CORREÇÃO: Adiciona o texto de dano para os alvos secundários, que estava faltando.
-                    createFloatingText(damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
-                }
-
+                
+                // CORREÇÃO: Aplica o dano a todos os alvos na corrente.
+                enemy.userData.hp -= damage;
+                createFloatingText(damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
                 enemy.userData.electrifiedTimer = 300; // 5 segundos
                 enemy.userData.hitTimer = 10;
 
+                let startPoint;
+                // O primeiro raio sai do jogador, os seguintes saem do inimigo anterior.
                 if (i > 0) {
-                    const prevEnemy = chain[i - 1];
-                    const startPoint = prevEnemy.position.clone().setY(0.5);
-                    const endPoint = enemy.position.clone().setY(0.5);
-                    const distance = startPoint.distanceTo(endPoint);
-
-                    const geometry = new THREE.CylinderGeometry(0.05, 0.05, distance, 8);
-                    const material = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
-                    const lightningSegment = new THREE.Mesh(geometry, material);
-
-                    lightningSegment.position.copy(startPoint).lerp(endPoint, 0.5);
-                    lightningSegment.lookAt(endPoint);
-                    lightningSegment.rotateX(Math.PI / 2);
-
-                    scene.add(lightningSegment);
-                    setTimeout(() => scene.remove(lightningSegment), 150);
+                    startPoint = chain[i - 1].position.clone();
+                } else {
+                    startPoint = player.position.clone();
                 }
+
+                const endPoint = enemy.position.clone();
+                startPoint.y = endPoint.y = 0.5; // Alinha os raios na altura do mago
+
+                const distance = startPoint.distanceTo(endPoint);
+                if (distance === 0) continue; // Evita criar um raio de comprimento zero
+
+                const geometry = new THREE.CylinderGeometry(0.05, 0.05, distance, 8);
+                const material = new THREE.MeshBasicMaterial({ color: 0xFFFF00, transparent: true, opacity: 0.9 });
+                const lightningSegment = new THREE.Mesh(geometry, material);
+
+                // Posiciona e orienta o cilindro para conectar os dois pontos
+                lightningSegment.position.copy(startPoint).lerp(endPoint, 0.5);
+                lightningSegment.lookAt(endPoint);
+                lightningSegment.rotateX(Math.PI / 2);
+
+                scene.add(lightningSegment);
+                // Animação de fade-out
+                setTimeout(() => {
+                    lightningSegment.material.opacity = 0;
+                    setTimeout(() => scene.remove(lightningSegment), 100);
+                }, 100);
             }
         }
 
@@ -2306,21 +2354,8 @@
 
                 if (projectileCooldown <= 0) {
                     // Lógica de ataque aprimorada por nível e power-up
-                    if (tripleShotTimer > 0) {
-                        // NOVO: O power-up escala com o nível
-                        const isUpgraded = playerLevel >= 4;
-                        const angles = isUpgraded 
-                            ? [-0.3, -0.15, 0, 0.15, 0.3] // Nível 4+: 5 projéteis
-                            : [-0.1745, 0, 0.1745];       // Nível 1-3: 3 projéteis
-
-                        angles.forEach(angle => {
-                            const shotDirection = direction.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-                            createProjectile('weak', shotDirection, player.position);
-                        });
-
-                    } else if (playerLevel >= 4) {
-                        // Nível 4+ base: 3 projéteis
-                        const angles = [-0.1745, 0, 0.1745]; // 10 graus
+                    if (tripleShotTimer > 0) { // Apenas o power-up concede tiro múltiplo
+                        const angles = [-0.1745, 0, 0.1745]; // 3 projéteis
                         angles.forEach(angle => {
                             const shotDirection = direction.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
                             createProjectile('weak', shotDirection, player.position);
@@ -2401,9 +2436,27 @@
                     break;
                 }
                 case 'corrente_raios': { // Corrente de Raios
-                    // Apenas marca como carregado. A lógica acontece no projétil.
-                    player.userData.chainLightningCharged = true;
-                    return; 
+                    // COMPORTAMENTO NOVO: Disparo instantâneo no alvo mais próximo.
+                    const jumpDistance = [5, 8, 11, 14, 17][level - 1];
+                    let closestEnemy = null;
+                    let minDistanceSq = jumpDistance * jumpDistance;
+
+                    // Encontra o inimigo mais próximo DENTRO DO ALCANCE
+                    enemies.forEach(enemy => {
+                        const distanceSq = enemy.position.distanceToSquared(player.position);
+                        if (distanceSq < minDistanceSq) {
+                            minDistanceSq = distanceSq;
+                            closestEnemy = enemy;
+                        }
+                    });
+
+                    // Se encontrou um alvo, dispara. Senão, não gasta a habilidade.
+                    if (closestEnemy) {
+                        triggerChainLightning(closestEnemy);
+                    } else {
+                        return; // Não consome a habilidade se não houver alvos no alcance.
+                    }
+                    break;
                 }
                 case 'carga_explosiva': { // Carga Explosiva
                     // Pega a direção da mira do mouse
@@ -2973,7 +3026,14 @@
             if (enemyData.hp <= 0) {
                 score += enemyData.score;
                 gainExperience(enemyData.score); 
-                killPoints++; // CORREÇÃO: Apenas incrementa. O limite é gerenciado pela UI.
+
+                // CORREÇÃO: Incrementa os abates e limita ao máximo da habilidade ativa.
+                const activeId = player.userData.activeAbility;
+                if (activeId) {
+                    const ability = upgrades[activeId];
+                    const maxKills = ability.getKillCost(player.userData.upgrades[activeId] || 1);
+                    killPoints = Math.min(maxKills, killPoints + 1);
+                }
                 killsSinceLastPotion++;
 
                 if (killStats[enemyData.type] !== undefined) {
@@ -3021,20 +3081,15 @@
             // A UI será atualizada no loop animate
             updateUI();
         }
-        
+
         function levelUp() {
             experiencePoints -= player.userData.experienceForNextLevel; // Subtrai o custo e mantém o excesso
             playerLevel++;
-            
-            // Aumenta a vida máxima em 10 a cada nível como bônus base
-            maxHP += 10;
-            playerHP += 10;
+            pendingLevelUps++; // NOVO: Incrementa o contador de level ups pendentes
+            document.getElementById('level-up-prompt-button').classList.remove('hidden'); // Mostra o botão
 
-            // Aumenta o custo para o próximo nível (500, 1000, 1500, etc.)
-            player.userData.experienceForNextLevel = baseExperience * playerLevel;
-            
-            // NOVO: Pausa o jogo e mostra as opções de melhoria
-            showLevelUpOptions();
+            // Toca a animação de level up no personagem
+            displayLevelUpMessage();
         }
 
         // NOVO: Estrutura de dados REFORMULADA para as melhorias com níveis
@@ -3135,6 +3190,13 @@
         // NOVO: Função para mostrar as opções de level up
         function showLevelUpOptions() {
             isGamePaused = true;
+            pendingLevelUps--; // Decrementa um level up pendente
+
+            // Esconde o botão se não houver mais level ups pendentes
+            if (pendingLevelUps <= 0) {
+                document.getElementById('level-up-prompt-button').classList.add('hidden');
+            }
+
             levelUpModal.classList.remove('hidden');
             upgradeOptionsContainer.innerHTML = '';
             knownUpgradesContainer.innerHTML = '';
@@ -3186,13 +3248,15 @@
                     const currentLevel = playerUpgrades[upgradeId];
                     const isMaxLevel = currentLevel >= upgrade.maxLevel;
 
-                    const card = document.createElement('div');
-                    card.className = 'upgrade-card';
+                    const card = document.createElement('div');                    card.className = 'upgrade-card';
+                    if (isMaxLevel) {
+                        card.classList.add('opacity-50', 'cursor-not-allowed');
+                    }
                     
                     let cardHTML = `
                         <div class="upgrade-icon">${upgrade.icon}</div>
                         <div class="upgrade-title">${upgrade.title}</div>
-                        <div class="upgrade-level">${isMaxLevel ? 'NÍVEL MÁXIMO' : `Nível ${currentLevel}`}</div>
+                        <div class="upgrade-level">${isMaxLevel ? 'NÍVEL MÁXIMO' : `Nível ${currentLevel} ➔ ${currentLevel + 1}`}</div>
                         <div class="upgrade-description">${upgrade.description(isMaxLevel ? currentLevel : currentLevel + 1)}</div>`;
 
                     if (upgrade.type === 'active') {
@@ -3206,7 +3270,9 @@
                     }
 
                     // Permite clicar para melhorar (se não for nível máximo) ou para equipar
-                    card.onclick = () => selectUpgrade(upgradeId, isMaxLevel);
+                    if (!isMaxLevel) {
+                        card.onclick = () => selectUpgrade(upgradeId, isMaxLevel);
+                    }
 
                     knownUpgradesContainer.appendChild(card);
                 });
@@ -3297,6 +3363,11 @@
             document.getElementById('confirm-upgrade-button').onclick = () => {
                 levelUpModal.classList.add('hidden');
                 isGamePaused = false;
+                // Se ainda houver level ups pendentes, o botão já estará visível.
+                // Se não, ele foi escondido ao abrir o menu.
+                if (pendingLevelUps > 0) {
+                    document.getElementById('level-up-prompt-button').classList.remove('hidden');
+                }
                 updateUI();
             };
         }
@@ -3321,9 +3392,6 @@
                 
                 // Executa o efeito da melhoria
                 upgrade.apply();
-
-                // Mostra o feedback de Level Up
-                displayLevelUpMessage();
             }
         }
 
@@ -3399,15 +3467,7 @@
                             createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
                             enemy.userData.hitTimer = 10;
 
-                            // Ativa a Corrente de Raios se estiver carregada
-                            if (player.userData.chainLightningCharged) {
-                                triggerChainLightning(enemy);
-                                player.userData.chainLightningCharged = false;
-                                rangeIndicator.visible = false; // Esconde o indicador
-                                rangeIndicatorTimer = 0;
-                                killPoints = 0; // Consome os abates
-                                updateUI();
-                            }
+                            // Lógica da Corrente de Raios foi movida para attemptSpecialAttack
 
                             hit = true;
                             break;
@@ -3506,6 +3566,10 @@
             const hpPercent = Math.max(0, playerHP / maxHP) * 100;
             hpBar.style.width = `${hpPercent}%`;
             
+            // NOVO: Atualiza o texto do HP
+            const hpTextDisplay = document.getElementById('hp-text-display');
+            hpTextDisplay.textContent = `${Math.floor(playerHP)}/${Math.floor(maxHP)}`;
+
             // NOVO: Lógica da HUD de Habilidade Ativa
             const activeAbilityId = player.userData.activeAbility;
             if (activeAbilityId) {
@@ -3729,14 +3793,14 @@
             if (autoHealLevel > 0) {
                 passiveHealTimer++;
 
-                const healAmount = Math.min(5, autoHealLevel + 1); // Nível 1 cura 2, Nível 2 cura 3, etc.
+                const healAmount = Math.floor(Math.min(5, autoHealLevel + 1)); // Nível 1 cura 2, Nível 2 cura 3, etc.
                 const currentHealInterval = autoHealLevel < 5 ? 300 : 180; // 5 segundos para Nv 1-4, 3 segundos para Nv 5
 
                 if (passiveHealTimer >= currentHealInterval) {
                     const oldHP = playerHP;
                     playerHP = Math.min(maxHP, playerHP + healAmount);
                     if (playerHP > oldHP) {
-                        createFloatingText(`+${healAmount}`, player.position.clone().setY(1.5), '#00ff00');
+                        createFloatingText(`+${playerHP - oldHP}`, player.position.clone().setY(1.5), '#00ff00');
                     }
                     passiveHealTimer = 0;
                 }
@@ -3759,6 +3823,7 @@
             playerLevel = 1;
             experiencePoints = 0;
             playerSpeed = 0.15; 
+            pendingLevelUps = 0; // NOVO: Reseta level ups pendentes
 
             killPoints = 0;
             killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 }; // NOVO: Reseta killStats
@@ -3809,6 +3874,9 @@
             // Reset UI
             startMenuModal.classList.add('hidden');
             gameOverModal.classList.add('hidden');
+            // NOVO: Garante que o botão de level up esteja escondido no início
+            document.getElementById('level-up-prompt-button').classList.add('hidden');
+
             
             // NOVO: Spawna um power-up especial obrigatório no início
             const specialPowers = ['tripleShot', 'shield', 'explosion'];
