@@ -3,15 +3,6 @@
         let raycaster, mouse;
         const pointer = new THREE.Vector2();
         
-        // Variáveis de Labels 2D
-        const enemyLabelsContainer = document.getElementById('enemy-labels-container');
-        const enemyLabels = new Map(); // Mapa para rastrear labels
-        const powerUpLabels = new Map(); // NOVO: Mapa para labels dos itens
-
-        // Variáveis do Jogo
-        const floatingTexts = []; // NOVO: Para texto de dano/cura
-
-
         let player, targetRing;
         let playerName = 'Mago Anônimo'; // NOVO: Nome do jogador
         let score = 0;
@@ -124,52 +115,76 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             expBoost: { duration: 3600, color: 0xFFFF00, geometry: new THREE.TorusKnotGeometry(0.3, 0.08, 50, 8) } // NOVO: EXP em dobro por 60s
         };
 
-        // UI Elementos
-        let scoreDisplay, hpBar, specialBar, killPointsDisplay, gameOverModal, finalScoreDisplay, playerNameDisplay, healingMessage, startMenuModal, waveLevelDisplay;
-        
-        // NOVO: Elementos da UI de Level
-        let playerLevelDisplay, levelUpMessage, xpTextDisplay, levelUpModal, upgradeOptionsContainer, knownUpgradesContainer;
-
-        // NOVO: Elementos da HUD de Habilidade Ativa
-        let activeAbilityHud, activeAbilityIcon, activeAbilityProgressBar, activeAbilityKillCount;
-
-        // NOVO: Função para inicializar os elementos da UI (Evita erros de 'null')
-        function setupUIElements() {
-            scoreDisplay = document.getElementById('score-display'); // Removido
-            hpBar = document.getElementById('hp-bar'); // Removido
-            specialBar = document.getElementById('special-bar'); // Removido
-            killPointsDisplay = document.getElementById('kill-points-display'); // Removido
-            gameOverModal = document.getElementById('game-over-modal');
-            finalScoreDisplay = document.getElementById('final-score');
-            playerNameDisplay = document.getElementById('player-name-display');
-            healingMessage = document.getElementById('healing-message');
-            startMenuModal = document.getElementById('start-menu-modal');
-            
-            // NOVO: Mapeia UI de Level
-            playerLevelDisplay = document.getElementById('player-level-display');
-            levelUpMessage = document.getElementById('level-up-message');
-            xpTextDisplay = document.getElementById('xp-text-display');
-            // NOVO: Botão de Level Up
-            document.getElementById('level-up-prompt-button').onclick = () => {
-                showLevelUpOptions();
-            };
-            // NOVO: Mapeia o modal de Level Up
-            levelUpModal = document.getElementById('level-up-modal');
-            upgradeOptionsContainer = document.getElementById('upgrade-options-container');
-            knownUpgradesContainer = document.getElementById('known-upgrades-container');
-
-            // NOVO: Mapeia UI da Onda
-            waveLevelDisplay = document.getElementById('wave-level-display');
-
-            // NOVO: Mapeia a HUD de Habilidade Ativa
-            activeAbilityHud = document.getElementById('active-ability-hud');
-            activeAbilityIcon = document.getElementById('active-ability-icon');
-            activeAbilityProgressBar = document.getElementById('active-ability-progress-bar');
-            activeAbilityKillCount = document.getElementById('active-ability-kill-count');
-
-            // abilityTooltip = document.getElementById('ability-tooltip'); // Removido por enquanto
-        }
-
+        // NOVO: Estrutura de dados para as melhorias com níveis
+        const upgrades = {
+            // --- MELHORIAS DE ATRIBUTOS (PASSIVAS) ---
+            increase_damage: {
+                type: 'attribute',
+                icon: '💥',
+                title: "Poder Arcano",
+                maxLevel: 5,
+                description: (level) => `Aumenta o dano do ataque básico em +10%.`,
+                apply: () => { /* O dano é calculado dinamicamente */ }
+            },
+            increase_attack_speed: {
+                type: 'attribute',
+                icon: '⚡️',
+                title: "Celeridade",
+                maxLevel: 5,
+                description: (level) => `Aumenta a velocidade de ataque em +10%.`,
+                apply: () => { baseCooldown = Math.max(5, baseCooldown * 0.90); }
+            },
+            increase_move_speed: {
+                type: 'attribute',
+                icon: '🏃',
+                title: "Passos Ligeiros",
+                maxLevel: 5,
+                description: (level) => `Aumenta sua velocidade de movimento em +7%.`,
+                apply: () => { playerSpeed *= 1.07; }
+            },
+            increase_max_hp: {
+                type: 'attribute',
+                icon: '❤️',
+                title: "Vigor",
+                maxLevel: 5,
+                description: (level) => `Aumenta a vida máxima em +20.`,
+                apply: () => { maxHP += 20; playerHP += 20; }
+            },
+            increase_xp_gain: {
+                type: 'attribute',
+                icon: '🎓',
+                title: "Sede de Conhecimento",
+                maxLevel: 3,
+                description: (level) => `Aumenta o ganho de experiência em +20%.`,
+                apply: () => { /* A EXP é calculada dinamicamente */ }
+            },
+            auto_heal: {
+                type: 'attribute',
+                icon: '✨',
+                title: "Regeneração",
+                maxLevel: 5,
+                description: (level) => level < 5 ? `Recupera ${level + 1} de HP a cada 5 segundos.` : `Recupera 5 de HP a cada 3 segundos.`,
+                apply: () => { /* A lógica é gerenciada no loop animate */ }
+            },
+            // --- HABILIDADES ATIVAS ---
+            missil_magico: {
+                type: 'active', icon: '🔥', title: "Míssil Mágico", maxLevel: 5,
+                getKillCost: (level) => level < 4 ? 5 : 10,
+                description: (level) => `Dispara ${level < 4 ? 1 : (level === 4 ? 2 : 3)} míssil(eis) teleguiado(s) no(s) inimigo(s) mais forte(s).`
+            },
+            explosao_energia: {
+                type: 'active', icon: '🌀', title: "Explosão de Energia", maxLevel: 5, getKillCost: () => 10,
+                description: (level) => `Libera uma explosão de projéteis em todas as direções. Mais projéteis com o nível.`
+            },
+            corrente_raios: {
+                type: 'active', icon: '⛓️', title: "Corrente de Raios", maxLevel: 5, getKillCost: () => 8,
+                description: (level) => `Eletrifica seu próximo ataque, ricocheteando e aplicando dano contínuo.`
+            },
+            carga_explosiva: {
+                type: 'active', icon: '💣', title: "Carga Explosiva", maxLevel: 5, getKillCost: () => 20,
+                description: (level) => `Cria uma grande explosão. Nv. 4+ libera fragmentos explosivos.`
+            }
+        };
 
         // --- Funções de Inicialização ---
 
@@ -225,9 +240,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
 
             // 8. Setup de Inputs e Eventos
             setupInputs();
-
-            // NOVO: Configura os tooltips das habilidades
-            setupAbilityTooltips();
 
             // 9. Cria o Player Temporário para Colisão (NOVO)
             tempPlayer = createWizardModel();
@@ -405,16 +417,8 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             document.addEventListener('mousemove', onPointerMove);
             window.addEventListener('resize', onWindowResize);
             
-            // Ataque Especial com clique do mouse (botão esquerdo)
-            document.addEventListener('mousedown', (e) => {
-                if (e.button === 0 && !isGameOver) { // 0 é o botão esquerdo
-                    // CORREÇÃO: Impede o disparo se o jogo estiver pausado
-                    if (isGamePaused) {
-                        return;
-                    }
-                    attemptSpecialAttack();
-                }
-            });
+            // Ataque Especial com clique do mouse (botão esquerdo) - movido para setupUI
+            document.addEventListener('mousedown', handleMouseClick);
         }
 
         function onWindowResize() {
@@ -428,9 +432,13 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             pointer.y = - (event.clientY / window.innerHeight) * 2 + 1;
         }
 
-        // NOVO: Função para configurar os tooltips das habilidades
-        function setupAbilityTooltips() { /* Temporariamente desativado */ }
-
+        function handleMouseClick(event) {
+            if (event.button === 0 && !isGameOver && !isGamePaused) {
+                attemptSpecialAttack();
+            }
+        }
+        
+        
         // --- Funções de Entidade e Spawning ---
         
         function createWizardModel() {
@@ -1244,43 +1252,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             createPowerUp(randomType, position);
         }
 
-
-        // NOVO: Função para disparar a Nova Mágica
-        function triggerNovaBomb() {
-            const numProjectiles = 16; // Mais projéteis para um efeito mais denso
-            for (let i = 0; i < numProjectiles; i++) {
-                const angle = (i / numProjectiles) * Math.PI * 2;
-                const direction = new THREE.Vector3(
-                    Math.cos(angle),
-                    0,
-                    Math.sin(angle)
-                );
-                // Usa o novo tipo 'nova' com 20 de dano
-                createProjectile('nova', direction, player.position);
-            }
-        }
-
-        // NOVO: Função para criar o clone
-        function createClone() {
-            if (clone) { // Remove o clone antigo se existir
-                scene.remove(clone);
-            }
-
-            clone = createWizardModel();
-            clone.position.copy(player.position);
-
-            // Torna o clone semitransparente
-            clone.traverse((child) => {
-                if (child.isMesh) {
-                    child.material = child.material.clone(); // Clona o material para não afetar o jogador
-                    child.material.transparent = true;
-                    child.material.opacity = 0.5;
-                }
-            });
-
-            scene.add(clone);
-        }
-
         // NOVO: Função para atualizar a lógica do clone
         function updateClone() {
             if (cloneTimer > 0 && clone) {
@@ -1397,44 +1368,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             setTimeout(() => scene.remove(beamMesh), 200);
         }
 
-        // NOVO: Função para criar texto flutuante de dano/cura
-        function createFloatingText(text, position, color = 'white', fontSize = '1rem') {
-            const textElement = document.createElement('div');
-            textElement.className = 'floating-text';
-            textElement.textContent = text;
-            textElement.style.color = color;
-            textElement.style.fontSize = fontSize;
-
-            document.getElementById('floating-text-container').appendChild(textElement);
-
-            const textData = {
-                element: textElement,
-                position: position.clone(),
-                life: 60, // 1 segundo de vida
-                velocity: new THREE.Vector3(0, 0.03, 0) // Move para cima
-            };
-            floatingTexts.push(textData);
-        }
-
-        // NOVO: Função para atualizar o texto flutuante
-        function updateFloatingText() {
-            for (let i = floatingTexts.length - 1; i >= 0; i--) {
-                const ft = floatingTexts[i];
-                ft.life--;
-                ft.position.add(ft.velocity);
-
-                if (ft.life <= 0) {
-                    ft.element.remove();
-                    floatingTexts.splice(i, 1);
-                } else {
-                    // Atualiza a posição 2D
-                    const tempV = ft.position.clone().project(camera);
-                    ft.element.style.left = `${(tempV.x * 0.5 + 0.5) * window.innerWidth}px`;
-                    ft.element.style.top = `${(-tempV.y * 0.5 + 0.5) * window.innerHeight}px`;
-                    ft.element.style.opacity = ft.life / 60;
-                }
-            }
-        }
         // NOVO: Função para disparar a Corrente de Raios
         function triggerChainLightning(startEnemy) {
             const level = player.userData.upgrades.corrente_raios || 1;
@@ -1533,107 +1466,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
 
         // --- Funções de Lógica do Jogo ---
         
-        // Vetor temporário para o cálculo dos labels
-        const tempV = new THREE.Vector3(); 
-
-        // Renomeada: Atualiza a UI (Label e Barra de Vida) dos Inimigos
-        function updateEnemyUI() {
-            enemies.forEach(enemy => {
-                // NOVO: Destaca a barra de vida do chefe
-                if (enemy.userData.isBoss) {
-                    const ui = enemyLabels.get(enemy.uuid);
-                    if (ui && ui.hpBar) {
-                        ui.hpBar.style.backgroundColor = '#FFD700'; // Dourado
-                    }
-                }
-                const uiElements = enemyLabels.get(enemy.uuid); // Pega o objeto
-                if (!uiElements) return;
-                const { nameLabel, hpBar, hpFill, armorBar, armorFill, summonMarker, frozenMarker, electrifiedMarker } = uiElements;
-                const modelHeight = enemy.userData.modelHeight || 1.0;
-                
-                // 1. Projeta a Posição 3D (como antes)
-                const labelBaseY = enemy.position.y + modelHeight;
-                tempV.set(enemy.position.x, labelBaseY, enemy.position.z); // Posição base acima da cabeça
-                tempV.project(camera);
-
-                // 2. Converte para coordenadas de tela
-                const x = (tempV.x * 0.5 + 0.5) * window.innerWidth;
-                const y = (-tempV.y * 0.5 + 0.5) * window.innerHeight;
-
-                // 3. Aplica posição ao Label do Nome (Offset para cima)
-                nameLabel.style.left = `${x}px`;
-                nameLabel.style.top = `${y - 8}px`; // Sobe 8px para dar espaço
-
-                // 4. NOVO: Aplica posição às Barras
-                if (enemy.userData.armor > 0) {
-                    armorBar.style.display = 'block';
-                    armorBar.style.left = `${x}px`;
-                    armorBar.style.top = `${y}px`;
-                    hpBar.style.left = `${x}px`;
-                    hpBar.style.top = `${y + 8}px`; // HP bar fica abaixo da armadura
-                } else {
-                    if (armorBar) armorBar.style.display = 'none';
-                    hpBar.style.left = `${x}px`;
-                    hpBar.style.top = `${y}px`;
-                }
-
-                // 5. NOVO: Atualiza a largura da barra de vida
-                if (armorFill) armorFill.style.width = `${(enemy.userData.armor / enemy.userData.maxArmor) * 100}%`;
-                const hpPercent = (enemy.userData.hp / enemy.userData.maxHP) * 100;
-                hpFill.style.width = `${hpPercent}%`;
-
-                // 6. NOVO: Atualiza a posição do marcador de invocação
-                if (summonMarker) {
-                    summonMarker.style.left = `${x}px`;
-                    summonMarker.style.top = `${y - 18}px`; // Posiciona acima do nome
-                }
-
-                // 7. NOVO: Atualiza a visibilidade do marcador de congelado
-                if (frozenMarker) {
-                    if (enemy.userData.isFrozen) {
-                        frozenMarker.style.display = 'block';
-                        frozenMarker.style.left = `${x}px`;
-                        frozenMarker.style.top = `${y - 18}px`; // Acima do nome
-                    } else {
-                        frozenMarker.style.display = 'none';
-                    }
-                }
-
-                // NOVO: Atualiza a visibilidade do marcador de eletrificado
-                if (electrifiedMarker) {
-                    if (enemy.userData.electrifiedTimer > 0) {
-                        electrifiedMarker.style.display = 'block';
-                        electrifiedMarker.style.left = `${x + 10}px`; // Deslocado para o lado
-                        electrifiedMarker.style.top = `${y - 18}px`;
-                    } else {
-                        electrifiedMarker.style.display = 'none';
-                    }
-                }
-            });
-        }
-
-        // NOVO: Função para atualizar os labels dos Power-ups
-        function updatePowerUpLabels() {
-            powerUps.forEach(powerUp => {
-                const label = powerUpLabels.get(powerUp.uuid);
-                if (!label) return;
-
-                // 1. Projeta a Posição 3D (como antes)
-                // Posição base acima do item
-                const height = powerUp.userData.geometry.parameters.height || 0.5;
-                tempV.set(powerUp.position.x, powerUp.position.y + height, powerUp.position.z); 
-                tempV.project(camera);
-
-                // 2. Converte para coordenadas de tela
-                const x = (tempV.x * 0.5 + 0.5) * window.innerWidth;
-                const y = (-tempV.y * 0.5 + 0.5) * window.innerHeight;
-
-                // 3. Aplica posição ao Label
-                label.style.left = `${x}px`;
-                label.style.top = `${y}px`;
-            });
-        }
-
         function handlePlayerMovement() {
             let dx = 0;
             let dz = 0;
@@ -1927,47 +1759,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             }
         }
         
-        function displayHealingMessage(amount) {
-            healingMessage.textContent = `+${amount} HP!`;
-            healingMessage.style.opacity = 1;
-            healingMessage.classList.add('transition-none'); // Desliga transição para resetar
-            
-            // Reinicia a animação de opacidade
-            setTimeout(() => {
-                healingMessage.classList.remove('transition-none');
-                healingMessage.style.transition = 'opacity 1.5s ease-out, transform 1.5s ease-out';
-                healingMessage.style.opacity = 0;
-                healingMessage.style.transform = 'translate(-50%, -150%)'; // Move para cima enquanto desaparece
-            }, 10);
-            
-            // Reseta a posição após a animação
-             setTimeout(() => {
-                healingMessage.style.transform = 'translate(-50%, -50%)';
-            healingMessage.style.transition = 'none';
-        }, 1510);
-    }
-    
-    // NOVO: Feedback visual de Level Up
-    function displayLevelUpMessage() {
-        levelUpMessage.textContent = `LEVEL ${playerLevel}!`;
-        levelUpMessage.style.opacity = 1;
-        levelUpMessage.classList.add('transition-none');
-        
-        // Reinicia a animação
-        setTimeout(() => {
-            levelUpMessage.classList.remove('transition-none');
-            levelUpMessage.style.transition = 'opacity 1.5s ease-out, transform 1.5s ease-out';
-            levelUpMessage.style.opacity = 0;
-            levelUpMessage.style.transform = 'translate(-50%, -150%)'; // Move para cima
-        }, 10);
-        
-        // Reseta a posição
-         setTimeout(() => {
-            levelUpMessage.style.transform = 'translate(-50%, -50%)';
-            levelUpMessage.style.transition = 'none';
-        }, 1510);
-    }
-
     // NOVO: Lógica da Explosão (usada pelo projétil)
     function triggerBigExplosion(position, radius, damage, level) {
             // Efeito visual simples (Flash)
@@ -2703,342 +2494,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             displayLevelUpMessage();
         }
 
-        // NOVO: Estrutura de dados REFORMULADA para as melhorias com níveis
-        const upgrades = {
-            // --- MELHORIAS DE ATRIBUTOS (PASSIVAS) ---
-            increase_damage: {
-                type: 'attribute',
-                icon: '💥',
-                title: "Poder Arcano",
-                maxLevel: 5,
-                description: (level) => `Aumenta o dano do ataque básico em +10%.`,
-                apply: () => { /* O dano é calculado dinamicamente agora */ }
-            },
-            increase_attack_speed: {
-                type: 'attribute',
-                icon: '⚡️',
-                title: "Celeridade",
-                maxLevel: 5,
-                description: (level) => `Aumenta a velocidade de ataque em +10%.`,
-                apply: () => { baseCooldown = Math.max(5, baseCooldown * 0.90); } // Multiplicativo é bom aqui
-            },
-            increase_move_speed: {
-                type: 'attribute',
-                icon: '🏃',
-                title: "Passos Ligeiros",
-                maxLevel: 5,
-                description: (level) => `Aumenta sua velocidade de movimento em +7%.`,
-                apply: () => { playerSpeed *= 1.07; }
-            },
-            increase_max_hp: {
-                type: 'attribute',
-                icon: '❤️',
-                title: "Vigor",
-                maxLevel: 5,
-                description: (level) => `Aumenta a vida máxima em +20.`,
-                apply: () => { maxHP += 20; playerHP += 20; }
-            },
-            increase_xp_gain: {
-                type: 'attribute',
-                icon: '🎓',
-                title: "Sede de Conhecimento",
-                maxLevel: 3,
-                description: (level) => `Aumenta o ganho de experiência em +20%.`,
-                apply: () => { /* A EXP é calculada dinamicamente agora */ }
-            },
-            // --- HABILIDADES ATIVAS (SÓ PODE TER UMA EQUIPADA) ---
-            missil_magico: {
-                type: 'active',
-                icon: '🔥',
-                title: "Míssil Mágico",
-                maxLevel: 5,
-                getKillCost: (level) => level < 4 ? 5 : 10,
-                description: (level) => `Dispara ${level < 4 ? 1 : (level === 4 ? 2 : 3)} míssil(eis) teleguiado(s) no(s) inimigo(s) mais forte(s).`,
-                apply: () => { /* A lógica será gerenciada em `attemptSpecialAttack` */ }
-            },
-            explosao_energia: {
-                type: 'active',
-                icon: '🌀',
-                title: "Explosão de Energia",
-                maxLevel: 5,
-                getKillCost: () => 10,
-                description: (level) => `Libera uma explosão de projéteis em todas as direções. Mais projéteis com o nível.`,
-                apply: () => { /* A lógica será gerenciada no loop `animate` */ }
-            },
-            corrente_raios: {
-                type: 'active',
-                icon: '⛓️',
-                title: "Corrente de Raios",
-                maxLevel: 5,
-                getKillCost: () => 8,
-                description: (level) => `Eletrifica seu próximo ataque, ricocheteando e aplicando dano contínuo.`,
-                apply: () => { /* A lógica será gerenciada em `updateProjectiles` */ }
-            },
-            // Habilidade de Carga Explosiva agora é ATIVA
-            carga_explosiva: {
-                type: 'active',
-                icon: '💣',
-                title: "Carga Explosiva",
-                maxLevel: 5,
-                getKillCost: () => 20,
-                description: (level) => `Cria uma grande explosão. Nv. 4+ libera fragmentos explosivos.`,
-                apply: () => { /* Lógica em attemptSpecialAttack */ }
-            },
-            // NOVO: Habilidade de Auto-Cura
-            auto_heal: {
-                type: 'attribute', // É um atributo passivo
-                icon: '✨',
-                title: "Regeneração",
-                maxLevel: 5,
-                description: (level) => {
-                    if (level < 5) return `Recupera ${level + 1} de HP a cada 5 segundos.`;
-                    return `Recupera 5 de HP a cada 3 segundos.`;
-                },
-                apply: () => { /* A lógica será gerenciada no loop `animate` */ }
-            }
-        };
-
-        // NOVO: Função para mostrar as opções de level up
-        function showLevelUpOptions() {
-            isGamePaused = true;
-            pendingLevelUps--; // Decrementa um level up pendente
-
-            // Esconde o botão se não houver mais level ups pendentes
-            if (pendingLevelUps <= 0) {
-                document.getElementById('level-up-prompt-button').classList.add('hidden');
-            }
-
-            levelUpModal.classList.remove('hidden');
-            upgradeOptionsContainer.innerHTML = '';
-            knownUpgradesContainer.innerHTML = '';
-            document.getElementById('confirm-upgrade-container').classList.add('hidden'); // Esconde o botão de continuar
-            const playerUpgrades = player.userData.upgrades;
-            const activeAbility = player.userData.activeAbility;
-
-            // --- 1. Gerar 3 Opções Aleatórias (Topo) ---
-            const availableUpgradeKeys = Object.keys(upgrades).filter(key => {
-                const currentLevel = playerUpgrades[key] || 0;
-                return currentLevel < upgrades[key].maxLevel;
-            });
-            const chosenUpgrades = [];
-            while (chosenUpgrades.length < 3 && availableUpgradeKeys.length > 0) {
-                const randomIndex = Math.floor(Math.random() * availableUpgradeKeys.length);
-                const upgradeId = availableUpgradeKeys.splice(randomIndex, 1)[0];
-                chosenUpgrades.push(upgradeId);
-            }
-            chosenUpgrades.forEach(upgradeId => {
-                const upgrade = upgrades[upgradeId];
-                const currentLevel = playerUpgrades[upgradeId] || 0;
-                const nextLevel = currentLevel + 1;
-                const card = document.createElement('div');
-                card.className = 'upgrade-card';
-                card.onclick = () => selectUpgrade(upgradeId, false); // CORREÇÃO: Passa isMaxLevel como false
-                let cardHTML = `
-                    <div class="upgrade-icon">${upgrade.icon}</div>
-                    <div class="upgrade-title">${upgrade.title}</div>
-                    <div class="upgrade-description">${upgrade.description(nextLevel)}</div>`;
-
-                if (upgrade.type === 'active') {
-                    if (activeAbility && activeAbility !== upgradeId) {
-                        cardHTML += `<div class="upgrade-replace-text">Substitui ${upgrades[activeAbility].title}</div>`;
-                    }
-                    cardHTML += `<div class="upgrade-level">${currentLevel > 0 ? `Nível ${currentLevel} ➔ ${nextLevel}` : 'APRENDER'}</div>`;
-                } else {
-                    cardHTML += `<div class="upgrade-level">${currentLevel > 0 ? `Nível ${currentLevel} ➔ ${nextLevel}` : 'NOVO!'}</div>`;
-                }
-                cardHTML += `</div>`;
-                card.innerHTML = cardHTML;
-                upgradeOptionsContainer.appendChild(card);
-            });
-
-            // --- 2. Gerar Opções para Melhorar Habilidades Conhecidas (Embaixo) ---
-            const knownAbilities = Object.keys(playerUpgrades);
-            if (knownAbilities.length > 0) {
-                knownAbilities.forEach(upgradeId => {
-                    const upgrade = upgrades[upgradeId];
-                    const currentLevel = playerUpgrades[upgradeId];
-                    const isMaxLevel = currentLevel >= upgrade.maxLevel;
-
-                    const card = document.createElement('div');                    card.className = 'upgrade-card';
-                    if (isMaxLevel) {
-                        card.classList.add('opacity-50', 'cursor-not-allowed');
-                    }
-                    
-                    let cardHTML = `
-                        <div class="upgrade-icon">${upgrade.icon}</div>
-                        <div class="upgrade-title">${upgrade.title}</div>
-                        <div class="upgrade-level">${isMaxLevel ? 'NÍVEL MÁXIMO' : `Nível ${currentLevel} ➔ ${currentLevel + 1}`}</div>
-                        <div class="upgrade-description">${upgrade.description(isMaxLevel ? currentLevel : currentLevel + 1)}</div>`;
-
-                    if (upgrade.type === 'active') {
-                        cardHTML += `<div class="upgrade-replace-text">Clique para equipar</div>`;
-                    }
-                    card.innerHTML = cardHTML;
-
-                    // Adiciona a classe 'selected' se for a habilidade ativa
-                    if (upgradeId === activeAbility) {
-                        card.classList.add('selected');
-                    }
-
-                    // Permite clicar para melhorar (se não for nível máximo) ou para equipar
-                    if (!isMaxLevel) {
-                        card.onclick = () => selectUpgrade(upgradeId, isMaxLevel);
-                    }
-
-                    knownUpgradesContainer.appendChild(card);
-                });
-            }
-        }
-
-        // NOVO: Função chamada quando o jogador escolhe uma melhoria
-        function selectUpgrade(upgradeId, isMaxLevel) {
-            const upgrade = upgrades[upgradeId];
-            if (!upgrade) return;
-
-            // Se a habilidade não está no nível máximo, melhora ela.
-            if (!isMaxLevel) {
-                // Incrementa o nível da habilidade no estado do jogador
-                player.userData.upgrades[upgradeId] = (player.userData.upgrades[upgradeId] || 0) + 1;
-
-                // CORREÇÃO: Se for uma nova habilidade ativa, equipa ela imediatamente.
-                if (upgrade.type === 'active' && player.userData.activeAbility !== upgradeId) {
-                    const isNew = !player.userData.upgrades[upgradeId] || player.userData.upgrades[upgradeId] === 1;
-                    if (isNew) killPoints = 0; // Zera abates ao aprender
-                    player.userData.activeAbility = upgradeId;
-                }
-                
-                // Executa o efeito da melhoria
-                if (upgrade.apply) upgrade.apply();
-
-                // MELHORIA: Não zera os abates ao subir de nível, apenas ao trocar de magia.
-                // A lógica de troca já lida com isso, então não fazemos nada aqui.
-                // Apenas chamamos a próxima etapa.
-                // A barra será recalculada na UI.
-                displayLevelUpMessage(); // Mostra o feedback de "LEVEL UP!"
-
-                // Pausa o jogo e mostra a tela para escolher a habilidade ativa
-                promptEquipActiveAbility();
-            } else {
-                // Se já está no nível máximo mas é uma habilidade ativa, apenas equipa.
-                if (upgrade.type === 'active') {
-                    const isNew = player.userData.activeAbility !== upgradeId;
-                    if (isNew) killPoints = 0;
-                    player.userData.activeAbility = upgradeId;
-                }
-                promptEquipActiveAbility(); // Apenas atualiza a UI do grimório
-            }
-        }
-
-        // NOVO: Função que mostra a segunda etapa do Level Up (equipar magia)
-        function promptEquipActiveAbility() {
-            upgradeOptionsContainer.innerHTML = '<p class="text-lg text-gray-300 col-span-3 text-center">Escolha a magia que deseja manter equipada.</p>';
-            knownUpgradesContainer.innerHTML = ''; // Limpa o grimório antigo
-
-            const playerUpgrades = player.userData.upgrades;
-            const activeAbilities = Object.keys(playerUpgrades).filter(key => upgrades[key].type === 'active');
-
-            activeAbilities.forEach(upgradeId => {
-                const upgrade = upgrades[upgradeId];
-                const currentLevel = playerUpgrades[upgradeId];
-                const card = document.createElement('div');
-                card.className = 'upgrade-card';
-                card.innerHTML = `
-                    <div class="upgrade-icon">${upgrade.icon}</div>
-                    <div class="upgrade-title">${upgrade.title}</div>
-                    <div class="upgrade-level">Nível ${currentLevel}</div>
-                    <div class="upgrade-description">${upgrade.description(currentLevel)}</div>
-                `;
-
-                if (upgradeId === player.userData.activeAbility) {
-                    card.classList.add('selected');
-                }
-
-                card.onclick = () => {
-                    const isNew = player.userData.activeAbility !== upgradeId;
-                    if (isNew) {
-                        // MELHORIA: Lógica de ajuste de abates
-                        const newAbility = upgrades[upgradeId];
-                        const newMaxKills = newAbility.getKillCost(player.userData.upgrades[upgradeId] || 1);
-                        // Se o total de abates atual for maior que o novo máximo, ajusta. Senão, mantém.
-                        if (killPoints > newMaxKills) killPoints = newMaxKills;
-                    }
-                    player.userData.activeAbility = upgradeId;
-                    promptEquipActiveAbility(); // Re-renderiza para mostrar a seleção
-                };
-                knownUpgradesContainer.appendChild(card);
-            });
-
-            // Mostra o botão de continuar
-            const confirmContainer = document.getElementById('confirm-upgrade-container');
-            confirmContainer.classList.remove('hidden');
-            document.getElementById('confirm-upgrade-button').onclick = () => {
-                levelUpModal.classList.add('hidden');
-                isGamePaused = false;
-                // Se ainda houver level ups pendentes, o botão já estará visível.
-                // Se não, ele foi escondido ao abrir o menu.
-                if (pendingLevelUps > 0) {
-                    document.getElementById('level-up-prompt-button').classList.remove('hidden');
-                }
-                updateUI();
-            };
-        }
-
-        // NOVO: Função para a recompensa do Arquilich
-        function showSpecialLevelUpOptions() {
-            isGamePaused = true;
-            levelUpModal.classList.remove('hidden');
-            upgradeOptionsContainer.innerHTML = '<p class="text-lg text-yellow-400 col-span-3 text-center">O Arquilich foi derrotado! Escolha qualquer poder como sua recompensa.</p>';
-            knownUpgradesContainer.innerHTML = '';
-            document.getElementById('confirm-upgrade-container').classList.add('hidden');
-
-            const playerUpgrades = player.userData.upgrades;
-
-            // Mostra TODAS as habilidades que ainda não estão no nível máximo
-            Object.keys(upgrades).forEach(upgradeId => {
-                const upgrade = upgrades[upgradeId];
-                const currentLevel = playerUpgrades[upgradeId] || 0;
-
-                if (currentLevel < upgrade.maxLevel) {
-                    const card = document.createElement('div');
-                    card.className = 'upgrade-card';
-                    card.innerHTML = `
-                        <div class="upgrade-icon">${upgrade.icon}</div>
-                        <div class="upgrade-title">${upgrade.title}</div>
-                        <div class="upgrade-level">${currentLevel > 0 ? `Nível ${currentLevel} ➔ ${currentLevel + 1}` : 'APRENDER'}</div>
-                        <div class="upgrade-description">${upgrade.description(currentLevel + 1)}</div>
-                    `;
-                    card.onclick = () => {
-                        selectUpgrade(upgradeId, false); // Aplica a melhoria
-                        // A função selectUpgrade já chama a próxima etapa
-                    };
-                    knownUpgradesContainer.appendChild(card);
-                }
-            });
-        }
-
-        // Função antiga foi dividida em duas
-        function old_selectUpgrade(upgradeId) {
-            const upgrade = upgrades[upgradeId];
-            if (upgrade && upgrade.apply) {
-                const isNewActiveAbility = upgrade.type === 'active' && player.userData.activeAbility !== upgradeId;
-
-                // Se for uma habilidade ativa, equipa ela (Lógica antiga, agora mais complexa)
-                if (upgrade.type === 'active') {
-                    // CORREÇÃO: Zera os abates ao aprender ou trocar de habilidade ativa
-                    if (isNewActiveAbility) {
-                        // A nova lógica de ajuste de abates está em promptEquipActiveAbility
-                    }
-                    player.userData.activeAbility = upgradeId;
-                }
-
-                // Incrementa o nível da habilidade no estado do jogador
-                player.userData.upgrades[upgradeId] = (player.userData.upgrades[upgradeId] || 0) + 1;
-                
-                // Executa o efeito da melhoria
-                upgrade.apply();
-            }
-        }
-
         // NOVO: Função restaurada para atualizar os projéteis
         function updateProjectiles() {
             const tempBBox = new THREE.Box3();
@@ -3201,103 +2656,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             if (playerHP <= 0) {
                 endGame();
             }
-        }
-
-        function updateUI() {
-            // NOVO: Checagem de segurança (UI não carregada)
-            if (!playerNameDisplay) return; 
-
-            playerNameDisplay.textContent = playerName;
-            scoreDisplay.textContent = `Pontuação: ${score}`;
-
-            // NOVO: Atualiza o display de Level
-            playerLevelDisplay.textContent = playerLevel;
-
-            // NOVO: Atualiza a barra de experiência
-            const experienceForNextLevel = player.userData.experienceForNextLevel || baseExperience;
-            const xpPercent = (experiencePoints / experienceForNextLevel) * 100;
-            document.getElementById('xp-bar').style.width = `${xpPercent}%`;
-            xpTextDisplay.textContent = `${Math.floor(experiencePoints)}/${experienceForNextLevel}`;
-
-            // NOVO: Atualiza o display da Onda
-            waveLevelDisplay.textContent = currentWave;
-
-            const hpPercent = Math.max(0, playerHP / maxHP) * 100;
-            hpBar.style.width = `${hpPercent}%`;
-            
-            // NOVO: Atualiza o texto do HP
-            const hpTextDisplay = document.getElementById('hp-text-display');
-            hpTextDisplay.textContent = `${Math.floor(playerHP)}/${Math.floor(maxHP)}`;
-
-            // NOVO: Lógica da HUD de Habilidade Ativa
-            const activeAbilityId = player.userData.activeAbility;
-            if (activeAbilityId) {
-                activeAbilityHud.classList.remove('hidden');
-                const abilityTitle = document.getElementById('active-ability-title');
-                const ability = upgrades[activeAbilityId];
-                const maxKills = ability.getKillCost(player.userData.upgrades[activeAbilityId] || 1);
-                const progressPercent = Math.min(100, (killPoints / maxKills) * 100);
-
-                activeAbilityIcon.textContent = ability.icon;
-                activeAbilityProgressBar.style.width = `${progressPercent}%`;
-                activeAbilityKillCount.textContent = `${killPoints}/${maxKills}`;
-
-                // 1. NOME E NÍVEL NA CAPSULA
-                const level = player.userData.upgrades[activeAbilityId] || 1;
-                abilityTitle.textContent = `${ability.title} (Nv. ${level})`;
-
-                if (killPoints >= maxKills) {
-                    activeAbilityHud.classList.add('ready');
-                    // 3. ANEL DE ALCANCE QUANDO PRONTO
-                    if (activeAbilityId === 'corrente_raios') {
-                        const jumpDistance = [5, 8, 11, 14, 17][level - 1];
-                        rangeIndicator.scale.set(jumpDistance, jumpDistance, 1);
-                        rangeIndicator.visible = true;
-                    }
-                    // NOVO: Anel de alcance para Explosão de Energia
-                    if (activeAbilityId === 'explosao_energia') {
-                        const radius = 30;
-                        rangeIndicator.scale.set(radius, radius, 1);
-                        rangeIndicator.visible = true;
-                    }
-                } else {
-                    activeAbilityHud.classList.remove('ready');
-                    rangeIndicator.visible = false; // Esconde se não estiver pronto
-                }
-
-
-            } else {
-                activeAbilityHud.classList.add('hidden');
-            }
-
-            // NOVO: Atualiza display de timers dos power-ups
-            const timerDisplay = document.getElementById('powerup-timers-display');
-            let timersHTML = '';
-            if (tripleShotTimer > 0) {
-                timersHTML += `<span class="powerup-active">Tiro Múltiplo! (${Math.ceil(tripleShotTimer/60)}s)</span>`;
-            }
-            if (repulsionBubbleTimer > 0) {
-                timersHTML += `<span class="powerup-active">Bolha Repulsora! (${Math.ceil(repulsionBubbleTimer/60)}s)</span>`;
-            }
-            if (cloneTimer > 0) {
-                timersHTML += `<span class="powerup-active">Clone Ativo! (${Math.ceil(cloneTimer/60)}s)</span>`;
-            }
-            if (freezingAuraTimer > 0) {
-                timersHTML += `<span class="powerup-active">Aura Congelante! (${Math.ceil(freezingAuraTimer/60)}s)</span>`;
-            }
-            if (expBoostTimer > 0) {
-                timersHTML += `<span class="powerup-active">EXP em Dobro! (${Math.ceil(expBoostTimer/60)}s)</span>`;
-            }
-
-            // NOVO: Calcula o total de esferas em todas as camadas
-            const totalSpheres = shieldLayers.reduce((acc, layer) => acc + layer.spheres.length, 0);
-            if (totalSpheres > 0) {
-                timersHTML += `<span class="powerup-active">Escudo Ativo! (${totalSpheres} esferas)</span>`;
-            }
-            timerDisplay.innerHTML = timersHTML;
-
-            // NOVO: Atualiza display de Cargas de Explosão
-            // Removido, pois agora é uma habilidade ativa
         }
 
         // --- Ciclo de Jogo (Game Loop) ---
@@ -3606,35 +2964,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             powerUpLabels.clear(); // NOVO: Limpa o mapa de labels dos itens
         }
 
-        // NOVO: Função para atualizar o cache local do ranking imediatamente
-        function updateLocalRankingCache(newScore, playerName, killStats, level, waveLevel) {
-            try {
-                const cachedRankingJSON = localStorage.getItem('hordaMagicaRanking');
-                let scores = [];
-                if (cachedRankingJSON) {
-                    scores = JSON.parse(cachedRankingJSON);
-                }
-
-                // Adiciona a nova pontuação ao array
-                scores.push({
-                    score: newScore,
-                    playerName: playerName,
-                    killStats: killStats,
-                    level: level, // NOVO: Salva o nível
-                    waveLevel: waveLevel, // NOVO: Salva a onda
-                    fullUserId: window.userId || null, // CORREÇÃO: Usa o userId global
-                    timestamp: Date.now() // Garante que sempre tenha um timestamp
-                });
-
-                // CORREÇÃO: Ordena por PONTUAÇÃO e mantém os 15 melhores resultados
-                scores.sort((a, b) => b.score - a.score);
-                scores = scores.slice(0, 15);
-                localStorage.setItem('hordaMagicaRanking', JSON.stringify(scores));
-            } catch (error) {
-                console.warn("Falha ao atualizar o cache do ranking local:", error);
-            }
-        }
-
         // --- Funções de Controle da UI (Menu) ---
         function handleRestartClick() {
             gameOverModal.classList.add('hidden');
@@ -3654,16 +2983,10 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             startGame(playerName); // Chama a função diretamente
         }
 
-        function handleViewRankingClick() {
-            // CORREÇÃO: Recarrega o ranking do cache toda vez que o modal é aberto
-            loadInitialRankingFromCache();
-            document.getElementById('full-ranking-modal').classList.remove('hidden');
-        }
-
         // Inicia a aplicação Three.js quando a janela estiver carregada
         window.onload = function () {
-            setupUIElements(); // NOVO: Inicializa referências da UI
-            loadInitialRankingFromCache(); // NOVO: Carrega o ranking do cache
+            if (window.setupUIElements) setupUIElements(); // Inicializa referências da UI
+            if (window.loadInitialRankingFromCache) loadInitialRankingFromCache(); // Carrega o ranking do cache
             // A configuração dos tooltips é chamada dentro de init()
             init();
             createPlayer(); // Cria o jogador uma vez para ter a referência em `startGame`
