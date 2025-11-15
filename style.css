@@ -1,0 +1,439 @@
+/* Estilização customizada para o jogo */
+body {
+    margin: 0;
+    overflow: hidden;
+    font-family: 'Inter', sans-serif;
+    background-color: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+canvas {
+    display: block;
+}
+#game-ui {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%; /* Para que os elementos inferiores funcionem */
+    pointer-events: none; /* Permite interagir com a tela 3D por baixo */
+    z-index: 5; /* Reduzido para ficar abaixo dos modais */
+}
+/* O ui-panel agora é um estilo base para modais e barras */
+.ui-panel {
+    background: rgba(43, 45, 66, 0.9);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    border: 2px solid #ff6b6b; /* Mantido para consistência */
+    pointer-events: auto; /* Permite cliques em botões/inputs no modal */
+}
+/* Estilo da barra superior de HUD */
+#hud-top-bar {
+    background: rgba(43, 45, 66, 0.9);
+    color: white;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    border-bottom: 2px solid #ff6b6b;
+    border-radius: 0 0 0.5rem 0.5rem;
+    padding: 0.25rem 1.5rem; /* Reduzido para ficar menor */
+}
+/* NOVO: Botão de Level Up */
+#level-up-prompt-button {
+    position: absolute;
+    top: 80px;
+    left: 20px;
+    background: linear-gradient(45deg, #fbbF24, #fde047);
+    color: #333;
+    font-weight: bold;
+    font-size: 1.2rem;
+    padding: 1rem 1.5rem;
+    border-radius: 50px;
+    border: 3px solid white;
+    box-shadow: 0 0 25px #fde047;
+    cursor: pointer;
+    pointer-events: auto;
+    z-index: 45; /* Acima da UI do jogo, abaixo dos modais */
+    animation: pulse 1.5s infinite;
+}
+@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+
+/* NOVO: Estilo para o display de timers de power-ups */
+#powerup-timers-display {
+    position: absolute;
+    top: 180px; /* Mais para baixo */
+    right: 20px; /* Movido para a direita */
+    align-items: flex-end; /* Alinha o texto à direita */
+    display: flex;
+    flex-direction: column;
+    gap: 4px; /* Espaçamento entre os timers */
+    pointer-events: none;
+    z-index: 11; /* NOVO: Garante que fique acima da HUD principal (z-index: 10) */
+}
+.powerup-active {
+    background-color: rgba(255, 215, 0, 0.8); /* Dourado */
+    color: #333;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+/* NOVO: Estilos para a nova HUD de Habilidade Ativa ("Grimório Ativo") */
+#active-ability-hud {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    background-color: rgba(20, 20, 30, 0.85);
+    border-radius: 50px;
+    border: 2px solid #4a5568;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    padding: 5px;
+    height: 54px; /* Reduzido de 68px */
+}
+#active-ability-icon {
+    width: 44px;  /* Reduzido de 58px */
+    height: 44px; /* Reduzido de 58px */
+    border-radius: 50%;
+    background-color: #1a1a2e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem; /* Reduzido de 2.2rem */
+    color: white;
+    border: 2px solid #4a5568;
+}
+/* NOVO: Estilo para o título da habilidade na HUD */
+#active-ability-title {
+    font-size: 0.7rem;
+    line-height: 1;
+    margin-bottom: 2px;
+}
+#active-ability-progress-container {
+    flex-grow: 1;
+    height: 18px; /* Reduzido de 20px */
+    background-color: #1a1a2e;
+    border-radius: 20px;
+    margin: 0 15px;
+    width: 220px; /* Reduzido de 250px para ser menos alongado */
+    position: relative;
+    overflow: hidden;
+}
+#active-ability-progress-bar {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #34d399, #2dd4bf);
+    transition: width 0.3s ease;
+    border-radius: 20px;
+}
+#active-ability-kill-count {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.75rem; /* Reduzido de 0.8rem */
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 0 3px black;
+}
+#active-ability-hud.ready {
+    border-color: #ffc700;
+    box-shadow: 0 0 20px #ffc700;
+}
+#active-ability-hud.ready #active-ability-icon {
+    border-color: #ffc700;
+}
+#active-ability-hud.ready #active-ability-progress-bar {
+    background: linear-gradient(90deg, #fbbF24, #fde047);
+}
+
+.hp-bar-fill {
+    transition: width 0.3s ease;
+}
+.special-bar-fill {
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+.modal {
+    background-color: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(5px);
+    z-index: 50; /* CORREÇÃO: Garante que todos os modais fiquem sobre a UI do jogo */
+}
+/* Estilização dos Labels dos Monstros */
+.enemy-label {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 0px 4px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    transform: translate(-50%, -100%); /* Centraliza e posiciona acima */
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 20;
+}
+
+/* NOVO: Estilos da Barra de Vida do Inimigo */
+.enemy-hp-bar {
+    position: absolute;
+    width: 50px; /* Largura fixa */
+    height: 6px;
+    background-color: rgba(100, 0, 0, 0.7); /* Fundo vermelho escuro */
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    border-radius: 3px;
+    transform: translate(-50%, -100%); /* Centraliza e posiciona */
+    pointer-events: none;
+    z-index: 19; /* Fica abaixo do nome */
+}
+.enemy-hp-fill {
+    width: 100%; /* Começa cheio */
+    height: 100%;
+    background-color: #4CAF50; /* Verde */
+    border-radius: 2px;
+    transition: width 0.3s ease; /* Transição suave */
+}
+/* NOVO: Estilo para a Barra de Armadura do Chefe */
+.enemy-armor-bar {
+    position: absolute;
+    width: 50px;
+    height: 6px;
+    background-color: rgba(50, 50, 50, 0.7);
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    border-radius: 3px;
+    transform: translate(-50%, -100%);
+    pointer-events: none;
+    z-index: 19;
+    display: none; /* Começa escondida */
+}
+/* NOVO: Estilo para a marca de "Invocado" */
+.summon-marker {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background-color: #9400D3; /* Roxo escuro */
+    border: 1px solid black;
+    border-radius: 50%;
+    transform: translate(-50%, -100%);
+    z-index: 21; /* Acima de tudo */
+}
+/* NOVO: Estilo para o ícone de congelado */
+.frozen-marker {
+    position: absolute;
+    width: 16px; /* Tamanho maior */
+    height: 16px;
+    color: #87CEFA; /* Azul gelo */
+    font-size: 16px;
+    line-height: 1;
+    text-shadow: 0 0 3px black;
+    transform: translate(-50%, -100%);
+    z-index: 21; /* Acima de tudo */
+}
+/* NOVO: Estilo para o ícone de eletrificado */
+.electrified-marker {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    color: #fde047; /* Amarelo elétrico */
+    font-size: 16px;
+    line-height: 1;
+    text-shadow: 0 0 5px black;
+    transform: translate(-50%, -100%);
+    z-index: 21; /* Acima de tudo */
+    animation: flicker 0.5s infinite alternate;
+}
+@keyframes flicker {
+    from { opacity: 0.7; }
+    to { opacity: 1; }
+}
+
+/* NOVO: Estilo para os Labels dos Power-ups */
+.powerup-label {
+    position: absolute;
+    background: rgba(0, 180, 255, 0.8); /* Azul Ciano */
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    transform: translate(-50%, -100%);
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 18; /* Abaixo dos inimigos */
+    text-shadow: 0 0 3px rgba(0,0,0,0.7);
+}
+
+/* NOVO: Estilo da mensagem de Level Up */
+#level-up-message {
+    position: fixed;
+    top: 15%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 215, 0, 0.85); /* Dourado */
+    color: #333;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 1.8rem;
+    font-weight: bold;
+    z-index: 51; /* Acima da cura */
+    opacity: 0;
+    transition: opacity 0.5s ease-out;
+    pointer-events: none;
+    text-shadow: 0 0 5px rgba(255,255,255,0.5);
+}
+
+/* Estilo da mensagem de cura (NOVO) */
+#healing-message {
+    position: fixed;
+    top: 15%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 255, 0, 0.8);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 1.5rem;
+    font-weight: bold;
+    z-index: 50;
+    opacity: 0;
+    transition: opacity 0.5s ease-out;
+    pointer-events: none;
+}
+/* Estilo customizado para a lista do Ranking */
+.ranking-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.ranking-stats {
+    font-size: 0.7rem;
+    color: #ccc;
+    margin-left: 1rem;
+    white-space: nowrap;
+}
+/* NOVO: Estilo para o Tooltip do Ranking */
+#ranking-tooltip {
+    position: fixed;
+    display: none;
+    background: rgba(20, 20, 30, 0.95);
+    border: 1px solid #ffc700;
+    border-radius: 8px;
+    padding: 0.75rem;
+    color: white;
+    font-size: 0.8rem;
+    pointer-events: none;
+    z-index: 100;
+}
+/* NOVO: Estilo para o Texto Flutuante de Dano/Cura */
+#floating-text-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 40; /* Abaixo dos modais (z-index: 50) */
+}
+.floating-text {
+    position: absolute;
+    font-weight: bold;
+    text-shadow: 0 0 5px rgba(0,0,0,0.8);
+}
+
+/* NOVO: Estilo para o Tooltip das Habilidades */
+#ability-tooltip {
+    position: fixed;
+    display: none;
+    background: rgba(20, 20, 30, 0.95);
+    border: 1px solid #34d399; /* Cor do progresso */
+    border-radius: 8px;
+    padding: 0.75rem;
+    color: white;
+    font-size: 0.8rem;
+    pointer-events: none;
+    z-index: 101; /* Acima do tooltip do ranking */
+    max-width: 250px;
+}
+
+/* NOVO: Estilos para o Modal de Level Up */
+#level-up-modal .upgrade-card {
+    background: rgba(43, 45, 66, 0.95);
+    border: 2px solid #a0aec0;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    width: 280px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+#level-up-modal .upgrade-card:hover {
+    border-color: #ffc700;
+    transform: translateY(-10px);
+    box-shadow: 0 8px 25px rgba(255, 199, 0, 0.3);
+}
+.upgrade-icon {
+    font-size: 3rem;
+    line-height: 1;
+    margin-bottom: 0.75rem;
+}
+.upgrade-title {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: #ffc700;
+    margin-bottom: 0.5rem;
+}
+.upgrade-description {
+    font-size: 0.85rem;
+    color: #cbd5e0;
+    min-height: 40px; /* Garante alinhamento vertical */
+}
+/* NOVO: Estilo para o nível da melhoria */
+.upgrade-level {
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #a0aec0;
+}
+/* NOVO: Estilo para o texto de substituição */
+.upgrade-replace-text {
+    font-size: 0.7rem;
+    color: #f87171; /* Vermelho claro */
+    margin-top: 0.5rem;
+}
+/* NOVO: Estilo para os cards menores do grimório */
+#known-upgrades-container .upgrade-card {
+    width: 140px; /* 50% de 280px */
+    padding: 0.75rem;
+    cursor: pointer;
+    transform: none !important; /* Remove efeito de hover */
+    border-width: 1px;
+}
+/* Ajusta os textos dentro dos cards menores */
+#known-upgrades-container .upgrade-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+#known-upgrades-container .upgrade-title {
+    font-size: 1rem;
+}
+#known-upgrades-container .upgrade-description {
+    font-size: 0.7rem;
+    min-height: 28px;
+}
+#known-upgrades-container .upgrade-level,
+#known-upgrades-container .upgrade-replace-text {
+    font-size: 0.65rem;
+    margin-top: 0.25rem;
+}
+/* NOVO: Estilo para o estado "selecionado" no grimório */
+#known-upgrades-container .upgrade-card.selected {
+    border-color: #34d399; /* Verde */
+    box-shadow: 0 0 15px #34d399;
+}
