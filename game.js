@@ -1264,7 +1264,7 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             const chain = [startEnemy];
             let currentEnemy = startEnemy;
 
-            for (let i = 0; i < maxJumps; i++) {
+            for (let i = 0; i < maxJumps - 1; i++) { // CORREÇÃO: O loop deve rodar (maxJumps - 1) vezes para encontrar os alvos *adicionais*.
                 let closestEnemy = null; // CORREÇÃO: A variável estava sendo redeclarada
                 let minDistanceSq = maxJumpDistanceSq; // Inicia com o alcance máximo
 
