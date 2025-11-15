@@ -934,6 +934,10 @@
         let enemiesToSpawnThisWave = 0;
         let enemiesAliveThisWave = 0;
         let monstersInPreviousWave = 0; // NOVO: Guarda o total da onda anterior
+        // NOVO: Variáveis de Chefe
+        let isBossWave = false;
+        let currentBoss = null;
+
         let intraWaveSpawnTimer = 0;
 
         const maxActiveEnemies = 40; 
@@ -1283,6 +1287,31 @@
             return group;
         }
 
+        // NOVO: Modelo para o Rei Goblin
+        function createGoblinKingModel() {
+            const group = createGoblinModel(); // Começa com o modelo base
+            
+            // Aumenta o tamanho
+            group.scale.set(2.0, 2.0, 2.0);
+
+            // Muda a cor para um verde mais escuro e ameaçador
+            const darkGreenMaterial = new THREE.MeshLambertMaterial({ color: 0x2E8B57 }); // Verde Mar
+            group.traverse(child => {
+                if (child.isMesh) {
+                    child.material = darkGreenMaterial;
+                }
+            });
+
+            // Adiciona uma coroa
+            const crownGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.1, 8);
+            const crownMaterial = new THREE.MeshLambertMaterial({ color: 0xFFD700 }); // Dourado
+            const crown = new THREE.Mesh(crownGeometry, crownMaterial);
+            crown.position.y = 1.0; // Posição relativa à cabeça do goblin (que está em 0.7)
+            group.add(crown);
+
+            return group;
+        }
+
         // --- NOVAS FUNÇÕES DE MODELO DOS INIMIGOS ---
 
         function createGoblinModel() {
@@ -1458,7 +1487,9 @@
             // NOVOS INIMIGOS
             skeleton: { hp: 80, speed: 0.05, score: 35, damage: 25, name: "Esqueleto", modelFn: createSkeletonModel, modelHeight: 1.4 },
             skeleton_warrior: { hp: 200, speed: 0.04, score: 55, damage: 35, name: "Esqueleto Guerreiro", modelFn: createSkeletonWarriorModel, modelHeight: 1.5 },
-            skeleton_archer: { hp: 45, speed: 0.05, score: 45, damage: 5, name: "Esqueleto Arqueiro", modelFn: createSkeletonArcherModel, modelHeight: 1.4 }
+            skeleton_archer: { hp: 45, speed: 0.05, score: 45, damage: 5, name: "Esqueleto Arqueiro", modelFn: createSkeletonArcherModel, modelHeight: 1.4 },
+            // NOVO: Chefe
+            goblin_king: { hp: 800, speed: 0.045, score: 500, damage: 30, name: "Rei Goblin", modelFn: createGoblinKingModel, modelHeight: 1.8 }
         };
 
         // Funções de criação de Obstáculos
@@ -1577,6 +1608,13 @@
                 electrifiedTimer: 0 // NOVO: Timer para o status Eletrificado
             };
 
+            // NOVO: Adiciona propriedades específicas para o Rei Goblin
+            if (type === 'goblin_king') {
+                enemy.userData.isBoss = true;
+                enemy.userData.summonCooldown = 300; // Cooldown inicial de 5s
+                enemy.userData.summonInterval = 900; // Invoca a cada 15 segundos
+            }
+
             // NOVO: Adiciona propriedades específicas para o Necromante
             if (type === 'necromancer') {
                 enemy.userData.summonCooldown = Math.random() * 240; // Cooldown inicial aleatório (até 4s)
@@ -1676,6 +1714,21 @@
         // NOVO: Sistema de Ondas por Abates
         function startNextWave() {
             currentWave++;
+
+            // NOVO: Lógica da Onda de Chefe
+            if (currentWave % 10 === 0) {
+                isBossWave = true;
+                enemiesToSpawnThisWave = 1; // Apenas o chefe
+                enemiesAliveThisWave = 1;
+                monstersInPreviousWave = enemies.length; // Guarda o número atual para a próxima onda normal
+                
+                // Spawna o chefe no centro do mapa
+                createEnemy('goblin_king', new THREE.Vector3(0, 0, 0));
+                currentBoss = enemies[enemies.length - 1]; // Guarda a referência do chefe
+                updateUI();
+                return; // Interrompe a lógica de onda normal
+            }
+
             monstersInPreviousWave = enemiesAliveThisWave; // Guarda o valor antes de resetar
             
             let numMonsters;
@@ -1695,6 +1748,9 @@
 
         function spawnEnemies() { // Agora gerencia o spawn da onda atual
             // Se não há mais inimigos na onda, inicia a próxima
+            if (isBossWave) {
+                return; // Não spawna inimigos normais durante a onda de chefe
+            }
             if (enemiesAliveThisWave <= 0) {
                 startNextWave();
             }
@@ -1906,13 +1962,13 @@
         }
         
         // NOVO: Função para spawnar um item aleatório (usado pela lógica de kills)
-        function spawnRandomItem() {
+        function spawnRandomItem(position = null) {
             // Pega todos os tipos de power-ups disponíveis (potion, tripleShot, etc.)
             const powerUpTypes = Object.keys(powerUpProps);
             // Escolhe um tipo aleatoriamente
             const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
             // Cria o power-up em uma posição aleatória
-            createPowerUp(randomType);
+            createPowerUp(randomType, position);
         }
 
 
@@ -2191,6 +2247,13 @@
         // Renomeada: Atualiza a UI (Label e Barra de Vida) dos Inimigos
         function updateEnemyUI() {
             enemies.forEach(enemy => {
+                // NOVO: Destaca a barra de vida do chefe
+                if (enemy.userData.isBoss) {
+                    const ui = enemyLabels.get(enemy.uuid);
+                    if (ui && ui.hpBar) {
+                        ui.hpBar.style.backgroundColor = '#FFD700'; // Dourado
+                    }
+                }
                 const uiElements = enemyLabels.get(enemy.uuid); // Pega o objeto
                 if (!uiElements) return;
                 const { nameLabel, hpBar, hpFill, summonMarker, frozenMarker, electrifiedMarker } = uiElements;
@@ -2774,6 +2837,15 @@
 
         function updateEnemies() {
             // CORREÇÃO: Posição do BBox do Player atualizada em checkPlayerCollisions
+
+            // NOVO: Lógica da Aura do Rei Goblin
+            let goblinKingAura = false;
+            if (currentBoss && currentBoss.userData.type === 'goblin_king' && currentBoss.userData.hp > 0) {
+                goblinKingAura = true;
+            }
+            const auraRadiusSq = 15 * 15; // Raio de 15 unidades
+            const speedBoost = 1.25; // 25% mais rápido
+
             
             for (let i = enemies.length - 1; i >= 0; i--) {
                 const enemy = enemies[i];
@@ -2827,6 +2899,10 @@
             const targetPos = target.position;
 
             // Lógica de congelamento persistente e dano por segundo
+            let finalSpeed = enemyData.speed;
+            if (goblinKingAura && enemyData.type === 'goblin' && enemy.position.distanceToSquared(currentBoss.position) < auraRadiusSq) {
+                finalSpeed *= speedBoost;
+            }
             let isSlowed = false;
             if (enemyData.type !== 'ghost') { // Fantasmas são imunes
                 const isInAura = freezingAuraTimer > 0 && enemy.position.distanceTo(player.position) < 6;
@@ -2876,11 +2952,28 @@
                 }
             }
 
+            // NOVO: Lógica do Rei Goblin
+            if (enemyData.type === 'goblin_king') {
+                enemyData.summonCooldown = Math.max(0, enemyData.summonCooldown - 1);
+                if (enemyData.summonCooldown <= 0 && enemies.length < maxActiveEnemies) {
+                    // Invoca 5 goblins normais
+                    for (let j = 0; j < 5; j++) {
+                        const offset = new THREE.Vector3((Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6);
+                        const spawnPosition = enemy.position.clone().add(offset);
+                        createEnemy('goblin', spawnPosition, true);
+                    }
+                    enemyData.summonCooldown = enemyData.summonInterval;
+                }
+            }
+
             // NOVO: Lógica do status Eletrificado
             if (enemyData.electrifiedTimer > 0) {
                 enemyData.electrifiedTimer--;
                 if (enemyData.electrifiedTimer % 60 === 0) { // Causa dano a cada segundo
                     enemyData.hp -= 5;
+                    if (enemyData.hp <= 0 && enemyData.isBoss) {
+                        handleBossDefeat(enemy);
+                    }
                     createFloatingText('5', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
                     enemyData.hitTimer = 5; // Pequeno feedback visual
                 }
@@ -2890,8 +2983,15 @@
             if (isSlowed) { // Inimigos congelados têm prioridade de movimento
                 // Movimento lento se estiver congelado
                 const slowDirection = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                enemy.position.addScaledVector(slowDirection, enemyData.speed * 0.5);
+                enemy.position.addScaledVector(slowDirection, finalSpeed * 0.5);
             
+            } else if (enemyData.isBoss && enemyData.hp / enemyData.maxHP < 0.3) {
+                // NOVO: Comportamento de fuga do chefe
+                const fleeDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
+                const newPosition = enemy.position.clone().addScaledVector(fleeDirection, finalSpeed);
+                // (A lógica de colisão para o chefe é a mesma do movimento padrão)
+                handleStandardMovement(enemy, newPosition, finalSpeed);
+
             } else if (enemyData.type === 'necromancer') {
                 // Lógica de movimento do Necromante (kiting)
                  const distanceToPlayer = enemy.position.distanceTo(player.position);
@@ -2915,7 +3015,7 @@
                  }
  
                  if (direction.lengthSq() > 0) {
-                     const newPosition = enemy.position.clone().addScaledVector(direction, enemyData.speed);
+                     const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
                      tempPlayer.position.copy(newPosition);
                      tempPlayer.updateMatrixWorld();
                      let fullEnemyBBox = new THREE.Box3().setFromObject(tempPlayer);
@@ -2949,7 +3049,7 @@
                 }
 
                 if (direction.lengthSq() > 0) {
-                    const newPosition = enemy.position.clone().addScaledVector(direction, enemyData.speed);
+                    const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
                     tempPlayer.position.copy(newPosition);
                     tempPlayer.updateMatrixWorld();
                     let fullEnemyBBox = new THREE.Box3().setFromObject(tempPlayer);
@@ -2961,51 +3061,13 @@
             } else if (enemyData.type === 'ghost') {
                 // Lógica de movimento do Fantasma (ignora paredes)
                 const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                enemy.position.addScaledVector(direction, enemyData.speed);
+                enemy.position.addScaledVector(direction, finalSpeed);
 
             } else {
                 // Lógica de movimento padrão com colisão para outros inimigos
                 const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                const newPosition = enemy.position.clone().addScaledVector(direction, enemyData.speed);
-                tempPlayer.position.copy(newPosition);
-                tempPlayer.updateMatrixWorld();
-                let fullEnemyBBox = new THREE.Box3().setFromObject(tempPlayer);
-                let fullCollisionDetected = false;
-                
-                for (const obstacle of obstacles) {
-                    obstacle.updateMatrixWorld();
-                    let obstacleBBox = obstacle.userData.collisionMesh ? new THREE.Box3().setFromObject(obstacle.userData.collisionMesh) : new THREE.Box3().setFromObject(obstacle);
-                    if (fullEnemyBBox.intersectsBox(obstacleBBox)) {
-                        fullCollisionDetected = true;
-                        break;
-                    }
-                }
-
-                if (!fullCollisionDetected) {
-                    enemy.position.copy(newPosition);
-                } else {
-                    // Tenta deslizar no eixo X
-                    const newPositionX = enemy.position.clone();
-                    newPositionX.x += direction.x * enemyData.speed;
-                    tempPlayer.position.copy(newPositionX);
-                    tempPlayer.updateMatrixWorld();
-                    let enemyBBoxX = new THREE.Box3().setFromObject(tempPlayer);
-                    let collisionOnX = obstacles.some(o => enemyBBoxX.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
-                    if (!collisionOnX) {
-                        enemy.position.x = newPositionX.x;
-                    }
-
-                    // Tenta deslizar no eixo Z
-                    const newPositionZ = enemy.position.clone();
-                    newPositionZ.z += direction.z * enemyData.speed;
-                    tempPlayer.position.copy(newPositionZ);
-                    tempPlayer.updateMatrixWorld();
-                    let enemyBBoxZ = new THREE.Box3().setFromObject(tempPlayer);
-                    let collisionOnZ = obstacles.some(o => enemyBBoxZ.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
-                    if (!collisionOnZ) {
-                        enemy.position.z = newPositionZ.z;
-                    }
-                }
+                const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
+                handleStandardMovement(enemy, newPosition, finalSpeed);
             }
             
             // Checa colisão com o jogador APÓS o movimento
@@ -3024,6 +3086,12 @@
             enemy.updateMatrixWorld(); // Atualiza a matriz do inimigo para a verificação de morte
             
             if (enemyData.hp <= 0) {
+                // NOVO: Lógica de derrota do chefe
+                if (enemyData.isBoss) {
+                    handleBossDefeat(enemy);
+                    // A função handleBossDefeat já remove o inimigo
+                    continue; // Pula para o próximo inimigo no loop
+                }
                 score += enemyData.score;
                 gainExperience(enemyData.score); 
 
@@ -3049,6 +3117,75 @@
                 updateUI();
             }
         }
+    }
+
+    // NOVO: Função para lidar com movimento padrão e colisão
+    function handleStandardMovement(enemy, newPosition, speed) {
+        tempPlayer.position.copy(newPosition);
+        tempPlayer.updateMatrixWorld();
+        let fullEnemyBBox = new THREE.Box3().setFromObject(tempPlayer);
+        let fullCollisionDetected = false;
+        
+        for (const obstacle of obstacles) {
+            obstacle.updateMatrixWorld();
+            let obstacleBBox = obstacle.userData.collisionMesh ? new THREE.Box3().setFromObject(obstacle.userData.collisionMesh) : new THREE.Box3().setFromObject(obstacle);
+            if (fullEnemyBBox.intersectsBox(obstacleBBox)) {
+                fullCollisionDetected = true;
+                break;
+            }
+        }
+
+        if (!fullCollisionDetected) {
+            enemy.position.copy(newPosition);
+        } else {
+            const direction = new THREE.Vector3().subVectors(newPosition, enemy.position).normalize();
+            // Tenta deslizar no eixo X
+            const newPositionX = enemy.position.clone();
+            newPositionX.x += direction.x * speed;
+            tempPlayer.position.copy(newPositionX);
+            tempPlayer.updateMatrixWorld();
+            let enemyBBoxX = new THREE.Box3().setFromObject(tempPlayer);
+            let collisionOnX = obstacles.some(o => enemyBBoxX.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
+            if (!collisionOnX) {
+                enemy.position.x = newPositionX.x;
+            }
+
+            // Tenta deslizar no eixo Z
+            const newPositionZ = enemy.position.clone();
+            newPositionZ.z += direction.z * speed;
+            tempPlayer.position.copy(newPositionZ);
+            tempPlayer.updateMatrixWorld();
+            let enemyBBoxZ = new THREE.Box3().setFromObject(tempPlayer);
+            let collisionOnZ = obstacles.some(o => enemyBBoxZ.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
+            if (!collisionOnZ) {
+                enemy.position.z = newPositionZ.z;
+            }
+        }
+    }
+
+    // NOVO: Função para lidar com a derrota de um chefe
+    function handleBossDefeat(boss) {
+        score += boss.userData.score;
+        gainExperience(boss.userData.score);
+        
+        // Dropa múltiplos power-ups
+        const numDrops = Math.floor(Math.random() * 3) + 3; // 3 a 5 drops
+        for (let i = 0; i < numDrops; i++) {
+            const offset = new THREE.Vector3((Math.random() - 0.5) * 4, 0, (Math.random() - 0.5) * 4);
+            spawnRandomItem(boss.position.clone().add(offset));
+        }
+
+        // Remove o chefe da cena
+        const index = enemies.indexOf(boss);
+        if (index > -1) enemies.splice(index, 1);
+        scene.remove(boss);
+        removeEnemyUI(boss);
+
+        // Finaliza a onda de chefe
+        isBossWave = false;
+        currentBoss = null;
+        enemiesAliveThisWave = 0; // Zera para a próxima onda começar
+        updateUI();
     }
 
         // NOVO: Funções de Level Up
@@ -3844,6 +3981,10 @@
             // NOVO: Reseta o estado das ondas
             currentWave = 0;
             enemiesAliveThisWave = 0;
+            // NOVO: Reseta estado do chefe
+            isBossWave = false;
+            currentBoss = null;
+
             enemiesToSpawnThisWave = 0;
             monstersInPreviousWave = 0;
 
