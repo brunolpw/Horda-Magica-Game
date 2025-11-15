@@ -37,7 +37,7 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         let isGameOver = true; // Inicia como TRUE para mostrar o menu
         let isGamePaused = false; // NOVO: Flag para pausar o jogo durante o level up
         let keys = {};
-        const enemies = []; const projectiles = []; const powerUps = [];
+        const enemies = []; const powerUps = [];
 
         // Variáveis do Sistema de Ondas
         let currentWave = 0;
@@ -525,75 +525,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             }
         }
 
-        function createProjectile(type, direction, startPosition) {
-            let props, geometry, material, isExplosive = false, explosionRadius = 0, explosionDamage = 0;
-
-            if (type === 'explosion') {
-                // Granada Explosiva (Roxa)
-                geometry = new THREE.SphereGeometry(0.3, 8, 8);
-                material = new THREE.MeshBasicMaterial({ color: 0x9333ea }); // Roxo
-                props = { damage: 0, speed: 0.25 }; // Dano direto é 0, velocidade mais lenta (granada)
-                isExplosive = true;
-            
-            } else if (type === 'nova') {
-                // NOVO: Projétil da Nova Mágica
-                geometry = new THREE.SphereGeometry(0.2, 8, 8);
-                material = new THREE.MeshBasicMaterial({ color: 0xFF00FF }); // Rosa/Magenta para Explosão de Energia
-                props = { damage: 0, speed: 0.125 }; // Dano definido pela habilidade, velocidade reduzida para teleguiado
-                isExplosive = false;
-            
-            } else if (type === 'necro_bolt') {
-                // NOVO: Projétil do Necromante
-                props = projectileProps[type];
-                geometry = new THREE.SphereGeometry(props.size, 8, 8);
-                material = new THREE.MeshBasicMaterial({ color: props.color });
-                isExplosive = false;
-
-            } else if (type === 'arrow') {
-                // NOVO: Flecha do Arqueiro
-                props = projectileProps[type];
-                geometry = new THREE.CylinderGeometry(props.size, props.size, 1.0, 4);
-                material = new THREE.MeshBasicMaterial({ color: props.color });
-                isExplosive = false;
-
-            } else { // weak or strong
-                props = projectileProps[type];
-                if (!props) {
-                    console.error("Tipo de projétil desconhecido:", type);
-                    return;
-                }
-                geometry = new THREE.SphereGeometry(props.size, 8, 8);
-                material = new THREE.MeshBasicMaterial({ color: props.color });
-            }
-            
-            const projectile = new THREE.Mesh(geometry, material);
-
-            projectile.position.copy(startPosition);
-            // Posição do projétil na altura do centro do player (Y=0.5)
-            projectile.position.y = 0.5; 
-
-            projectile.userData = {
-                type: type,
-                damage: props.damage,
-                speed: props.speed,
-                direction: direction.normalize(),
-                isExplosive: isExplosive,
-                explosionRadius: explosionRadius,
-                explosionDamage: explosionDamage,
-                // NOVO: Adiciona uma flag para controlar a reflexão.
-                // Projéteis do jogador não podem ser refletidos.
-                // Projéteis inimigos podem ser refletidos uma vez.
-                // Projéteis refletidos não podem ser refletidos novamente.
-                // null = pode ser refletido, true = já foi refletido, 'homing' = nunca pode ser refletido.
-                isHoming: false, // NOVO: Flag para projéteis teleguiados
-                target: null,    // NOVO: Alvo do projétil teleguiado
-                hasBeenReflected: (type === 'necro_bolt' || type === 'arrow') ? null : true
-            };
-
-            projectiles.push(projectile);
-            scene.add(projectile);
-        }
-        
         // Função para criar poção (AGORA CRIA QUALQUER POWER-UP)
         function createPowerUp(type = 'potion', position = null) {
             const props = powerUpProps[type];
@@ -1045,55 +976,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             }
         }
         
-    // NOVO: Lógica da Explosão (usada pelo projétil)
-    function triggerBigExplosion(position, radius, damage, level) {
-            // Efeito visual simples (Flash)
-            const flashGeometry = new THREE.SphereGeometry(radius * 0.5, 16, 16);
-            const flashMaterial = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.8 });
-            const flash = new THREE.Mesh(flashGeometry, flashMaterial);
-            flash.position.copy(position);
-            flash.position.y = 0.5;
-            scene.add(flash);
-            
-            // Animação do Flash (cresce e desaparece)
-            let scale = 1.0;
-            const interval = setInterval(() => {
-                scale += 0.8;
-                flash.scale.set(scale, scale, scale);
-                flash.material.opacity -= 0.1;
-                if (flash.material.opacity <= 0) {
-                    clearInterval(interval);
-                    scene.remove(flash);
-                }
-            }, 30);
-
-            // Causa dano em área
-            const radiusSq = radius * radius;
-            enemies.forEach(enemy => {
-                if (enemy.position.distanceToSquared(position) <= radiusSq) {
-                    enemy.userData.hp -= damage;
-                    createFloatingText(damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff4500');
-                    enemy.userData.hitTimer = 10; // Ativa o feedback de hit
-                }
-            });
-
-            // NOVO: Gera fragmentos para níveis 4 e 5
-            const spawnShards = level && level >= 4;
-            if (spawnShards) {
-                const numShards = level === 4 ? 3 : 5;
-                for (let i = 0; i < numShards; i++) {
-                    const shardDirection = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
-                    // Cria um projétil do tipo 'explosion', que explode ao colidir
-                    createProjectile('explosion', shardDirection, position);
-                    const shard = projectiles[projectiles.length - 1];
-                    // Define que a explosão do fragmento é menor e causa metade do dano
-                    shard.userData.explosionRadius = radius / 2;
-                    shard.userData.explosionDamage = damage / 2;
-                    shard.userData.explosionLevel = 0; // Fragmentos não geram mais fragmentos
-                }
-            }
-        }
-
         // NOVO: Lógica do Escudo (Múltiplas Camadas)
         function createShield(layerIndex) {
             const numSpheres = 10;
@@ -1736,137 +1618,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         }
     }
 
-        // NOVO: Função restaurada para atualizar os projéteis
-        function updateProjectiles() {
-            const tempBBox = new THREE.Box3();
-
-            for (let i = projectiles.length - 1; i >= 0; i--) {
-                const projectile = projectiles[i];
-                const projData = projectile.userData;
-                
-                let hit = false;
-
-                // Lógica de reflexão da Bolha Repulsora
-                if (repulsionBubbleTimer > 0 && projData.hasBeenReflected === null) {
-                    const distanceToPlayerSq = projectile.position.distanceToSquared(player.position);
-                    const repulsionRadius = 4;
-                    if (distanceToPlayerSq < repulsionRadius * repulsionRadius) {
-                        const reflectionVector = new THREE.Vector3().subVectors(projectile.position, player.position).normalize();
-                        projData.direction.copy(reflectionVector);
-                        projData.type = 'weak';
-                        projData.damage = 20;
-                        projData.speed *= 1.5;
-                        projData.hasBeenReflected = true;
-                        projectile.material.color.setHex(0x00D7FE);
-                        continue;
-                    }
-                }
-
-                projectile.position.addScaledVector(projData.direction, projData.speed);
-                projectile.updateMatrixWorld();
-                tempBBox.setFromObject(projectile);
-
-                // NOVO: Lógica para projéteis teleguiados
-                if (projData.isHoming && projData.target && projData.target.userData.hp > 0) {
-                    const targetPosition = projData.target.position;
-                    const directionToTarget = new THREE.Vector3().subVectors(targetPosition, projectile.position).normalize();
-                    
-                    // Interpola suavemente a direção atual para a direção do alvo
-                    projData.direction.lerp(directionToTarget, 0.1);
-                } else if (projData.isHoming) {
-                    // Se o alvo morreu, o projétil continua em linha reta
-                    projData.isHoming = false;
-                }
-
-                // Checa colisão de projéteis inimigos com o jogador
-                if (projData.type === 'necro_bolt' || projData.type === 'arrow') {
-                    const playerBBox = new THREE.Box3().setFromObject(player);
-                    if (tempBBox.intersectsBox(playerBBox)) {
-                        damagePlayer(projData.damage);
-                        createFloatingText(projData.damage, player.position.clone().setY(1.5), '#ff0000', '1.5rem');
-                        scene.remove(projectile);
-                        projectiles.splice(i, 1);
-                        continue;
-                    }
-                }
-
-                // Checa colisão com inimigos (apenas projéteis do jogador)
-                if (projData.type !== 'necro_bolt' && projData.type !== 'arrow') {
-                    for (const enemy of enemies) {
-                        const enemyBBox = new THREE.Box3().setFromObject(enemy);
-                        if (tempBBox.intersectsBox(enemyBBox)) {
-                            // Calcula o dano final com bônus do Poder Arcano
-                            const damageLevel = player.userData.upgrades.increase_damage || 0;
-                            let finalDamage = projData.damage; // Usa o dano base do projétil
-                            if (damageLevel > 0) {
-                                const bonusPercentage = damageLevel * 0.10; // 10% por nível
-                                const bonusAmount = Math.ceil(projData.damage * bonusPercentage);
-                                finalDamage += bonusAmount;
-                            }
-
-                            // NOVO: Dano na armadura primeiro
-                            if (enemy.userData.isBoss && enemy.userData.soulShieldCharges > 0) {
-                                // Escudo de Almas do Arquilich absorve o projétil
-                                enemy.userData.soulShieldCharges--;
-                                removeShield(); // Remove o escudo visual antigo
-                                if (enemy.userData.soulShieldCharges > 0) createBossShield(enemy.userData.soulShieldCharges); // Recria com menos esferas
-                                hit = true; // Marca como acerto para o projétil ser destruído
-                            } else if (enemy.userData.armor > 0) {
-                                const armorDamage = Math.min(enemy.userData.armor, finalDamage);
-                                enemy.userData.armor -= armorDamage;
-                                finalDamage -= armorDamage;
-                                createFloatingText(Math.floor(armorDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#A9A9A9'); // Cinza
-                            }
-
-                            if (hit || finalDamage <= 0) continue; // Se o escudo absorveu ou não há mais dano
-                            enemy.userData.hp -= finalDamage;
-                            createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
-                            enemy.userData.hitTimer = 10;
-
-                            // Lógica da Corrente de Raios foi movida para attemptSpecialAttack
-
-                            hit = true;
-                            break;
-                        }
-                    }
-                }
-
-                // Rotaciona a flecha
-                if (projData.type === 'arrow') {
-                    projectile.lookAt(projectile.position.clone().add(projData.direction));
-                    projectile.rotateX(Math.PI / 2);
-                }
-
-                // Remove projéteis que saem do mapa
-                if (Math.abs(projectile.position.x) > mapSize + 5 || Math.abs(projectile.position.z) > mapSize + 5) {
-                    scene.remove(projectile);
-                    projectiles.splice(i, 1);
-                    continue;
-                }
-
-                // Checa colisão com obstáculos
-                if (!hit) {
-                    for (const obstacle of obstacles) { // ...
-                        obstacle.updateMatrixWorld();
-                        let obstacleBBox = obstacle.userData.collisionMesh ? new THREE.Box3().setFromObject(obstacle.userData.collisionMesh) : new THREE.Box3().setFromObject(obstacle);
-                        if (tempBBox.intersectsBox(obstacleBBox)) {
-                            hit = true;
-                            break;
-                        }
-                    }
-                }
-
-                // Remove o projétil se ele atingiu algo
-                if (hit) {
-                    if (projData.isExplosive) {
-                        triggerBigExplosion(projectile.position, projData.explosionRadius, projData.explosionDamage, projData.explosionLevel);
-                    }
-                    scene.remove(projectile);
-                    projectiles.splice(i, 1);
-                }
-            }
-        }
-
         // NOVO: Função para iniciar o tremor da câmera
         function triggerCameraShake(intensity, duration) {
             // Garante que um novo tremor mais forte substitua um mais fraco
@@ -2061,9 +1812,7 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             enemies.forEach(e => { scene.remove(e); removeEnemyUI(e); });
             projectiles.forEach(p => scene.remove(p));
             powerUps.forEach(p => { scene.remove(p); removePowerUpLabel(p); }); // Limpa labels dos itens
-            enemies.length = 0;
-            projectiles.length = 0;
-            powerUps.length = 0; 
+            enemies.length = 0; projectiles.length = 0; powerUps.length = 0; 
             enemyLabelsContainer.innerHTML = '';
             enemyLabels.clear();
             powerUpLabels.clear(); // NOVO: Limpa o mapa de labels dos itens
