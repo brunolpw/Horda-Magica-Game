@@ -39,19 +39,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         let keys = {};
         const enemies = []; const powerUps = [];
 
-        // Variáveis do Sistema de Ondas
-        let currentWave = 0;
-        let enemiesToSpawnThisWave = 0;
-        let enemiesAliveThisWave = 0;
-        let monstersInPreviousWave = 0; // NOVO: Guarda o total da onda anterior
-        // NOVO: Variáveis de Chefe
-        let isBossWave = false;
-        let currentBoss = null;
-        let killsForSoulHarvest = 0; // Contador para o Arquilich
-
-        let intraWaveSpawnTimer = 0;
-
-        const maxActiveEnemies = 40; 
         let powerUpTimer = 0; 
 
         // Variável temporária para checagem de colisão
@@ -420,108 +407,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
                     enemyLabelsContainer.removeChild(uiElements.electrifiedMarker);
                 }
                 enemyLabels.delete(enemy.uuid);
-            }
-        }
-
-        // NOVO: Sistema de Ondas por Abates
-        function startNextWave() {
-            currentWave++;
-
-            // NOVO: Lógica da Onda de Chefe
-            if (currentWave % 10 === 0) {
-                isBossWave = true;
-                enemiesToSpawnThisWave = 1; // Apenas o chefe
-                enemiesAliveThisWave = 1;
-                monstersInPreviousWave = enemies.length; // Guarda o número atual para a próxima onda normal
-                
-                // Spawna o chefe correto para a onda
-                let bossType;
-                switch(currentWave) {
-                    case 10:
-                        bossType = 'goblin_king';
-                        break;
-                    case 20:
-                        bossType = 'juggernaut_troll';
-                        break;
-                    case 30:
-                        bossType = 'archlich';
-                        createBossShield(5); // Cria o escudo de almas para o Arquilich
-                        break;
-                    // Adicionar outros chefes aqui
-                }
-
-                if (bossType) createEnemy(bossType, new THREE.Vector3(0, 0, 0));
-                currentBoss = enemies[enemies.length - 1]; // Guarda a referência do chefe
-                updateUI();
-                return; // Interrompe a lógica de onda normal
-            }
-
-            monstersInPreviousWave = enemiesAliveThisWave; // Guarda o valor antes de resetar
-            
-            let numMonsters;
-            if (currentWave === 1) {
-                numMonsters = 5; // Onda inicial
-            } else {
-                // Aumenta em 30% da quantidade da onda anterior
-                const growthRate = 1.3; // 30%
-                const baseNum = monstersInPreviousWave > 0 ? monstersInPreviousWave : 5;
-                numMonsters = Math.floor(baseNum * growthRate);
-            }
-
-            enemiesToSpawnThisWave = numMonsters;
-            enemiesAliveThisWave = numMonsters;
-            updateUI();
-        }
-
-        function spawnEnemies() { // Agora gerencia o spawn da onda atual
-            // Se não há mais inimigos na onda, inicia a próxima
-            if (isBossWave) {
-                return; // Não spawna inimigos normais durante a onda de chefe
-            }
-            if (enemiesAliveThisWave <= 0) {
-                startNextWave();
-            }
-
-            // Se ainda há inimigos para spawnar e não atingiu o limite da tela
-            if (enemiesToSpawnThisWave > 0 && enemies.length < maxActiveEnemies) {
-                intraWaveSpawnTimer++;
-                // Spawna um inimigo a cada ~1 segundo
-                if (intraWaveSpawnTimer >= 60) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const radius = mapSize + 5;
-                    const x = Math.cos(angle) * radius;
-                    const z = Math.sin(angle) * radius;
-                    const position = new THREE.Vector3(x, 0, z);
-
-                    // A lógica de qual monstro aparece continua a mesma, baseada no nível da onda
-                    let type;
-                    const roll = Math.random() * 100;
-
-                    if (currentWave < 5) {
-                        type = 'goblin';
-                    } else if (currentWave < 8) { // Ondas 5, 6, 7
-                        type = roll < 70 ? 'goblin' : 'orc';
-                    } else if (currentWave < 10) { // Ondas 8, 9
-                        if (roll < 50) type = 'goblin';
-                        else if (roll < 80) type = 'orc';
-                        else type = 'troll';
-                    } else if (currentWave < 12) { // Ondas 10, 11
-                        if (roll < 40) type = 'goblin';
-                        else if (roll < 65) type = 'orc';
-                        else if (roll < 85) type = 'troll';
-                        else type = 'necromancer';
-                    } else { // Onda 12+
-                        if (roll < 20) type = 'goblin';          // 20%
-                        else if (roll < 40) type = 'orc';       // 20%
-                        else if (roll < 60) type = 'troll';     // 20%
-                        else if (roll < 80) type = 'necromancer'; // 20%
-                        else type = 'ghost';                    // 20%
-                    }
-
-                    createEnemy(type, position);
-                    enemiesToSpawnThisWave--;
-                    intraWaveSpawnTimer = 0;
-                }
             }
         }
 
@@ -1122,7 +1007,8 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
                     // CORREÇÃO: Percorre os filhos para aplicar o efeito
                     enemy.traverse((child) => {
                         if (child.isMesh && child.material) {
-                            child.material.color.setHex(0xffffff);
+                    if (!child.userData.originalColor) child.userData.originalColor = child.material.color.getHex();
+                    child.material.color.setHex(0xFFFFFF);
                         }
                     });
                     enemyData.hitTimer--;
@@ -1151,11 +1037,11 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             // CORREÇÃO: Toda a lógica abaixo foi movida para dentro do loop 'for'
 
             // NOVO: Define o alvo (fantasmas ignoram o clone)
-            let target;
-            if (enemyData.type === 'ghost') {
-                target = player;
+            let target = player; // BUGFIX 1: Alvo padrão é o jogador
+            if (clone && cloneTimer > 0 && enemyData.type !== 'ghost' && !enemyData.isBoss) {
+                target = clone;
             } else {
-                target = clone && cloneTimer > 0 ? clone : player;
+                target = player;
             }
             const targetPos = target.position;
 
@@ -1419,6 +1305,11 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
                 if (enemyData.isBoss) {
                     handleBossDefeat(enemy);
                     // A função handleBossDefeat já remove o inimigo
+                    const index = enemies.indexOf(enemy);
+                    if (index > -1) enemies.splice(index, 1);
+                    scene.remove(enemy);
+                    removeEnemyUI(enemy);
+                    // A função handleBossDefeat já remove o inimigo
                     continue; // Pula para o próximo inimigo no loop
                 }
                 score += enemyData.score;
@@ -1529,74 +1420,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         }, 20); // Velocidade da expansão
     }
 
-    // NOVO: Função para a habilidade de "Chuva de Pedras" do Rei Goblin
-    function triggerRockFall(targetPosition) {
-        const fallRadius = 7;
-        const damage = 15;
-
-        // 1. Efeito visual do alvo no chão
-        const targetGeometry = new THREE.RingGeometry(fallRadius - 0.5, fallRadius, 32);
-        const targetMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
-        const targetMarker = new THREE.Mesh(targetGeometry, targetMaterial);
-        targetMarker.position.copy(targetPosition);
-        targetMarker.position.y = 0.1;
-        targetMarker.rotation.x = -Math.PI / 2;
-        scene.add(targetMarker);
-
-        // Animação de aviso
-        setTimeout(() => {
-            // 2. Causa dano se o jogador estiver na área
-            if (player.position.distanceToSquared(targetPosition) < fallRadius * fallRadius) {
-                damagePlayer(damage);
-                createFloatingText(damage, player.position.clone().setY(1.5), '#ff4500', '1.5rem');
-            }
-
-            // 3. Efeito visual da pedra caindo (simples)
-            const rockGeometry = new THREE.DodecahedronGeometry(1);
-            const rockMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
-            const rock = new THREE.Mesh(rockGeometry, rockMaterial);
-            rock.position.copy(targetPosition);
-            rock.position.y = 0.5;
-            scene.add(rock);
-
-            // Remove os efeitos visuais
-            scene.remove(targetMarker);
-            setTimeout(() => scene.remove(rock), 200);
-
-        }, 1000); // 1 segundo de aviso antes do impacto
-    }
-
-    // NOVO: Função para lidar com a derrota de um chefe
-    function handleBossDefeat(boss) {
-        score += boss.userData.score;
-        gainExperience(boss.userData.score);
-        
-        // Dropa múltiplos power-ups
-        const numDrops = Math.floor(Math.random() * 3) + 3; // 3 a 5 drops
-        for (let i = 0; i < numDrops; i++) {
-            const offset = new THREE.Vector3((Math.random() - 0.5) * 4, 0, (Math.random() - 0.5) * 4);
-            spawnRandomItem(boss.position.clone().add(offset));
-        }
-
-        // Recompensa especial do Arquilich
-        if (boss.userData.type === 'archlich') {
-            showSpecialLevelUpOptions();
-            return; // Interrompe a lógica padrão de remoção para esperar a escolha do jogador
-        }
-
-        // Remove o chefe da cena
-        const index = enemies.indexOf(boss);
-        if (index > -1) enemies.splice(index, 1);
-        scene.remove(boss);
-        removeEnemyUI(boss);
-
-        // Finaliza a onda de chefe
-        isBossWave = false;
-        currentBoss = null;
-        enemiesAliveThisWave = 0; // Zera para a próxima onda começar
-        updateUI();
-    }
-
     // NOVO: Função para a Prisão de Ossos
     function triggerBonePrison() {
         const numWalls = 12;
@@ -1639,8 +1462,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             // Mas 'startGame' só falha se 'removeShield' não existir.
             
             // CORREÇÃO 2: O erro 'Cannot read properties of undefined (reading 'position')'
-            // acontece se 'player' for 'undefined' E 'isGameOver' for 'false'.
-            // Isso acontece se 'startGame' falhar (por causa de 'removeShield').
             // A correção é garantir que 'removeShield' exista.
             
             if (isGameOver) {
@@ -1653,8 +1474,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             }
 
             // A partir daqui, isGameOver = false, então 'player' DEVE existir.
-            // O erro 'Cannot read properties of undefined (reading 'position')'
-            // indica que 'player' é nulo.
             if (!player) return; // Proteção extra se 'startGame' falhar
 
             // 1. Lógica da Câmera: A câmera acompanha o jogador (Afastada +50%)
@@ -1769,9 +1588,10 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             // CORREÇÃO DE ORDEM:
             // 1. Move os inimigos
             updateEnemies();
-            
+
             // 2. O Escudo ataca (e pode matar o inimigo que acabou de se mover)
             updateShield(); 
+
 
             // 4. Lógica dos Projéteis
             updateProjectiles();
@@ -1787,6 +1607,26 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             renderer.render(scene, camera);
         }
 
+        // NOVO: Função para lidar com a derrota de um chefe (movida para game.js)
+        function handleBossDefeat(boss) {
+            score += boss.userData.score;
+            gainExperience(boss.userData.score);
+            
+            const numDrops = Math.floor(Math.random() * 3) + 3;
+            for (let i = 0; i < numDrops; i++) {
+                const offset = new THREE.Vector3((Math.random() - 0.5) * 4, 0, (Math.random() - 0.5) * 4);
+                spawnRandomItem(boss.position.clone().add(offset));
+            }
+
+            if (boss.userData.type === 'archlich') {
+                showSpecialLevelUpOptions();
+            }
+
+            isBossWave = false;
+            currentBoss = null;
+            updateUI();
+        }
+
         // Função startGame agora recebe o nome do jogador
         window.startGame = function (name) {
             resetPlayerState();
@@ -1796,15 +1636,7 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             if (goblinKingAuraMesh) goblinKingAuraMesh.visible = false; // NOVO: Esconde a aura do chefe
             if (rangeIndicator) rangeIndicator.visible = false; // NOVO: Esconde indicador de alcance
 
-            // NOVO: Reseta o estado das ondas
-            currentWave = 0;
-            enemiesAliveThisWave = 0;
-            // NOVO: Reseta estado do chefe
-            isBossWave = false;
-            currentBoss = null;
-
-            enemiesToSpawnThisWave = 0;
-            monstersInPreviousWave = 0;
+            resetWaveState();
 
             powerUpTimer = 0; 
             
@@ -1834,6 +1666,31 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
 
             // CORREÇÃO: Define como "jogo iniciado" APENAS DEPOIS que tudo foi criado
             isGameOver = false;
+        }
+
+        // NOVO: Função para a habilidade de "Chuva de Pedras" do Rei Goblin
+        function triggerRockFall(targetPosition) {
+            const fallRadius = 7;
+            const damage = 15;
+
+            const targetGeometry = new THREE.RingGeometry(fallRadius - 0.5, fallRadius, 32);
+            const targetMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
+            const targetMarker = new THREE.Mesh(targetGeometry, targetMaterial);
+            targetMarker.position.copy(targetPosition);
+            targetMarker.position.y = 0.1;
+            targetMarker.rotation.x = -Math.PI / 2;
+            scene.add(targetMarker);
+
+            setTimeout(() => {
+                if (player.position.distanceToSquared(targetPosition) < fallRadius * fallRadius) {
+                    damagePlayer(damage);
+                    createFloatingText(damage, player.position.clone().setY(1.5), '#ff4500', '1.5rem');
+                }
+                const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1), new THREE.MeshLambertMaterial({ color: 0x8B4513 }));
+                rock.position.copy(targetPosition); rock.position.y = 0.5; scene.add(rock);
+                scene.remove(targetMarker);
+                setTimeout(() => scene.remove(rock), 200);
+            }, 1000);
         }
 
         function endGame() {
