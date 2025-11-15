@@ -1252,6 +1252,26 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             createPowerUp(randomType, position);
         }
 
+        // NOVO: Função para criar o clone
+        function createClone() {
+            if (clone) { // Remove o clone antigo se existir
+                scene.remove(clone);
+            }
+
+            clone = createWizardModel();
+            clone.position.copy(player.position);
+
+            // Torna o clone semitransparente
+            clone.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = child.material.clone(); // Clona o material para não afetar o jogador
+                    child.material.transparent = true;
+                    child.material.opacity = 0.5;
+                }
+            });
+
+            scene.add(clone);
+        }
         // NOVO: Função para atualizar a lógica do clone
         function updateClone() {
             if (cloneTimer > 0 && clone) {
