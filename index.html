@@ -246,6 +246,34 @@
             }
         }
 
+        // NOVO: Função para atualizar o cache local do ranking imediatamente
+        function updateLocalRankingCache(newScore, playerName, killStats, level, waveLevel) {
+            try {
+                const cachedRankingJSON = localStorage.getItem('hordaMagicaRanking');
+                let scores = [];
+                if (cachedRankingJSON) {
+                    scores = JSON.parse(cachedRankingJSON);
+                }
+
+                // Adiciona a nova pontuação ao array
+                scores.push({
+                    score: newScore,
+                    playerName: playerName,
+                    killStats: killStats,
+                    level: level,
+                    waveLevel: waveLevel,
+                    fullUserId: window.userId || null,
+                    timestamp: Date.now()
+                });
+
+                scores.sort((a, b) => b.score - a.score);
+                scores = scores.slice(0, 15);
+                localStorage.setItem('hordaMagicaRanking', JSON.stringify(scores));
+            } catch (error) {
+                console.warn("Falha ao atualizar o cache do ranking local:", error);
+            }
+        }
+
         // Funções de Firestore (Disponibilizadas no escopo global para uso no JS principal)
         // NOVO: Adiciona killStats
         window.saveScore = async (score, name, killStats, level, waveLevel) => {
@@ -414,7 +442,8 @@
     </script>
 
     <!-- Script Principal do Jogo (Three.js) -->
-    <script src="./game.js"></script>
+    <script src="./game.js"></script> 
+    <script src="./player.js"></script>
     <script src="./ui.js"></script>
     
     <!-- Script para garantir o foco correto ao pressionar ENTER -->

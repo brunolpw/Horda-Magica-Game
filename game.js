@@ -3,21 +3,10 @@
         let raycaster, mouse;
         const pointer = new THREE.Vector2();
         
-        let player, targetRing;
-        let playerName = 'Mago Anônimo'; // NOVO: Nome do jogador
-        let score = 0;
-        let playerHP = 100;
-        let maxHP = 100;
-        let killPoints = 0;
-        const maxKillPoints = 5; // NOVO: Contadores de abates por tipo
-        let killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 };
-        let killsSinceLastPotion = 0; // NOVO: Contador para spawn de poção por kill
         const killsPerItemSpawn = 30; // NOVO: Limite de abates para garantir um item aleatório
 
         // NOVO: Timers e referências para os novos poderes
         let tripleShotTimer = 0;
-        // let shieldTimer = 0; // REMOVIDO: O escudo não usa mais timer
-        // let shieldSpheres = []; // Antigo
         let shieldLayers = []; // NOVO: Array de camadas        
         let expBoostAuraMesh; // NOVO: Efeito visual para o bônus de EXP
         let expBoostTimer = 0; // NOVO: Timer para o EXP em dobro
@@ -25,16 +14,6 @@
         // NOVO: Indicador de alcance da habilidade
         let rangeIndicator;
         let rangeIndicatorTimer = 0;
-
-        // NOVO: Variáveis de Level
-        let playerLevel = 1;
-        let experiencePoints = 0;
-        const baseExperience = 100; // XP base para o Lvl 2
-        let pendingLevelUps = 0; // NOVO: Contador para level ups pendentes
-        // NOVO: Cura passiva (Lvl 3+)
-        let passiveHealTimer = 0;
-        const passiveHealInterval = 300; // 5 segundos (60fps)
-
 
         // NOVO: Power-up Aura Congelante
         let freezingAuraTimer = 0;
@@ -45,15 +24,8 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         let smokeParticles = [];
         const numSmokeParticles = 50;
         
-        // REMOVIDO: As habilidades de combate agora são gerenciadas pelo novo sistema de upgrades
-        // let novaBombKills = 0;
-        // const killsForNovaBomb = 10;
         let repulsionBubbleTimer = 0; // Timer para o novo power-up
         let repulsionBubbleMesh; // NOVO: Malha para o efeito visual da bolha
-
-        // let chainLightningKills = 0;
-        // const killsForChainLightning = 20;
-        // let chainLightningCharged = false;
 
         let clone = null;
         let cloneTimer = 0;
@@ -65,7 +37,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         let isGameOver = true; // Inicia como TRUE para mostrar o menu
         let isGamePaused = false; // NOVO: Flag para pausar o jogo durante o level up
         let keys = {};
-        let playerSpeed = 0.15;
         const mapSize = 40; // AUMENTADO: Tamanho do mapa (X/Z)
 
         // Variáveis de Jogo
@@ -73,9 +44,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         const projectiles = [];
         const powerUps = []; 
         const obstacles = []; // NOVO: Array para guardar obstáculos
-        let projectileCooldown = 0; // Cooldown do ataque básico
-        let baseCooldown = 30; // Cooldown base do ataque
-        let specialCooldown = 0; // Cooldown do ataque especial
 
         // Variáveis do Sistema de Ondas
         let currentWave = 0;
@@ -113,77 +81,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             clone: { duration: 1200, color: 0x87CEEB, geometry: new THREE.OctahedronGeometry(0.4) }, // NOVO: 20 segundos
             freezingAura: { duration: 1200, color: 0x87CEFA, geometry: new THREE.TorusKnotGeometry(0.3, 0.1, 64, 8) }, // NOVO: 20 segundos
             expBoost: { duration: 3600, color: 0xFFFF00, geometry: new THREE.TorusKnotGeometry(0.3, 0.08, 50, 8) } // NOVO: EXP em dobro por 60s
-        };
-
-        // NOVO: Estrutura de dados para as melhorias com níveis
-        const upgrades = {
-            // --- MELHORIAS DE ATRIBUTOS (PASSIVAS) ---
-            increase_damage: {
-                type: 'attribute',
-                icon: '💥',
-                title: "Poder Arcano",
-                maxLevel: 5,
-                description: (level) => `Aumenta o dano do ataque básico em +10%.`,
-                apply: () => { /* O dano é calculado dinamicamente */ }
-            },
-            increase_attack_speed: {
-                type: 'attribute',
-                icon: '⚡️',
-                title: "Celeridade",
-                maxLevel: 5,
-                description: (level) => `Aumenta a velocidade de ataque em +10%.`,
-                apply: () => { baseCooldown = Math.max(5, baseCooldown * 0.90); }
-            },
-            increase_move_speed: {
-                type: 'attribute',
-                icon: '🏃',
-                title: "Passos Ligeiros",
-                maxLevel: 5,
-                description: (level) => `Aumenta sua velocidade de movimento em +7%.`,
-                apply: () => { playerSpeed *= 1.07; }
-            },
-            increase_max_hp: {
-                type: 'attribute',
-                icon: '❤️',
-                title: "Vigor",
-                maxLevel: 5,
-                description: (level) => `Aumenta a vida máxima em +20.`,
-                apply: () => { maxHP += 20; playerHP += 20; }
-            },
-            increase_xp_gain: {
-                type: 'attribute',
-                icon: '🎓',
-                title: "Sede de Conhecimento",
-                maxLevel: 3,
-                description: (level) => `Aumenta o ganho de experiência em +20%.`,
-                apply: () => { /* A EXP é calculada dinamicamente */ }
-            },
-            auto_heal: {
-                type: 'attribute',
-                icon: '✨',
-                title: "Regeneração",
-                maxLevel: 5,
-                description: (level) => level < 5 ? `Recupera ${level + 1} de HP a cada 5 segundos.` : `Recupera 5 de HP a cada 3 segundos.`,
-                apply: () => { /* A lógica é gerenciada no loop animate */ }
-            },
-            // --- HABILIDADES ATIVAS ---
-            missil_magico: {
-                type: 'active', icon: '🔥', title: "Míssil Mágico", maxLevel: 5,
-                getKillCost: (level) => level < 4 ? 5 : 10,
-                description: (level) => `Dispara ${level < 4 ? 1 : (level === 4 ? 2 : 3)} míssil(eis) teleguiado(s) no(s) inimigo(s) mais forte(s).`
-            },
-            explosao_energia: {
-                type: 'active', icon: '🌀', title: "Explosão de Energia", maxLevel: 5, getKillCost: () => 10,
-                description: (level) => `Libera uma explosão de projéteis em todas as direções. Mais projéteis com o nível.`
-            },
-            corrente_raios: {
-                type: 'active', icon: '⛓️', title: "Corrente de Raios", maxLevel: 5, getKillCost: () => 8,
-                description: (level) => `Eletrifica seu próximo ataque, ricocheteando e aplicando dano contínuo.`
-            },
-            carga_explosiva: {
-                type: 'active', icon: '💣', title: "Carga Explosiva", maxLevel: 5, getKillCost: () => 20,
-                description: (level) => `Cria uma grande explosão. Nv. 4+ libera fragmentos explosivos.`
-            }
         };
 
         // --- Funções de Inicialização ---
@@ -441,36 +338,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         
         // --- Funções de Entidade e Spawning ---
         
-        function createWizardModel() {
-            const group = new THREE.Group();
-            
-            // Robe/Corpo (Cilindro com base mais larga)
-            const robeGeometry = new THREE.CylinderGeometry(0.3, 0.5, 1.0, 8);
-            const robeMaterial = new THREE.MeshLambertMaterial({ color: 0x5b3c8f }); // Roxo Profundo
-            const robe = new THREE.Mesh(robeGeometry, robeMaterial);
-            robe.position.y = 0.5; // Base no chão
-            robe.castShadow = true;
-            group.add(robe);
-
-            // Cabeça (Esfera)
-            const headGeometry = new THREE.SphereGeometry(0.25, 8, 8);
-            const headMaterial = new THREE.MeshLambertMaterial({ color: 0xffcc99 }); // Cor de pele
-            const head = new THREE.Mesh(headGeometry, headMaterial);
-            head.position.y = 1.25;
-            head.castShadow = true;
-            group.add(head);
-
-            // Chapéu (Cone)
-            const hatGeometry = new THREE.ConeGeometry(0.35, 0.6, 8);
-            const hatMaterial = new THREE.MeshLambertMaterial({ color: 0x3a255a }); // Roxo Escuro
-            const hat = new THREE.Mesh(hatGeometry, hatMaterial);
-            hat.position.y = 1.7;
-            hat.castShadow = true;
-            group.add(hat);
-
-            return group;
-        }
-
         // NOVO: Modelo para o Rei Goblin
         function createGoblinKingModel() {
             const group = createGoblinModel(); // Começa com o modelo base
@@ -1486,69 +1353,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
 
         // --- Funções de Lógica do Jogo ---
         
-        function handlePlayerMovement() {
-            let dx = 0;
-            let dz = 0;
-
-            if (keys['w'] || keys['W'] || keys['ArrowUp']) dz = -1;
-            if (keys['s'] || keys['S'] || keys['ArrowDown']) dz = 1;
-            if (keys['a'] || keys['A'] || keys['ArrowLeft']) dx = -1;
-            if (keys['d'] || keys['D'] || keys['ArrowRight']) dx = 1;
-
-            if (dx !== 0 || dz !== 0) {
-                const movementVector = new THREE.Vector2(dx, dz).normalize();
-                const currentMovement = new THREE.Vector3(movementVector.x, 0, movementVector.y).multiplyScalar(playerSpeed);
-                
-                // Rotação do jogador para a direção do movimento
-                const angle = Math.atan2(movementVector.x, movementVector.y); 
-                player.rotation.y = angle;
-                
-                const newPosition = player.position.clone().add(currentMovement);
-                
-                // Bounding box do player na nova posição
-                const tempPlayerBBox = new THREE.Box3();
-                
-                let collisionDetected = false;
-                
-                // Usa o player temporário para checar a colisão antes de mover o player real
-                tempPlayer.position.copy(newPosition);
-                tempPlayer.updateMatrixWorld();
-                tempPlayerBBox.setFromObject(tempPlayer);
-
-                for (const obstacle of obstacles) {
-                    obstacle.updateMatrixWorld();
-                    
-                    let obstacleBBox;
-
-                    // NOVO: Usa a malha de colisão pequena se for uma árvore
-                    if (obstacle.userData.collisionMesh) {
-                        obstacle.userData.collisionMesh.updateWorldMatrix(true, false);
-                        obstacleBBox = new THREE.Box3().setFromObject(obstacle.userData.collisionMesh);
-                    } else {
-                        // Usa o BBox completo para paredes
-                        obstacleBBox = new THREE.Box3().setFromObject(obstacle);
-                    }
-                    
-                    if (tempPlayerBBox.intersectsBox(obstacleBBox)) {
-                        collisionDetected = true;
-                        break;
-                    }
-                }
-
-                if (!collisionDetected) {
-                    // Aplica o movimento real
-                    player.position.copy(newPosition);
-                    
-                    // Mantém o player dentro dos limites do mapa
-                    player.position.x = Math.max(-mapSize, Math.min(mapSize, player.position.x));
-                    player.position.z = Math.max(-mapSize, Math.min(mapSize, player.position.z));
-                    
-                    targetRing.position.x = player.position.x;
-                    targetRing.position.z = player.position.z;
-                }
-            }
-        }
-
         function updateAiming() {
             raycaster.setFromCamera(pointer, camera);
 
@@ -1585,123 +1389,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
                 }
             }
         }
-
-        // NOVO: Função de ativação da HABILIDADE ATIVA
-        function attemptSpecialAttack() {
-            const activeId = player.userData.activeAbility;
-            if (!activeId) return;
-
-            const ability = upgrades[activeId];
-            const level = player.userData.upgrades[activeId] || 1;
-
-            if (killPoints < ability.getKillCost(level) || specialCooldown > 0) return;
-
-            // Lógica específica para cada habilidade
-            switch (activeId) {
-                case 'missil_magico': { // Míssil Mágico
-                    const numMissiles = level >= 4 ? (level === 4 ? 2 : 3) : 1;
-                    const damage = level === 1 ? 25 : (level === 2 ? 35 : 50);
-                    const targets = findClosestEnemies(player.position, numMissiles, true);
-                    
-                    if (targets.length === 0) return; // Não gasta a habilidade se não houver alvos
-
-                    targets.forEach(target => {
-                        const direction = new THREE.Vector3().subVectors(target.position, player.position).normalize();
-                        createProjectile('strong', direction, player.position);
-                        projectiles[projectiles.length - 1].userData.damage = damage;
-                    });
-                    break;
-                }
-                case 'explosao_energia': { // Explosão de Energia
-                    const sphereCounts = [5, 7, 10, 15, 20];
-                    const damages = [5, 10, 15, 20, 25];
-                    const numProjectiles = sphereCounts[level - 1];
-                    const damage = damages[level - 1];
-                    const radius = 30;
-
-                    // Encontra inimigos próximos
-                    const nearbyEnemies = enemies.filter(e => e.position.distanceTo(player.position) <= radius);
-
-                    // Se não houver inimigos, não gasta a habilidade
-                    if (nearbyEnemies.length === 0) {
-                        return;
-                    }
-
-                    // Cria uma lista de alvos, repetindo se necessário
-                    const targets = [];
-                    for (let i = 0; i < numProjectiles; i++) {
-                        targets.push(nearbyEnemies[i % nearbyEnemies.length]);
-                    }
-
-                    // Lança os projéteis de forma escalonada
-                    for (let i = 0; i < numProjectiles; i++) {
-                        setTimeout(() => {
-                            if (isGameOver) return; // Não lança se o jogo acabou no meio do timeout
-
-                            // Direção inicial em espiral para o efeito visual
-                            const angle = (i / numProjectiles) * Math.PI * 4; // * 4 para dar mais voltas
-                            const initialDirection = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
-                            
-                            createProjectile('nova', initialDirection, player.position);
-                            const proj = projectiles[projectiles.length - 1];
-                            proj.userData.damage = damage;
-                            proj.userData.isHoming = true;
-                            proj.userData.target = targets[i];
-                            proj.userData.hasBeenReflected = 'homing'; // Impede reflexão
-                        }, i * 50); // Delay de 50ms entre cada projétil
-                    }
-                    break;
-                }
-                case 'corrente_raios': { // Corrente de Raios
-                    // COMPORTAMENTO NOVO: Disparo instantâneo no alvo mais próximo.
-                    const jumpDistance = [5, 8, 11, 14, 17][level - 1];
-                    let closestEnemy = null;
-                    let minDistanceSq = jumpDistance * jumpDistance;
-
-                    // Encontra o inimigo mais próximo DENTRO DO ALCANCE
-                    enemies.forEach(enemy => {
-                        const distanceSq = enemy.position.distanceToSquared(player.position);
-                        if (distanceSq < minDistanceSq) {
-                            minDistanceSq = distanceSq;
-                            closestEnemy = enemy;
-                        }
-                    });
-
-                    // Se encontrou um alvo, dispara. Senão, não gasta a habilidade.
-                    if (closestEnemy) {
-                        triggerChainLightning(closestEnemy);
-                    } else {
-                        return; // Não consome a habilidade se não houver alvos no alcance.
-                    }
-                    break;
-                }
-                case 'carga_explosiva': { // Carga Explosiva
-                    // Pega a direção da mira do mouse
-                    raycaster.setFromCamera(pointer, camera);
-                    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-                    const intersection = new THREE.Vector3();
-                    if (!raycaster.ray.intersectPlane(plane, intersection)) return;
-
-                    const direction = new THREE.Vector3().subVectors(intersection, player.position).normalize();
-                    
-                    // Cria o projétil explosivo
-                    createProjectile('explosion', direction, player.position);
-                    
-                    // Define os atributos da explosão com base no nível
-                    const lastProjectile = projectiles[projectiles.length - 1];
-                    lastProjectile.userData.explosionRadius = [5, 7, 8, 9, 10][level - 1];
-                    lastProjectile.userData.explosionDamage = [50, 60, 70, 80, 100][level - 1];
-                    lastProjectile.userData.explosionLevel = level;
-                    break;
-                }
-            }
-
-            // Reseta o cooldown e os pontos de abate
-            killPoints = 0;
-            specialCooldown = 180; // 3 segundos
-            updateUI();
-        }
-
 
         function updatePowerUps() {
             if (!player) return; // Proteção
@@ -2470,50 +2157,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         }
     }
 
-        // NOVO: Funções de Level Up
-        function gainExperience(amount) {
-            let finalAmount = amount;
-
-            // NOVO: Aplica o bônus da Sede de Conhecimento, arredondando para cima
-            const xpGainLevel = player.userData.upgrades.increase_xp_gain || 0;
-            if (xpGainLevel > 0) {
-                const bonusPercentage = xpGainLevel * 0.20; // 20% por nível
-                const bonusAmount = Math.ceil(finalAmount * bonusPercentage);
-                finalAmount += bonusAmount;
-            }
-
-            // NOVO: Aplica o bônus do Power-up de EXP em Dobro
-            if (expBoostTimer > 0) {
-                finalAmount *= 2;
-            }
-
-
-            createFloatingText(`+${finalAmount} EXP`, player.position.clone().setY(2.0), '#FFFF00', '1.2rem');
-
-            experiencePoints += finalAmount;
-            
-            // Permite múltiplos level ups de uma vez (ex: explosão)
-            while (experiencePoints >= player.userData.experienceForNextLevel) {
-                levelUp();
-            }
-
-            // A UI será atualizada no loop animate
-            updateUI();
-        }
-
-        function levelUp() {
-            experiencePoints -= player.userData.experienceForNextLevel; // Subtrai o custo e mantém o excesso
-            playerLevel++;
-            pendingLevelUps++; // NOVO: Incrementa o contador de level ups pendentes
-            document.getElementById('level-up-prompt-button').classList.remove('hidden'); // Mostra o botão
-
-            // CORREÇÃO: Aumenta o custo para o próximo nível
-            player.userData.experienceForNextLevel = Math.floor(baseExperience * Math.pow(playerLevel, 1.5));
-
-            // Toca a animação de level up no personagem
-            displayLevelUpMessage();
-        }
-
         // NOVO: Função restaurada para atualizar os projéteis
         function updateProjectiles() {
             const tempBBox = new THREE.Box3();
@@ -2650,32 +2293,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             // Garante que um novo tremor mais forte substitua um mais fraco
             cameraShakeIntensity = Math.max(cameraShakeIntensity, intensity);
             cameraShakeDuration = Math.max(cameraShakeDuration, duration);
-        }
-
-        // NOVO: Função dedicada para checar dano NO JOGADOR
-        // Isso garante que o escudo rode primeiro
-        function damagePlayer(amount) {
-            if (isGameOver) return;
-
-            playerHP = Math.max(0, playerHP - amount);
-            
-            // NOVO: Ativa o tremor da câmera ao receber dano
-            triggerCameraShake(0.5, 20); // Intensidade 0.5, duração de 20 frames
-
-            // Feedback visual de dano no Mago (pisca o robe)
-            const robe = player.children[0];
-            const originalColor = robe.material.color.getHex();
-            robe.material.color.setHex(0xff0000);
-            setTimeout(() => {
-                if (player && player.children[0] && !isGameOver) {
-                    player.children[0].material.color.setHex(originalColor);
-                }
-            }, 100);
-            updateUI();
-            
-            if (playerHP <= 0) {
-                endGame();
-            }
         }
 
         // --- Ciclo de Jogo (Game Loop) ---
@@ -2834,26 +2451,7 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             updateFloatingText(); // NOVO: Atualiza o texto flutuante
             updatePowerUpLabels(); // NOVO: Atualiza labels dos itens
 
-            // NOVO: Garante que a UI seja atualizada a cada frame
-            updateUI();
-
-            // NOVO: Lógica da habilidade de Auto-Cura
-            const autoHealLevel = player.userData.upgrades.auto_heal || 0;
-            if (autoHealLevel > 0) {
-                passiveHealTimer++;
-
-                const healAmount = Math.floor(Math.min(5, autoHealLevel + 1)); // Nível 1 cura 2, Nível 2 cura 3, etc.
-                const currentHealInterval = autoHealLevel < 5 ? 300 : 180; // 5 segundos para Nv 1-4, 3 segundos para Nv 5
-
-                if (passiveHealTimer >= currentHealInterval) {
-                    const oldHP = playerHP;
-                    playerHP = Math.min(maxHP, playerHP + healAmount);
-                    if (playerHP > oldHP) {
-                        createFloatingText(`+${playerHP - oldHP}`, player.position.clone().setY(1.5), '#00ff00');
-                    }
-                    passiveHealTimer = 0;
-                }
-            }
+            updatePassivePlayerAbilities();
 
             // 6. Renderização
             renderer.render(scene, camera);
@@ -2861,30 +2459,7 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
 
         // Função startGame agora recebe o nome do jogador
         window.startGame = function (name) {
-            playerName = name || 'Mago Anônimo';
-
-            // Limpa o estado anterior
-            isGameOver = false;
-            score = 0;
-            playerHP = maxHP;
-            
-            // NOVO: Reseta o Level
-            playerLevel = 1;
-            experiencePoints = 0;
-            playerSpeed = 0.15; 
-            pendingLevelUps = 0; // NOVO: Reseta level ups pendentes
-
-            killPoints = 0;
-            killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 }; // NOVO: Reseta killStats
-            killsSinceLastPotion = 0; // NOVO: Reseta contador de poção
-            
-            // NOVO: Reseta timers e estados dos novos poderes
-            tripleShotTimer = 0;
-            removeShield(); // Garante que o escudo seja removido
-            repulsionBubbleTimer = 0; 
-            if (clone) scene.remove(clone); // NOVO: Remove clone se existir
-            clone = null; cloneTimer = 0;             
-            freezingAuraTimer = 0; 
+            resetPlayerState();
             if (freezingAuraMesh) freezingAuraMesh.visible = false; // NOVO: Esconde a aura
             if (expBoostAuraMesh) expBoostAuraMesh.visible = false; // NOVO: Esconde a aura de EXP
             expBoostTimer = 0; // NOVO: Reseta timer de EXP
@@ -2902,9 +2477,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             monstersInPreviousWave = 0;
 
             powerUpTimer = 0; 
-            projectileCooldown = 0;
-            specialCooldown = 0;
-            passiveHealTimer = 0; // NOVO: Reseta timer da cura
             
             // Limpa as entidades 3D e seus labels
             enemies.forEach(e => { scene.remove(e); removeEnemyUI(e); });
@@ -2916,14 +2488,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             enemyLabelsContainer.innerHTML = '';
             enemyLabels.clear();
             powerUpLabels.clear(); // NOVO: Limpa o mapa de labels dos itens
-            
-            // Garante que os obstáculos não sejam removidos
-            // Obstáculos são criados/repopulados dentro de init/populateObstacles
-
-            if (player) scene.remove(player);
-            if (targetRing) scene.remove(targetRing);
-            createPlayer();
-            player.userData = { maxHP: 100, upgrades: {}, activeAbility: null, experienceForNextLevel: baseExperience }; // Reseta os atributos e upgrades do jogador
             
             // Reset UI
             startMenuModal.classList.add('hidden');

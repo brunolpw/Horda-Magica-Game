@@ -1,0 +1,365 @@
+// Este arquivo contém a lógica e o estado do jogador.
+
+// --- Variáveis de Estado do Jogador ---
+let player;
+let playerName = 'Mago Anônimo';
+let score = 0;
+let playerHP = 100;
+let maxHP = 100;
+let killPoints = 0;
+let killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 };
+let killsSinceLastPotion = 0;
+
+let playerLevel = 1;
+let experiencePoints = 0;
+const baseExperience = 100;
+let pendingLevelUps = 0;
+let passiveHealTimer = 0;
+
+let playerSpeed = 0.15;
+let projectileCooldown = 0;
+let baseCooldown = 30;
+let specialCooldown = 0;
+
+// --- Definições de Habilidades (Upgrades) ---
+const upgrades = {
+    increase_damage: {
+        type: 'attribute', icon: '💥', title: "Poder Arcano", maxLevel: 5,
+        description: (level) => `Aumenta o dano do ataque básico em +10%.`,
+        apply: () => { /* O dano é calculado dinamicamente */ }
+    },
+    increase_attack_speed: {
+        type: 'attribute', icon: '⚡️', title: "Celeridade", maxLevel: 5,
+        description: (level) => `Aumenta a velocidade de ataque em +10%.`,
+        apply: () => { baseCooldown = Math.max(5, baseCooldown * 0.90); }
+    },
+    increase_move_speed: {
+        type: 'attribute', icon: '🏃', title: "Passos Ligeiros", maxLevel: 5,
+        description: (level) => `Aumenta sua velocidade de movimento em +7%.`,
+        apply: () => { playerSpeed *= 1.07; }
+    },
+    increase_max_hp: {
+        type: 'attribute', icon: '❤️', title: "Vigor", maxLevel: 5,
+        description: (level) => `Aumenta a vida máxima em +20.`,
+        apply: () => { maxHP += 20; playerHP += 20; }
+    },
+    increase_xp_gain: {
+        type: 'attribute', icon: '🎓', title: "Sede de Conhecimento", maxLevel: 3,
+        description: (level) => `Aumenta o ganho de experiência em +20%.`,
+        apply: () => { /* A EXP é calculada dinamicamente */ }
+    },
+    auto_heal: {
+        type: 'attribute', icon: '✨', title: "Regeneração", maxLevel: 5,
+        description: (level) => level < 5 ? `Recupera ${level + 1} de HP a cada 5 segundos.` : `Recupera 5 de HP a cada 3 segundos.`,
+        apply: () => { /* A lógica é gerenciada no loop animate */ }
+    },
+    missil_magico: {
+        type: 'active', icon: '🔥', title: "Míssil Mágico", maxLevel: 5,
+        getKillCost: (level) => level < 4 ? 5 : 10,
+        description: (level) => `Dispara ${level < 4 ? 1 : (level === 4 ? 2 : 3)} míssil(eis) teleguiado(s) no(s) inimigo(s) mais forte(s).`
+    },
+    explosao_energia: {
+        type: 'active', icon: '🌀', title: "Explosão de Energia", maxLevel: 5, getKillCost: () => 10,
+        description: (level) => `Libera uma explosão de projéteis em todas as direções. Mais projéteis com o nível.`
+    },
+    corrente_raios: {
+        type: 'active', icon: '⛓️', title: "Corrente de Raios", maxLevel: 5, getKillCost: () => 8,
+        description: (level) => `Eletrifica seu próximo ataque, ricocheteando e aplicando dano contínuo.`
+    },
+    carga_explosiva: {
+        type: 'active', icon: '💣', title: "Carga Explosiva", maxLevel: 5, getKillCost: () => 20,
+        description: (level) => `Cria uma grande explosão. Nv. 4+ libera fragmentos explosivos.`
+    }
+};
+
+// --- Funções de Lógica do Jogador ---
+
+function createWizardModel() {
+    const group = new THREE.Group();
+    const robeGeometry = new THREE.CylinderGeometry(0.3, 0.5, 1.0, 8);
+    const robeMaterial = new THREE.MeshLambertMaterial({ color: 0x5b3c8f });
+    const robe = new THREE.Mesh(robeGeometry, robeMaterial);
+    robe.position.y = 0.5;
+    robe.castShadow = true;
+    group.add(robe);
+
+    const headGeometry = new THREE.SphereGeometry(0.25, 8, 8);
+    const headMaterial = new THREE.MeshLambertMaterial({ color: 0xffcc99 });
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    head.position.y = 1.25;
+    head.castShadow = true;
+    group.add(head);
+
+    const hatGeometry = new THREE.ConeGeometry(0.35, 0.6, 8);
+    const hatMaterial = new THREE.MeshLambertMaterial({ color: 0x3a255a });
+    const hat = new THREE.Mesh(hatGeometry, hatMaterial);
+    hat.position.y = 1.7;
+    hat.castShadow = true;
+    group.add(hat);
+
+    return group;
+}
+
+function createPlayer() {
+    player = createWizardModel();
+    player.position.set(0, 0, 0);
+    player.userData = { maxHP: maxHP };
+    scene.add(player);
+
+    const ringGeometry = new THREE.RingGeometry(1.5, 1.6, 32);
+    const ringMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    targetRing = new THREE.Mesh(ringGeometry, ringMaterial);
+    targetRing.rotation.x = -Math.PI / 2;
+    targetRing.position.y = 0.01;
+    scene.add(targetRing);
+}
+
+function handlePlayerMovement() {
+    let dx = 0;
+    let dz = 0;
+
+    if (keys['w'] || keys['W'] || keys['ArrowUp']) dz = -1;
+    if (keys['s'] || keys['S'] || keys['ArrowDown']) dz = 1;
+    if (keys['a'] || keys['A'] || keys['ArrowLeft']) dx = -1;
+    if (keys['d'] || keys['D'] || keys['ArrowRight']) dx = 1;
+
+    if (dx !== 0 || dz !== 0) {
+        const movementVector = new THREE.Vector2(dx, dz).normalize();
+        const currentMovement = new THREE.Vector3(movementVector.x, 0, movementVector.y).multiplyScalar(playerSpeed);
+        
+        const angle = Math.atan2(movementVector.x, movementVector.y); 
+        player.rotation.y = angle;
+        
+        const newPosition = player.position.clone().add(currentMovement);
+        
+        const tempPlayerBBox = new THREE.Box3();
+        let collisionDetected = false;
+        
+        tempPlayer.position.copy(newPosition);
+        tempPlayer.updateMatrixWorld();
+        tempPlayerBBox.setFromObject(tempPlayer);
+
+        for (const obstacle of obstacles) {
+            obstacle.updateMatrixWorld();
+            let obstacleBBox;
+            if (obstacle.userData.collisionMesh) {
+                obstacle.userData.collisionMesh.updateWorldMatrix(true, false);
+                obstacleBBox = new THREE.Box3().setFromObject(obstacle.userData.collisionMesh);
+            } else {
+                obstacleBBox = new THREE.Box3().setFromObject(obstacle);
+            }
+            
+            if (tempPlayerBBox.intersectsBox(obstacleBBox)) {
+                collisionDetected = true;
+                break;
+            }
+        }
+
+        if (!collisionDetected) {
+            player.position.copy(newPosition);
+            player.position.x = Math.max(-mapSize, Math.min(mapSize, player.position.x));
+            player.position.z = Math.max(-mapSize, Math.min(mapSize, player.position.z));
+            targetRing.position.x = player.position.x;
+            targetRing.position.z = player.position.z;
+        }
+    }
+}
+
+function damagePlayer(amount) {
+    if (isGameOver) return;
+
+    playerHP = Math.max(0, playerHP - amount);
+    triggerCameraShake(0.5, 20);
+
+    const robe = player.children[0];
+    const originalColor = robe.material.color.getHex();
+    robe.material.color.setHex(0xff0000);
+    setTimeout(() => {
+        if (player && player.children[0] && !isGameOver) {
+            player.children[0].material.color.setHex(originalColor);
+        }
+    }, 100);
+    updateUI();
+    
+    if (playerHP <= 0) {
+        endGame();
+    }
+}
+
+function gainExperience(amount) {
+    let finalAmount = amount;
+    const xpGainLevel = player.userData.upgrades.increase_xp_gain || 0;
+    if (xpGainLevel > 0) {
+        const bonusPercentage = xpGainLevel * 0.20;
+        const bonusAmount = Math.ceil(finalAmount * bonusPercentage);
+        finalAmount += bonusAmount;
+    }
+
+    if (expBoostTimer > 0) {
+        finalAmount *= 2;
+    }
+
+    createFloatingText(`+${finalAmount} EXP`, player.position.clone().setY(2.0), '#FFFF00', '1.2rem');
+    experiencePoints += finalAmount;
+    
+    while (experiencePoints >= player.userData.experienceForNextLevel) {
+        levelUp();
+    }
+
+    updateUI();
+}
+
+function levelUp() {
+    experiencePoints -= player.userData.experienceForNextLevel;
+    playerLevel++;
+    pendingLevelUps++;
+    document.getElementById('level-up-prompt-button').classList.remove('hidden');
+
+    player.userData.experienceForNextLevel = Math.floor(baseExperience * Math.pow(playerLevel, 1.5));
+    displayLevelUpMessage();
+}
+
+function attemptSpecialAttack() {
+    const activeId = player.userData.activeAbility;
+    if (!activeId) return;
+
+    const ability = upgrades[activeId];
+    const level = player.userData.upgrades[activeId] || 1;
+
+    if (killPoints < ability.getKillCost(level) || specialCooldown > 0) return;
+
+    switch (activeId) {
+        case 'missil_magico': {
+            const numMissiles = level >= 4 ? (level === 4 ? 2 : 3) : 1;
+            const damage = level === 1 ? 25 : (level === 2 ? 35 : 50);
+            const targets = findClosestEnemies(player.position, numMissiles, true);
+            
+            if (targets.length === 0) return;
+
+            targets.forEach(target => {
+                const direction = new THREE.Vector3().subVectors(target.position, player.position).normalize();
+                createProjectile('strong', direction, player.position);
+                projectiles[projectiles.length - 1].userData.damage = damage;
+            });
+            break;
+        }
+        case 'explosao_energia': {
+            const sphereCounts = [5, 7, 10, 15, 20];
+            const damages = [5, 10, 15, 20, 25];
+            const numProjectiles = sphereCounts[level - 1];
+            const damage = damages[level - 1];
+            const radius = 30;
+
+            const nearbyEnemies = enemies.filter(e => e.position.distanceTo(player.position) <= radius);
+            if (nearbyEnemies.length === 0) return;
+
+            const targets = [];
+            for (let i = 0; i < numProjectiles; i++) {
+                targets.push(nearbyEnemies[i % nearbyEnemies.length]);
+            }
+
+            for (let i = 0; i < numProjectiles; i++) {
+                setTimeout(() => {
+                    if (isGameOver) return;
+
+                    const angle = (i / numProjectiles) * Math.PI * 4;
+                    const initialDirection = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
+                    
+                    createProjectile('nova', initialDirection, player.position);
+                    const proj = projectiles[projectiles.length - 1];
+                    proj.userData.damage = damage;
+                    proj.userData.isHoming = true;
+                    proj.userData.target = targets[i];
+                    proj.userData.hasBeenReflected = 'homing';
+                }, i * 50);
+            }
+            break;
+        }
+        case 'corrente_raios': {
+            const jumpDistance = [5, 8, 11, 14, 17][level - 1];
+            let closestEnemy = null;
+            let minDistanceSq = jumpDistance * jumpDistance;
+
+            enemies.forEach(enemy => {
+                const distanceSq = enemy.position.distanceToSquared(player.position);
+                if (distanceSq < minDistanceSq) {
+                    minDistanceSq = distanceSq;
+                    closestEnemy = enemy;
+                }
+            });
+
+            if (closestEnemy) {
+                triggerChainLightning(closestEnemy);
+            } else {
+                return;
+            }
+            break;
+        }
+        case 'carga_explosiva': {
+            raycaster.setFromCamera(pointer, camera);
+            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            const intersection = new THREE.Vector3();
+            if (!raycaster.ray.intersectPlane(plane, intersection)) return;
+
+            const direction = new THREE.Vector3().subVectors(intersection, player.position).normalize();
+            
+            createProjectile('explosion', direction, player.position);
+            
+            const lastProjectile = projectiles[projectiles.length - 1];
+            lastProjectile.userData.explosionRadius = [5, 7, 8, 9, 10][level - 1];
+            lastProjectile.userData.explosionDamage = [50, 60, 70, 80, 100][level - 1];
+            lastProjectile.userData.explosionLevel = level;
+            break;
+        }
+    }
+
+    killPoints = 0;
+    specialCooldown = 180;
+    updateUI();
+}
+
+function updatePassivePlayerAbilities() {
+    // Lógica da habilidade de Auto-Cura
+    const autoHealLevel = player.userData.upgrades.auto_heal || 0;
+    if (autoHealLevel > 0) {
+        passiveHealTimer++;
+
+        const healAmount = Math.floor(Math.min(5, autoHealLevel + 1));
+        const currentHealInterval = autoHealLevel < 5 ? 300 : 180;
+
+        if (passiveHealTimer >= currentHealInterval) {
+            const oldHP = playerHP;
+            playerHP = Math.min(maxHP, playerHP + healAmount);
+            if (playerHP > oldHP) {
+                createFloatingText(`+${playerHP - oldHP}`, player.position.clone().setY(1.5), '#00ff00');
+            }
+            passiveHealTimer = 0;
+        }
+    }
+}
+
+function resetPlayerState() {
+    isGameOver = false;
+    score = 0;
+    maxHP = 100;
+    playerHP = maxHP;
+    
+    playerLevel = 1;
+    experiencePoints = 0;
+    playerSpeed = 0.15; 
+    pendingLevelUps = 0;
+
+    killPoints = 0;
+    killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 };
+    killsSinceLastPotion = 0;
+    
+    projectileCooldown = 0;
+    baseCooldown = 30;
+    specialCooldown = 0;
+    passiveHealTimer = 0;
+
+    if (player) scene.remove(player);
+    if (targetRing) scene.remove(targetRing);
+    createPlayer();
+    player.userData = { maxHP: 100, upgrades: {}, activeAbility: null, experienceForNextLevel: baseExperience };
+}
