@@ -208,6 +208,19 @@
             border-radius: 2px;
             transition: width 0.3s ease; /* Transição suave */
         }
+        /* NOVO: Estilo para a Barra de Armadura do Chefe */
+        .enemy-armor-bar {
+            position: absolute;
+            width: 50px;
+            height: 6px;
+            background-color: rgba(50, 50, 50, 0.7);
+            border: 1px solid rgba(0, 0, 0, 0.5);
+            border-radius: 3px;
+            transform: translate(-50%, -100%);
+            pointer-events: none;
+            z-index: 19;
+            display: none; /* Começa escondida */
+        }
         /* NOVO: Estilo para a marca de "Invocado" */
         .summon-marker {
             position: absolute;
@@ -583,7 +596,7 @@
     <div id="ability-tooltip"></div>
 
     <!-- NOVO: Modal de Level Up -->
-    <div id="level-up-modal" class="modal fixed inset-0 flex flex-col items-center justify-center hidden z-50">
+    <div id="level-up-modal" class="modal fixed inset-0 flex flex-col items-center justify-center hidden z-50 overflow-y-auto py-8">
         <div class="text-center mb-8">
             <h1 class="text-4xl font-extrabold text-yellow-300 mb-2">Santuário do Conhecimento</h1>
             <p class="text-lg text-gray-300">Escolha uma melhoria para o seu mago!</p>
@@ -599,7 +612,7 @@
         <!-- NOVO: Seção para Melhorar Habilidades Ativas Conhecidas (CORREÇÃO: Movido para dentro do flex-col) -->
         <div class="w-full max-w-4xl flex flex-col items-center">
             <h2 class="text-xl font-bold text-gray-400 text-center mb-4 border-t border-gray-600 pt-4">Melhorar Grimório</h2>
-            <div id="known-upgrades-container" class="flex flex-wrap justify-center gap-4 max-h-64 overflow-y-auto p-2">
+            <div id="known-upgrades-container" class="flex flex-wrap justify-center gap-4">
                 <!-- Cards de melhoria de habilidades conhecidas serão inseridos aqui -->
             </div>
         </div>
@@ -937,6 +950,7 @@
         // NOVO: Variáveis de Chefe
         let isBossWave = false;
         let currentBoss = null;
+        let killsForSoulHarvest = 0; // Contador para o Arquilich
 
         let intraWaveSpawnTimer = 0;
 
@@ -1312,6 +1326,57 @@
             return group;
         }
 
+        // NOVO: Modelo para o Juggernaut Troll
+        function createJuggernautTrollModel() {
+            const group = createTrollModel(); // Começa com o modelo base
+
+            // Aumenta o tamanho
+            group.scale.set(1.5, 1.5, 1.5);
+
+            // Adiciona cristais/pedras nas costas
+            const crystalMaterial = new THREE.MeshLambertMaterial({ color: 0x708090 }); // Cinza Ardósia
+            const numCrystals = 8;
+            for (let i = 0; i < numCrystals; i++) {
+                const crystalGeometry = new THREE.ConeGeometry(0.2, 0.8, 4);
+                const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
+
+                // Posiciona aleatoriamente no corpo
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.random() * 0.5 + 0.3;
+                crystal.position.set(Math.cos(angle) * radius, Math.random() * 1.2 + 0.5, Math.sin(angle) * radius);
+                crystal.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+                crystal.castShadow = true;
+                group.add(crystal);
+            }
+
+            return group;
+        }
+
+        // NOVO: Modelo para o Arquilich
+        function createArchlichModel() {
+            const group = createNecromancerModel(); // Começa com o modelo base
+
+            // Muda a cor para um tema mais fantasmagórico
+            const lichMaterial = new THREE.MeshLambertMaterial({
+                color: 0xADD8E6, // Azul claro
+                transparent: true,
+                opacity: 0.8
+            });
+            group.traverse(child => {
+                if (child.isMesh) {
+                    child.material = lichMaterial;
+                }
+            });
+
+            // Adiciona uma aura esquelética
+            const auraGeometry = new THREE.SphereGeometry(1.5, 16, 16);
+            const auraMaterial = new THREE.MeshBasicMaterial({ color: 0x8A2BE2, transparent: true, opacity: 0.2, side: THREE.BackSide });
+            const aura = new THREE.Mesh(auraGeometry, auraMaterial);
+            group.add(aura);
+
+            return group;
+        }
+
         // --- NOVAS FUNÇÕES DE MODELO DOS INIMIGOS ---
 
         function createGoblinModel() {
@@ -1489,7 +1554,10 @@
             skeleton_warrior: { hp: 200, speed: 0.04, score: 55, damage: 35, name: "Esqueleto Guerreiro", modelFn: createSkeletonWarriorModel, modelHeight: 1.5 },
             skeleton_archer: { hp: 45, speed: 0.05, score: 45, damage: 5, name: "Esqueleto Arqueiro", modelFn: createSkeletonArcherModel, modelHeight: 1.4 },
             // NOVO: Chefe
-            goblin_king: { hp: 800, speed: 0.045, score: 500, damage: 30, name: "Rei Goblin", modelFn: createGoblinKingModel, modelHeight: 1.8 }
+            goblin_king: { hp: 800, speed: 0.045, score: 500, damage: 30, name: "Rei Goblin", modelFn: createGoblinKingModel, modelHeight: 1.8 },
+            juggernaut_troll: { hp: 2500, speed: 0.025, score: 1500, damage: 40, name: "Juggernaut Troll", modelFn: createJuggernautTrollModel, modelHeight: 3.3, armor: 1000 }
+            juggernaut_troll: { hp: 2500, speed: 0.025, score: 1500, damage: 40, name: "Juggernaut Troll", modelFn: createJuggernautTrollModel, modelHeight: 3.3, armor: 1000 },
+            archlich: { hp: 4000, speed: 0.03, score: 3000, damage: 0, name: "Arquilich", modelFn: createArchlichModel, modelHeight: 1.9 }
         };
 
         // Funções de criação de Obstáculos
@@ -1615,6 +1683,22 @@
                 enemy.userData.summonInterval = 900; // Invoca a cada 15 segundos
             }
 
+            // NOVO: Adiciona propriedades para o Juggernaut Troll
+            if (type === 'juggernaut_troll') {
+                enemy.userData.isBoss = true;
+                enemy.userData.armor = props.armor;
+                enemy.userData.maxArmor = props.armor;
+                enemy.userData.earthquakeCooldown = 600; // Cooldown de 10s
+            }
+
+            // NOVO: Adiciona propriedades para o Arquilich
+            if (type === 'archlich') {
+                enemy.userData.isBoss = true;
+                enemy.userData.bonePrisonCooldown = 1200; // Cooldown de 20s
+                enemy.userData.soulShieldCharges = 5;
+                killsForSoulHarvest = 0; // Zera o contador de almas
+            }
+
             // NOVO: Adiciona propriedades específicas para o Necromante
             if (type === 'necromancer') {
                 enemy.userData.summonCooldown = Math.random() * 240; // Cooldown inicial aleatório (até 4s)
@@ -1660,6 +1744,14 @@
             hpFill.className = 'enemy-hp-fill';
             hpBarContainer.appendChild(hpFill);
             
+            // NOVO: Cria a Barra de Armadura (se necessário)
+            const armorBarContainer = document.createElement('div');
+            armorBarContainer.className = 'enemy-armor-bar';
+            const armorFill = document.createElement('div');
+            armorFill.className = 'enemy-hp-fill'; // Reutiliza a classe, mas muda a cor
+            armorFill.style.backgroundColor = '#A9A9A9'; // Cinza
+            armorBarContainer.appendChild(armorFill);
+
             enemyLabelsContainer.appendChild(hpBarContainer);
             
             // 3. NOVO: Cria o Marcador de Invocação (se necessário)
@@ -1685,7 +1777,7 @@
             enemyLabelsContainer.appendChild(electrifiedMarker);
 
             // 4. Armazena todas as referências
-            enemyLabels.set(enemy.uuid, { nameLabel: label, hpBar: hpBarContainer, hpFill: hpFill, summonMarker: summonMarker, frozenMarker: frozenMarker, electrifiedMarker: electrifiedMarker });
+            enemyLabels.set(enemy.uuid, { nameLabel: label, hpBar: hpBarContainer, hpFill: hpFill, armorBar: armorBarContainer, armorFill: armorFill, summonMarker: summonMarker, frozenMarker: frozenMarker, electrifiedMarker: electrifiedMarker });
         }
         
         // Remove a UI do Inimigo
@@ -1697,6 +1789,9 @@
                 }
                 if (uiElements.hpBar) {
                     enemyLabelsContainer.removeChild(uiElements.hpBar);
+                }
+                if (uiElements.armorBar && uiElements.armorBar.parentNode === enemyLabelsContainer) {
+                    enemyLabelsContainer.removeChild(uiElements.armorBar);
                 }
                 if (uiElements.summonMarker) { // NOVO
                     enemyLabelsContainer.removeChild(uiElements.summonMarker);
@@ -1722,8 +1817,23 @@
                 enemiesAliveThisWave = 1;
                 monstersInPreviousWave = enemies.length; // Guarda o número atual para a próxima onda normal
                 
-                // Spawna o chefe no centro do mapa
-                createEnemy('goblin_king', new THREE.Vector3(0, 0, 0));
+                // Spawna o chefe correto para a onda
+                let bossType;
+                switch(currentWave) {
+                    case 10:
+                        bossType = 'goblin_king';
+                        break;
+                    case 20:
+                        bossType = 'juggernaut_troll';
+                        break;
+                    case 30:
+                        bossType = 'archlich';
+                        createBossShield(5); // Cria o escudo de almas para o Arquilich
+                        break;
+                    // Adicionar outros chefes aqui
+                }
+
+                if (bossType) createEnemy(bossType, new THREE.Vector3(0, 0, 0));
                 currentBoss = enemies[enemies.length - 1]; // Guarda a referência do chefe
                 updateUI();
                 return; // Interrompe a lógica de onda normal
@@ -2236,6 +2346,25 @@
             }
         }
 
+        // NOVO: Lógica do Escudo do Chefe
+        function createBossShield(charges) {
+            // Reutiliza a lógica do escudo do jogador, mas com esferas roxas
+            const numSpheres = charges;
+            const radius = 3.0;
+
+            const geometry = new THREE.SphereGeometry(0.3, 8, 8);
+            const material = new THREE.MeshLambertMaterial({ color: 0x8A2BE2, emissive: 0x8A2BE2, emissiveIntensity: 1 });
+            
+            const newLayer = { spheres: [], radius: radius, angleOffset: 0 };
+
+            for (let i = 0; i < numSpheres; i++) {
+                const sphere = new THREE.Mesh(geometry, material);
+                newLayer.spheres.push(sphere);
+                scene.add(sphere);
+            }
+            // Assume que só haverá um escudo de chefe por vez
+            shieldLayers.push(newLayer);
+        }
 
 
 
@@ -2256,7 +2385,7 @@
                 }
                 const uiElements = enemyLabels.get(enemy.uuid); // Pega o objeto
                 if (!uiElements) return;
-                const { nameLabel, hpBar, hpFill, summonMarker, frozenMarker, electrifiedMarker } = uiElements;
+                const { nameLabel, hpBar, hpFill, armorBar, armorFill, summonMarker, frozenMarker, electrifiedMarker } = uiElements;
                 const modelHeight = enemy.userData.modelHeight || 1.0;
                 
                 // 1. Projeta a Posição 3D (como antes)
@@ -2272,11 +2401,21 @@
                 nameLabel.style.left = `${x}px`;
                 nameLabel.style.top = `${y - 8}px`; // Sobe 8px para dar espaço
 
-                // 4. NOVO: Aplica posição à Barra de Vida (Posição base)
-                hpBar.style.left = `${x}px`;
-                hpBar.style.top = `${y}px`;
+                // 4. NOVO: Aplica posição às Barras
+                if (enemy.userData.armor > 0) {
+                    armorBar.style.display = 'block';
+                    armorBar.style.left = `${x}px`;
+                    armorBar.style.top = `${y}px`;
+                    hpBar.style.left = `${x}px`;
+                    hpBar.style.top = `${y + 8}px`; // HP bar fica abaixo da armadura
+                } else {
+                    if (armorBar) armorBar.style.display = 'none';
+                    hpBar.style.left = `${x}px`;
+                    hpBar.style.top = `${y}px`;
+                }
 
                 // 5. NOVO: Atualiza a largura da barra de vida
+                if (armorFill) armorFill.style.width = `${(enemy.userData.armor / enemy.userData.maxArmor) * 100}%`;
                 const hpPercent = (enemy.userData.hp / enemy.userData.maxHP) * 100;
                 hpFill.style.width = `${hpPercent}%`;
 
@@ -2904,7 +3043,8 @@
                 finalSpeed *= speedBoost;
             }
             let isSlowed = false;
-            if (enemyData.type !== 'ghost') { // Fantasmas são imunes
+            // Juggernaut com armadura é imune a slow
+            if (enemyData.type !== 'ghost' && !(enemyData.type === 'juggernaut_troll' && enemyData.armor > 0)) {
                 const isInAura = freezingAuraTimer > 0 && enemy.position.distanceTo(player.position) < 6;
 
                 if (isInAura) {
@@ -2966,8 +3106,47 @@
                 }
             }
 
+            // NOVO: Lógica do Arquilich
+            if (enemyData.type === 'archlich') {
+                // Colheita de Almas
+                if (killsForSoulHarvest >= 5) {
+                    const numWarriors = Math.floor(killsForSoulHarvest / 5);
+                    for (let k = 0; k < numWarriors; k++) {
+                        const offset = new THREE.Vector3((Math.random() - 0.5) * 8, 0, (Math.random() - 0.5) * 8);
+                        createEnemy('skeleton_warrior', enemy.position.clone().add(offset), true);
+                    }
+                    killsForSoulHarvest %= 5; // Mantém o resto
+                }
+
+                // Prisão de Ossos
+                enemyData.bonePrisonCooldown = Math.max(0, enemyData.bonePrisonCooldown - 1);
+                if (enemyData.bonePrisonCooldown <= 0) {
+                    triggerBonePrison();
+                    enemyData.bonePrisonCooldown = 1200; // Reseta cooldown
+                }
+            }
+
+            // NOVO: Lógica do Juggernaut Troll
+            if (enemyData.type === 'juggernaut_troll') {
+                // Aumenta o dano conforme perde vida
+                const hpPercentage = enemyData.hp / enemyData.maxHP;
+                enemyData.damage = entityProps.juggernaut_troll.damage + Math.floor((1 - hpPercentage) * 20); // Adiciona até +20 de dano
+
+                enemyData.earthquakeCooldown = Math.max(0, enemyData.earthquakeCooldown - 1);
+                if (enemyData.earthquakeCooldown <= 0) {
+                    // Efeito visual do terremoto
+                    triggerCameraShake(0.8, 30);
+                    // Lógica de empurrar (simplificada por enquanto)
+                    const distanceToPlayer = player.position.distanceTo(enemy.position);
+                    if (distanceToPlayer < 10) { // Raio do terremoto
+                        damagePlayer(15); // Dano baixo
+                    }
+                    enemyData.earthquakeCooldown = 600; // Reseta cooldown
+                }
+            }
+
             // NOVO: Lógica do status Eletrificado
-            if (enemyData.electrifiedTimer > 0) {
+            if (enemyData.electrifiedTimer > 0 && !(enemyData.type === 'juggernaut_troll' && enemyData.armor > 0)) {
                 enemyData.electrifiedTimer--;
                 if (enemyData.electrifiedTimer % 60 === 0) { // Causa dano a cada segundo
                     enemyData.hp -= 5;
@@ -3094,6 +3273,7 @@
                 }
                 score += enemyData.score;
                 gainExperience(enemyData.score); 
+                if (isBossWave) killsForSoulHarvest++; // Contador para o Arquilich
 
                 // CORREÇÃO: Incrementa os abates e limita ao máximo da habilidade ativa.
                 const activeId = player.userData.activeAbility;
@@ -3175,6 +3355,12 @@
             spawnRandomItem(boss.position.clone().add(offset));
         }
 
+        // Recompensa especial do Arquilich
+        if (boss.userData.type === 'archlich') {
+            showSpecialLevelUpOptions();
+            return; // Interrompe a lógica padrão de remoção para esperar a escolha do jogador
+        }
+
         // Remove o chefe da cena
         const index = enemies.indexOf(boss);
         if (index > -1) enemies.splice(index, 1);
@@ -3186,6 +3372,27 @@
         currentBoss = null;
         enemiesAliveThisWave = 0; // Zera para a próxima onda começar
         updateUI();
+    }
+
+    // NOVO: Função para a Prisão de Ossos
+    function triggerBonePrison() {
+        const numWalls = 12;
+        const radius = 5;
+        for (let i = 0; i < numWalls; i++) {
+            const angle = (i / numWalls) * Math.PI * 2;
+            const x = player.position.x + Math.cos(angle) * radius;
+            const z = player.position.z + Math.sin(angle) * radius;
+            
+            // Cria uma parede de "osso" temporária
+            const wall = createWall(new THREE.Vector3(x, 0, z), 0.5, 2.5);
+            wall.material.color.setHex(0xf0e68c); // Cor de osso
+            
+            // Remove a parede após 8 segundos
+            setTimeout(() => {
+                scene.remove(wall);
+                obstacles.splice(obstacles.indexOf(wall), 1);
+            }, 8000);
+        }
     }
 
         // NOVO: Funções de Level Up
@@ -3224,6 +3431,9 @@
             playerLevel++;
             pendingLevelUps++; // NOVO: Incrementa o contador de level ups pendentes
             document.getElementById('level-up-prompt-button').classList.remove('hidden'); // Mostra o botão
+
+            // CORREÇÃO: Aumenta o custo para o próximo nível
+            player.userData.experienceForNextLevel = baseExperience * (playerLevel + 1);
 
             // Toca a animação de level up no personagem
             displayLevelUpMessage();
@@ -3509,6 +3719,39 @@
             };
         }
 
+        // NOVO: Função para a recompensa do Arquilich
+        function showSpecialLevelUpOptions() {
+            isGamePaused = true;
+            levelUpModal.classList.remove('hidden');
+            upgradeOptionsContainer.innerHTML = '<p class="text-lg text-yellow-400 col-span-3 text-center">O Arquilich foi derrotado! Escolha qualquer poder como sua recompensa.</p>';
+            knownUpgradesContainer.innerHTML = '';
+            document.getElementById('confirm-upgrade-container').classList.add('hidden');
+
+            const playerUpgrades = player.userData.upgrades;
+
+            // Mostra TODAS as habilidades que ainda não estão no nível máximo
+            Object.keys(upgrades).forEach(upgradeId => {
+                const upgrade = upgrades[upgradeId];
+                const currentLevel = playerUpgrades[upgradeId] || 0;
+
+                if (currentLevel < upgrade.maxLevel) {
+                    const card = document.createElement('div');
+                    card.className = 'upgrade-card';
+                    card.innerHTML = `
+                        <div class="upgrade-icon">${upgrade.icon}</div>
+                        <div class="upgrade-title">${upgrade.title}</div>
+                        <div class="upgrade-level">${currentLevel > 0 ? `Nível ${currentLevel} ➔ ${currentLevel + 1}` : 'APRENDER'}</div>
+                        <div class="upgrade-description">${upgrade.description(currentLevel + 1)}</div>
+                    `;
+                    card.onclick = () => {
+                        selectUpgrade(upgradeId, false); // Aplica a melhoria
+                        // A função selectUpgrade já chama a próxima etapa
+                    };
+                    knownUpgradesContainer.appendChild(card);
+                }
+            });
+        }
+
         // Função antiga foi dividida em duas
         function old_selectUpgrade(upgradeId) {
             const upgrade = upgrades[upgradeId];
@@ -3600,6 +3843,23 @@
                                 finalDamage += bonusAmount;
                             }
 
+                            // NOVO: Dano na armadura primeiro
+                            if (enemy.userData.armor > 0) {
+                            if (enemy.userData.isBoss && enemy.userData.soulShieldCharges > 0) {
+                                // Escudo de Almas do Arquilich absorve o projétil
+                                enemy.userData.soulShieldCharges--;
+                                removeShield(); // Remove o escudo visual antigo
+                                if (enemy.userData.soulShieldCharges > 0) createBossShield(enemy.userData.soulShieldCharges); // Recria com menos esferas
+                                hit = true; // Marca como acerto para o projétil ser destruído
+                            } else if (enemy.userData.armor > 0) {
+                                const armorDamage = Math.min(enemy.userData.armor, finalDamage);
+                                enemy.userData.armor -= armorDamage;
+                                finalDamage -= armorDamage;
+                                createFloatingText(Math.floor(armorDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#A9A9A9'); // Cinza
+                            }
+
+                            if (finalDamage <= 0) continue; // Se todo o dano foi absorvido
+                            if (hit || finalDamage <= 0) continue; // Se o escudo absorveu ou não há mais dano
                             enemy.userData.hp -= finalDamage;
                             createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
                             enemy.userData.hitTimer = 10;
