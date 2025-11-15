@@ -122,7 +122,7 @@
             <button id="restart-button" class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition duration-300 shadow-lg" onclick="handleRestartClick()">
                 Recomeçar
             </button>
-            <p class="mt-4 text-xs text-gray-400">ID do Usuário: <span id="user-id-display"></span></p>
+            <!-- ID do Usuário removido -->
         </div>
     </div>
     
@@ -183,131 +183,38 @@
         </div>
     </div>
 
-    <!-- Firebase Imports -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, onSnapshot, collection, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    <!-- NOVO: Script para Gerenciamento de Ranking Local -->
+    <script>
+        const RANKING_KEY = 'hordaMagicaRanking';
 
-        // Configurações e Variáveis Globais (MANDATÓRIAS)
-        setLogLevel('Debug');
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        let app;
-        let db;
-        let auth;
-        let userId = null;
-        let isAuthReady = false;
-
-        // Inicializa o Firebase e Autentica
-        async function setupFirebase() {
+        // Salva a pontuação no localStorage
+        window.saveScore = (score, name, killStats, level, waveLevel) => {
             try {
-                if (Object.keys(firebaseConfig).length === 0) {
-                    console.error("Firebase config is missing or empty.");
-                    
-                    // NOVO: Tenta carregar do cache e exibe um aviso
-                    loadInitialRankingFromCache(); 
-                    const rankingList = document.getElementById('full-ranking-list');
-                    rankingList.innerHTML += '<p class="text-yellow-400 text-center text-xs mt-2">Aviso: Ranking offline. Os dados podem estar desatualizados.</p>';
-                    
-                    return;
-                }
-
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        window.userId = user.uid; // NOVO: Expõe o userId globalmente
-                        userId = user.uid;
-                        isAuthReady = true;
-                        document.getElementById('user-id-display').textContent = userId;
-                        window.loadRanking();
-                    } else {
-                        window.userId = null; // NOVO: Limpa o userId global
-                        userId = null;
-                        isAuthReady = true; 
-                    }
-                });
-
-            } catch (error) {
-                console.error("Erro ao configurar Firebase:", error);
-                document.getElementById('full-ranking-list').innerHTML = `<p class="text-red-400 text-center">Erro: ${error.message}</p>`;
-            }
-        }
-
-        // NOVO: Função para atualizar o cache local do ranking imediatamente
-        function updateLocalRankingCache(newScore, playerName, killStats, level, waveLevel) {
-            try {
-                const cachedRankingJSON = localStorage.getItem('hordaMagicaRanking');
+                const cachedRankingJSON = localStorage.getItem(RANKING_KEY);
                 let scores = [];
                 if (cachedRankingJSON) {
                     scores = JSON.parse(cachedRankingJSON);
                 }
 
-                // Adiciona a nova pontuação ao array
                 scores.push({
-                    score: newScore,
-                    playerName: playerName,
+                    score: score,
+                    playerName: name,
                     killStats: killStats,
                     level: level,
                     waveLevel: waveLevel,
-                    fullUserId: window.userId || null,
                     timestamp: Date.now()
                 });
 
                 scores.sort((a, b) => b.score - a.score);
                 scores = scores.slice(0, 15);
-                localStorage.setItem('hordaMagicaRanking', JSON.stringify(scores));
+                localStorage.setItem(RANKING_KEY, JSON.stringify(scores));
+                console.log("Pontuação salva localmente.");
             } catch (error) {
-                console.warn("Falha ao atualizar o cache do ranking local:", error);
+                console.warn("Falha ao salvar ranking local:", error);
             }
-        }
-
-        // Funções de Firestore (Disponibilizadas no escopo global para uso no JS principal)
-        // NOVO: Adiciona killStats
-        window.saveScore = async (score, name, killStats, level, waveLevel) => {
-            if (!isAuthReady || !userId || !db) {
-                console.warn("Firebase não está pronto ou user não autenticado. Pontuação não salva.");
-                // Mesmo sem Firebase, atualiza o cache local
-                updateLocalRankingCache(score, name, killStats, level, waveLevel);
-                return;
-            }
-            
-            const sanitizedName = name.substring(0, 15) || 'Mago Anônimo';
-
-            const scoreData = {
-                score: score,
-                playerName: sanitizedName, // Novo campo
-                fullUserId: userId, 
-                killStats: killStats, // NOVO: Salva estatísticas de abates
-                level: level, // NOVO: Salva o nível alcançado
-                waveLevel: waveLevel, // NOVO: Salva o nível da onda
-                timestamp: Date.now()
-            };
-
-            try {
-                const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'global_scores');
-                await addDoc(collectionRef, scoreData);
-                console.log("Pontuação salva com sucesso:", score, name);
-            } catch (error) {
-                console.error("Erro ao salvar a pontuação:", error);
-            }
-
-            // Atualiza o cache local após tentar salvar no Firebase
-            updateLocalRankingCache(score, name, killStats, level, waveLevel);
         };
 
+        // Renderiza a lista de scores na tela
         window.renderRanking = (elementId, scores) => {
             const rankingList = document.getElementById(elementId);
             rankingList.innerHTML = '';
@@ -316,27 +223,22 @@
                 rankingList.innerHTML = '<p class="text-gray-400 text-center">Seja o primeiro a pontuar!</p>';
                 return;
             }
-            
-            // CORREÇÃO: Garante que o array esteja sempre ordenado antes de renderizar
+
             scores.sort((a, b) => b.score - a.score);
 
             scores.slice(0, 10).forEach((scoreData, index) => { // Limite de 10 para o modal
-                const isCurrentUser = scoreData.fullUserId === window.userId;
-                const rankClass = isCurrentUser ? 'text-yellow-300 font-bold' : 'text-white hover:bg-gray-700';
+                const rankClass = 'text-white hover:bg-gray-700';
                 const nameText = scoreData.playerName || 'Mago Anônimo';
-                
-                // NOVO: Extrai as estatísticas de abates
                 const stats = scoreData.killStats || { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 };
 
                 const itemDiv = document.createElement('div');
                 itemDiv.className = `ranking-item ${rankClass} cursor-default`;
                 itemDiv.innerHTML = `
-                        <span class="w-3/5 text-left">${index + 1}. ${nameText}</span>
-                        <span class="w-1/5 text-center">${scoreData.level || 1}</span>
-                        <span class="w-1/5 text-center">${scoreData.score}</span>
+                    <span class="w-3/5 text-left">${index + 1}. ${nameText}</span>
+                    <span class="w-1/5 text-center">${scoreData.level || 1}</span>
+                    <span class="w-1/5 text-center">${scoreData.score}</span>
                 `;
 
-                // NOVO: Adiciona listeners para o tooltip
                 itemDiv.addEventListener('mousemove', (e) => {
                     const killsHTML = `
                         Goblins: ${stats.goblin || 0}<br>
@@ -382,45 +284,10 @@
             });
         };
 
-        // Listener que carrega e atualiza o ranking (apenas para o modal)
-        window.loadRanking = () => {
-            if (!isAuthReady || !db) return;
-            const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'global_scores');
-            const q = query(collectionRef, orderBy("score", "desc"), limit(10)); 
-
-            // Usa onSnapshot para atualizações em tempo real
-            onSnapshot(q, (snapshot) => {
-                // CORREÇÃO: Limpa o ranking apenas quando os novos dados chegam
-                document.getElementById('full-ranking-list').innerHTML = '';
-                let scores = [];
-                snapshot.forEach(doc => {
-                    scores.push({ id: doc.id, ...doc.data() });
-                });
-
-                // A ordenação agora é feita pelo Firestore, mas uma reordenação local não prejudica
-                // e garante a ordem caso a query falhe em ordenar.
-
-                // NOVO: Salva o ranking no localStorage para cache
-                try {
-                    localStorage.setItem('hordaMagicaRanking', JSON.stringify(scores));
-                } catch (e) {
-                    console.warn("Não foi possível salvar o ranking no localStorage:", e);
-                }
-
-                // Atualiza o ranking do Modal
-                window.renderRanking('full-ranking-list', scores); 
-
-            }, (error) => {
-                console.error("Erro ao carregar ranking:", error);
-                const errorHtml = '<p class="text-red-400 text-center">Erro ao carregar ranking.</p>';
-                document.getElementById('full-ranking-list').innerHTML = errorHtml;
-            });
-        };
-
-        // NOVO: Carrega o ranking do cache para exibição inicial
+        // Carrega o ranking do cache para exibição
         window.loadInitialRankingFromCache = function() {
             try {
-                const cachedRankingJSON = localStorage.getItem('hordaMagicaRanking');
+                const cachedRankingJSON = localStorage.getItem(RANKING_KEY);
                 if (cachedRankingJSON) {
                     const scores = JSON.parse(cachedRankingJSON);
                     if (scores && scores.length > 0) {
@@ -431,14 +298,9 @@
                 console.error("Erro ao carregar ranking do cache:", error);
             }
         };
-
-        setupFirebase();
-
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !document.getElementById('game-over-modal').classList.contains('hidden')) {
-                document.getElementById('restart-button').click();
-            }
-        });
+        
+        // Alias para manter a compatibilidade com chamadas antigas
+        window.loadRanking = window.loadInitialRankingFromCache;
     </script>
 
     <!-- Script Principal do Jogo (Three.js) -->

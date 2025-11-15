@@ -2570,7 +2570,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         // Inicia a aplicação Three.js quando a janela estiver carregada
         window.onload = function () {
             if (window.setupUIElements) setupUIElements(); // Inicializa referências da UI
-            if (window.loadInitialRankingFromCache) loadInitialRankingFromCache(); // Carrega o ranking do cache
             // A configuração dos tooltips é chamada dentro de init()
             init();
             createPlayer(); // Cria o jogador uma vez para ter a referência em `startGame`

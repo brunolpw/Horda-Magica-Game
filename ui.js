@@ -519,6 +519,6 @@ function handleStartGameClick() {
 }
 
 function handleViewRankingClick() {
-    loadInitialRankingFromCache();
+    window.loadRanking();
     document.getElementById('full-ranking-modal').classList.remove('hidden');
 }
