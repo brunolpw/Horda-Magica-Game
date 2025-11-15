@@ -37,13 +37,7 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
         let isGameOver = true; // Inicia como TRUE para mostrar o menu
         let isGamePaused = false; // NOVO: Flag para pausar o jogo durante o level up
         let keys = {};
-        const mapSize = 40; // AUMENTADO: Tamanho do mapa (X/Z)
-
-        // Variáveis de Jogo
-        const enemies = [];
-        const projectiles = [];
-        const powerUps = []; 
-        const obstacles = []; // NOVO: Array para guardar obstáculos
+        const enemies = []; const projectiles = []; const powerUps = [];
 
         // Variáveis do Sistema de Ondas
         let currentWave = 0;
@@ -126,75 +120,17 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             scene.add(directionalLight);
             scene.add(directionalLight.target);
 
-            // 5. Chão (Grama e Terra) - NOVO
-            createBlendedFloor();
-
-            // 6. Raycaster para mira
+            createBlendedFloor(); // map.js
             raycaster = new THREE.Raycaster();
-
-            // 7. Configura Obstáculos
-            populateObstacles(); // NOVO: Cria árvores e paredes
-
-            // 8. Setup de Inputs e Eventos
+            populateObstacles(); // map.js
             setupInputs();
-
-            // 9. Cria o Player Temporário para Colisão (NOVO)
-            tempPlayer = createWizardModel();
-
-            // NOVO: Cria a malha da bolha de repulsão
+            tempPlayer = createWizardModel(); // player.js
             createRepulsionBubbleMesh();
-
-            // NOVO: Cria a malha da aura congelante
             createFreezingAuraMesh();
-
-            // NOVO: Cria as partículas de fumaça
             createSmokeParticles();
-
-            // NOVO: Cria a malha da aura de EXP
             createExpBoostAuraMesh();
-
-            // NOVO: Cria o indicador de alcance
             createRangeIndicator();
-
-            // NOVO: Cria a malha da aura do Rei Goblin
             createGoblinKingAuraMesh();
-
-            // 10. O jogo inicia no menu (isGameOver = true)
-        }
-        // NOVO: Função para criar o chão misturado (Terra e Grama)
-        function createBlendedFloor() {
-            const floorSize = mapSize * 2;
-            
-            // 1. Base (Terra/Dirt)
-            const dirtGeometry = new THREE.PlaneGeometry(floorSize, floorSize);
-            const dirtMaterial = new THREE.MeshLambertMaterial({ color: 0x5C4033 }); // Terra Marrom
-            const dirtFloor = new THREE.Mesh(dirtGeometry, dirtMaterial);
-            dirtFloor.rotation.x = -Math.PI / 2;
-            dirtFloor.position.y = 0; // Base floor
-            dirtFloor.receiveShadow = true;
-            scene.add(dirtFloor);
-
-            // 2. Grama (Patches)
-            const grassMaterial = new THREE.MeshLambertMaterial({ color: 0x556B2F }); // Verde Oliva
-            const numPatches = 300; 
-            const patchSize = 3; 
-            const halfFloor = mapSize;
-
-            for (let i = 0; i < numPatches; i++) {
-                // Varia o tamanho do patch de grama
-                const patchGeometry = new THREE.PlaneGeometry(patchSize * (0.5 + Math.random()), patchSize * (0.5 + Math.random()));
-                
-                // Posiciona a grama aleatoriamente dentro do mapa
-                const x = (Math.random() * floorSize) - halfFloor;
-                const z = (Math.random() * floorSize) - halfFloor;
-
-                const grassPatch = new THREE.Mesh(patchGeometry, grassMaterial);
-                grassPatch.rotation.x = -Math.PI / 2;
-                // Coloca a grama ligeiramente acima da terra para evitar z-fighting
-                grassPatch.position.set(x, 0.01, z); 
-                grassPatch.receiveShadow = true;
-                scene.add(grassPatch);
-            }
         }
 
         // NOVO: Função para encontrar os inimigos mais próximos (ou mais fortes)
@@ -595,85 +531,6 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
             juggernaut_troll: { hp: 2500, speed: 0.025, score: 1500, damage: 40, name: "Juggernaut Troll", modelFn: createJuggernautTrollModel, modelHeight: 3.3, armor: 1000 },
             archlich: { hp: 4000, speed: 0.03, score: 3000, damage: 0, name: "Arquilich", modelFn: createArchlichModel, modelHeight: 1.9 }
         };
-
-        // Funções de criação de Obstáculos
-        function createTree(position) { // ... (função createTree sem alterações)
-            const group = new THREE.Group();
-
-            // Tronco (Cylinder, Marrom) - Altura 3
-            const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 3, 6);
-            const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
-            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-            trunk.position.y = 1.5;
-            trunk.castShadow = true;
-            group.add(trunk);
-
-            // Folhagem (Dodecahedron/Cone, Verde)
-            const leavesGeometry = new THREE.DodecahedronGeometry(2);
-            const leavesMaterial = new THREE.MeshLambertMaterial({ color: 0x228b22 });
-            const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
-            leaves.position.y = 3.5;
-            leaves.castShadow = true;
-            group.add(leaves);
-
-            group.position.copy(position);
-            group.position.y = 0; 
-            
-            group.userData.isObstacle = true;
-            
-            // NOVO: Cria uma malha de colisão invisível que é pequena (apenas o tronco/base)
-            // Usamos uma BoxGeometry de 1x1x1 na base para uma colisão precisa no chão.
-            const collisionGeometry = new THREE.BoxGeometry(1.0, 1.0, 1.0); 
-            const collisionMesh = new THREE.Mesh(collisionGeometry, new THREE.MeshBasicMaterial({ visible: false }));
-            collisionMesh.position.y = 0.5; // Centraliza a malha de colisão no chão
-            group.add(collisionMesh);
-            group.userData.collisionMesh = collisionMesh; // Referência para ser usada no check
-
-            scene.add(group);
-            obstacles.push(group);
-        }
-
-        function createWall(position, width, depth) {
-            const height = 2;
-            const wallGeometry = new THREE.BoxGeometry(width, height, depth);
-            const wallMaterial = new THREE.MeshLambertMaterial({ color: 0x777777 }); // Cinza de pedra
-            const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-            
-            wall.position.copy(position);
-            wall.position.y = height / 2;
-            wall.castShadow = true;
-
-            wall.userData.isObstacle = true;
-            
-            scene.add(wall);
-            obstacles.push(wall);
-            return wall; // CORREÇÃO: Retorna o objeto da parede criada
-        }
-
-        function populateObstacles() {
-            // Limpa obstáculos antigos (necessário para o restart)
-            obstacles.forEach(o => scene.remove(o));
-            obstacles.length = 0;
-
-            const numTrees = 50;
-            const boundary = mapSize - 2; // Garante que não spawne na borda // ... (resto da função populateObstacles sem alterações)
-            for (let i = 0; i < numTrees; i++) {
-                const x = (Math.random() * boundary * 2) - boundary;
-                const z = (Math.random() * boundary * 2) - boundary;
-                createTree(new THREE.Vector3(x, 0, z));
-            }
-
-            const numWalls = 15;
-            for (let i = 0; i < numWalls; i++) {
-                const x = (Math.random() * boundary * 2) - boundary;
-                const z = (Math.random() * boundary * 2) - boundary;
-                // Varia a largura e profundidade para criar diferentes tipos de parede
-                const width = Math.random() < 0.5 ? 5 : 1; 
-                const depth = width === 1 ? 5 : 1;
-                createWall(new THREE.Vector3(x, 0, z), width, depth);
-            }
-        }
-
 
         function createPlayer() {
             // Usa o novo modelo
