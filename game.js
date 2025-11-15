@@ -1629,6 +1629,7 @@ let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
 
         // Função startGame agora recebe o nome do jogador
         window.startGame = function (name) {
+            playerName = name || 'Mago Anônimo';
             resetPlayerState();
             if (freezingAuraMesh) freezingAuraMesh.visible = false; // NOVO: Esconde a aura
             if (expBoostAuraMesh) expBoostAuraMesh.visible = false; // NOVO: Esconde a aura de EXP
