@@ -48,6 +48,7 @@
         // NOVO: Power-up Aura Congelante
         let freezingAuraTimer = 0;
         let freezingAuraMesh;
+let goblinKingAuraMesh; // NOVO: Malha para a aura do Rei Goblin
 
         // NOVO: Partículas de fumaça para a aura
         let smokeParticles = [];
@@ -246,6 +247,9 @@
             // NOVO: Cria o indicador de alcance
             createRangeIndicator();
 
+            // NOVO: Cria a malha da aura do Rei Goblin
+            createGoblinKingAuraMesh();
+
             // 10. O jogo inicia no menu (isGameOver = true)
         }
         // NOVO: Função para criar o chão misturado (Terra e Grama)
@@ -333,6 +337,21 @@
             scene.add(freezingAuraMesh);
         }
         
+        // NOVO: Função para criar a malha visual da Aura do Rei Goblin
+        function createGoblinKingAuraMesh() {
+            const auraRadius = 15; // Raio da aura de velocidade
+            const geometry = new THREE.TorusGeometry(auraRadius, 0.2, 16, 100);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x32CD32, // Verde Lima
+                transparent: true,
+                opacity: 0.5
+            });
+            goblinKingAuraMesh = new THREE.Mesh(geometry, material);
+            goblinKingAuraMesh.rotation.x = Math.PI / 2; // Deita o anel no chão
+            goblinKingAuraMesh.visible = false; // Começa invisível
+            scene.add(goblinKingAuraMesh);
+        }
+
         // NOVO: Função para criar as partículas de fumaça
         function createSmokeParticles() {
             const smokeMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
@@ -753,6 +772,7 @@
             
             scene.add(wall);
             obstacles.push(wall);
+            return wall; // CORREÇÃO: Retorna o objeto da parede criada
         }
 
         function populateObstacles() {
@@ -823,6 +843,7 @@
                 enemy.userData.isBoss = true;
                 enemy.userData.summonCooldown = 300; // Cooldown inicial de 5s
                 enemy.userData.summonInterval = 900; // Invoca a cada 15 segundos
+                enemy.userData.rockThrowCooldown = 0; // NOVO: Cooldown para o ataque de fuga
             }
 
             // NOVO: Adiciona propriedades para o Juggernaut Troll
@@ -2277,11 +2298,24 @@
                 enemyData.earthquakeCooldown = Math.max(0, enemyData.earthquakeCooldown - 1);
                 if (enemyData.earthquakeCooldown <= 0) {
                     // Efeito visual do terremoto
-                    triggerCameraShake(0.8, 30);
-                    // Lógica de empurrar (simplificada por enquanto)
+                    triggerCameraShake(0.8, 45);
+                    triggerEarthquakeVisual(enemy.position, 25); // Efeito visual com raio máximo
+
+                    // Lógica de dano em área com múltiplos raios
                     const distanceToPlayer = player.position.distanceTo(enemy.position);
-                    if (distanceToPlayer < 10) { // Raio do terremoto
-                        damagePlayer(15); // Dano baixo
+                    let damageDealt = 0;
+
+                    if (distanceToPlayer < 15) { // Raio 1: 15 unidades
+                        damageDealt = 30;
+                    } else if (distanceToPlayer < 20) { // Raio 2: 20 unidades
+                        damageDealt = 25;
+                    } else if (distanceToPlayer < 25) { // Raio 3: 25 unidades
+                        damageDealt = 20;
+                    }
+
+                    if (damageDealt > 0) {
+                        damagePlayer(damageDealt);
+                        createFloatingText(damageDealt, player.position.clone().setY(1.5), '#ff4500', '1.5rem');
                     }
                     enemyData.earthquakeCooldown = 600; // Reseta cooldown
                 }
@@ -2305,13 +2339,20 @@
                 // Movimento lento se estiver congelado
                 const slowDirection = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
                 enemy.position.addScaledVector(slowDirection, finalSpeed * 0.5);
-            
-            } else if (enemyData.isBoss && enemyData.hp / enemyData.maxHP < 0.3) {
-                // NOVO: Comportamento de fuga do chefe
+            // BUGFIX 1: Comportamento de fuga específico para o Rei Goblin
+            } else if (enemyData.type === 'goblin_king' && enemyData.hp / enemyData.maxHP < 0.3) {
+                // Foge do jogador
                 const fleeDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
                 const newPosition = enemy.position.clone().addScaledVector(fleeDirection, finalSpeed);
-                // (A lógica de colisão para o chefe é a mesma do movimento padrão)
                 handleStandardMovement(enemy, newPosition, finalSpeed);
+
+                // MELHORIA: Atira pedras enquanto foge
+                enemyData.rockThrowCooldown = Math.max(0, enemyData.rockThrowCooldown - 1);
+                if (enemyData.rockThrowCooldown <= 0) {
+                    const rockTargetPosition = player.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 5, 0, (Math.random() - 0.5) * 5));
+                    triggerRockFall(rockTargetPosition);
+                    enemyData.rockThrowCooldown = 240; // Atira a cada 4 segundos
+                }
 
             } else if (enemyData.type === 'necromancer') {
                 // Lógica de movimento do Necromante (kiting)
@@ -2391,6 +2432,14 @@
                 handleStandardMovement(enemy, newPosition, finalSpeed);
             }
             
+            // BUGFIX 2: Mantém os inimigos dentro do mapa
+            if (Math.abs(enemy.position.x) > mapSize) {
+                enemy.position.x = Math.sign(enemy.position.x) * mapSize;
+            }
+            if (Math.abs(enemy.position.z) > mapSize) {
+                enemy.position.z = Math.sign(enemy.position.z) * mapSize;
+            }
+
             // Checa colisão com o jogador APÓS o movimento
             const playerBBox = new THREE.Box3().setFromObject(player);
             // Inimigos de longa distância não causam dano de toque
@@ -2483,6 +2532,79 @@
                 enemy.position.z = newPositionZ.z;
             }
         }
+    }
+
+    // MELHORIA: Função para o efeito visual do Terremoto
+    function triggerEarthquakeVisual(position, maxRadius) {
+        const geometry = new THREE.RingGeometry(0.1, 1, 64); // Começa pequeno
+        const material = new THREE.MeshBasicMaterial({
+            color: 0xff4500, // Cor inicial (dano máximo)
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.8
+        });
+        const ring = new THREE.Mesh(geometry, material);
+
+        ring.position.copy(position);
+        ring.position.y = 0.1;
+        ring.rotation.x = -Math.PI / 2;
+        scene.add(ring);
+
+        let scale = 1;
+        const animationDuration = 30; // frames
+        const expansionInterval = setInterval(() => {
+            scale += 1;
+            ring.scale.set(scale, scale, scale);
+
+            // Muda a cor para indicar a zona de dano
+            if (scale > 15 && scale <= 20) {
+                ring.material.color.setHex(0xff8c00); // Laranja
+            } else if (scale > 20) {
+                ring.material.color.setHex(0xffd700); // Amarelo
+            }
+
+            if (scale >= maxRadius) {
+                clearInterval(expansionInterval);
+                scene.remove(ring);
+            }
+        }, 20); // Velocidade da expansão
+    }
+
+    // NOVO: Função para a habilidade de "Chuva de Pedras" do Rei Goblin
+    function triggerRockFall(targetPosition) {
+        const fallRadius = 7;
+        const damage = 15;
+
+        // 1. Efeito visual do alvo no chão
+        const targetGeometry = new THREE.RingGeometry(fallRadius - 0.5, fallRadius, 32);
+        const targetMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
+        const targetMarker = new THREE.Mesh(targetGeometry, targetMaterial);
+        targetMarker.position.copy(targetPosition);
+        targetMarker.position.y = 0.1;
+        targetMarker.rotation.x = -Math.PI / 2;
+        scene.add(targetMarker);
+
+        // Animação de aviso
+        setTimeout(() => {
+            // 2. Causa dano se o jogador estiver na área
+            if (player.position.distanceToSquared(targetPosition) < fallRadius * fallRadius) {
+                damagePlayer(damage);
+                createFloatingText(damage, player.position.clone().setY(1.5), '#ff4500', '1.5rem');
+            }
+
+            // 3. Efeito visual da pedra caindo (simples)
+            const rockGeometry = new THREE.DodecahedronGeometry(1);
+            const rockMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+            const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+            rock.position.copy(targetPosition);
+            rock.position.y = 0.5;
+            scene.add(rock);
+
+            // Remove os efeitos visuais
+            scene.remove(targetMarker);
+            setTimeout(() => scene.remove(rock), 200);
+
+        }, 1000); // 1 segundo de aviso antes do impacto
     }
 
     // NOVO: Função para lidar com a derrota de um chefe
@@ -3292,6 +3414,18 @@
                 rangeIndicator.position.copy(player.position);
             }
 
+            // NOVO: Atualiza a aura do Rei Goblin
+            if (goblinKingAuraMesh) {
+                if (isBossWave && currentBoss && currentBoss.userData.type === 'goblin_king' && currentBoss.userData.hp > 0) {
+                    goblinKingAuraMesh.visible = true;
+                    goblinKingAuraMesh.position.copy(currentBoss.position);
+                    goblinKingAuraMesh.position.y = 0.1;
+                    goblinKingAuraMesh.rotation.z += 0.01; // Animação de rotação
+                } else {
+                    goblinKingAuraMesh.visible = false;
+                }
+            }
+
             // 2. Lógica do Jogador
             handlePlayerMovement();
             
@@ -3376,6 +3510,7 @@
             if (freezingAuraMesh) freezingAuraMesh.visible = false; // NOVO: Esconde a aura
             if (expBoostAuraMesh) expBoostAuraMesh.visible = false; // NOVO: Esconde a aura de EXP
             expBoostTimer = 0; // NOVO: Reseta timer de EXP
+            if (goblinKingAuraMesh) goblinKingAuraMesh.visible = false; // NOVO: Esconde a aura do chefe
             if (rangeIndicator) rangeIndicator.visible = false; // NOVO: Esconde indicador de alcance
 
             // NOVO: Reseta o estado das ondas
@@ -3458,6 +3593,11 @@
             // NOVO: Garante que a aura de EXP desapareça no fim do jogo
             if (expBoostAuraMesh) {
                 expBoostAuraMesh.visible = false;
+            }
+
+            // NOVO: Garante que a aura do chefe desapareça
+            if (goblinKingAuraMesh) {
+                goblinKingAuraMesh.visible = false;
             }
 
             // Remove todos os labels quando o jogo termina
