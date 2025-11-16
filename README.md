@@ -115,7 +115,17 @@ Habilidades e auras podem aplicar status negativos nos inimigos, cada um com um 
 
 ---
 
-## 👹 Inimigos de Elite (Elementais)
+## 🛡️ Fraquezas Elementais
+
+Para adicionar mais estratégia ao combate, os inimigos elementais agora possuem fraquezas. Explorar a fraqueza de um inimigo aumenta todo o dano elemental causado a ele em **50%**.
+
+*   🔥 **Fogo** é forte contra ⚡ **Raio**.
+*   ⚡ **Raio** é forte contra ❄️ **Gelo**.
+*   ❄️ **Gelo** é forte contra 🔥 **Fogo**.
+
+---
+
+## � Inimigos de Elite (Elementais)
 
 A partir da Onda 20, inimigos elementais poderosos começam a aparecer, cada um com habilidades e imunidades únicas que exigem novas estratégias.
 

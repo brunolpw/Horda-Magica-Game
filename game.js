@@ -13,7 +13,6 @@
         let playerSlowTimer = 0;
         const enemies = []; const powerUps = [];
         const firePuddles = [];
-        const statusParticles = [];
 
         // Variável temporária para checagem de colisão
         let tempPlayer; 
@@ -280,20 +279,13 @@
                 const enemyData = enemy.userData;
 
                 // NOVO: Decrementa o cooldown de ataque do monstro
-                if (enemyData.damageCooldown > 0) enemyData.damageCooldown--;
+                if (enemyData.damageCooldown > 0) {
+                    enemyData.damageCooldown--;
+                }
 
                 // NOVO: Feedback de Hit (Piscar Branco)
-                if (enemyData.electrifiedTimer > 0) {
-                    // Efeito de piscar amarelo para Eletrificado (tem prioridade)
-                    const flash = Math.abs(Math.sin(Date.now() * 0.05));
-                    enemy.traverse((child) => {
-                        if (child.isMesh && child.material && child.userData.originalColor) {
-                            const originalColor = new THREE.Color(child.userData.originalColor);
-                            const flashColor = new THREE.Color(0xFFFF00);
-                            child.material.color.lerpColors(originalColor, flashColor, flash);
-                        }
-                    });
-                } else if (enemyData.hitTimer > 0) {
+                if (enemyData.hitTimer > 0) {
+                    // CORREÇÃO: Percorre os filhos para aplicar o efeito
                     enemy.traverse((child) => {
                         if (child.isMesh && child.material) {
                     if (!child.userData.originalColor) child.userData.originalColor = child.material.color.getHex();
@@ -346,7 +338,7 @@
                 const auraRadius = 6;
 
                 if (freezingAuraTimer > 0 && distanceToPlayer < auraRadius) {
-                    enemyData.freezeLingerTimer = 600; // 10 segundos
+                    if (enemyData.type !== 'ice_elemental') enemyData.freezeLingerTimer = 600;
                 }
                 if (flamingAuraTimer > 0 && distanceToPlayer < auraRadius) {
                     if (enemyData.type !== 'fire_elemental') {
@@ -354,7 +346,7 @@
                     }
                 }
                 if (electrifyingAuraTimer > 0 && distanceToPlayer < auraRadius) {
-                    if (enemyData.type !== 'lightning_elemental') {
+                    if (enemyData.type !== 'lightning_elemental' && enemyData.type !== 'juggernaut_troll') {
                         enemyData.electrifiedTimer = 120; // 2 segundos
                     }
                 }
@@ -365,30 +357,11 @@
                     isSlowed = true;
 
                     // Dano de 5 a cada 1 segundo (60 frames)
-                    // Efeito de fumaça de gelo
-                    if (enemyData.freezeLingerTimer > 0 && Math.random() < 0.2) {
-                        const smokeGeo = new THREE.PlaneGeometry(0.4, 0.4);
-                        const smokeMat = new THREE.MeshBasicMaterial({ color: 0xADD8E6, transparent: true, opacity: 0.6 });
-                        const particle = new THREE.Mesh(smokeGeo, smokeMat);
-                        particle.position.copy(enemy.position).add(new THREE.Vector3(Math.random() - 0.5, Math.random() * enemyData.modelHeight, Math.random() - 0.5));
-                        
-                        const life = 30 + Math.random() * 30;
-                        let currentLife = 0;
-                        const interval = setInterval(() => {
-                            currentLife++;
-                            particle.position.y += 0.01;
-                            particle.material.opacity = 0.6 * (1 - (currentLife / life));
-                            if (currentLife >= life) {
-                                clearInterval(interval);
-                                scene.remove(particle);
-                            }
-                        }, 20);
-                        scene.add(particle);
-                    }
-
                     if (enemyData.freezeLingerTimer % 60 === 0) {
-                        enemyData.hp -= 5;
-                        enemyData.auraDamageAccumulator += 5;
+                        let damage = 5;
+                        damage *= getWeaknessMultiplier('ice', enemyData.type);
+                        enemyData.hp -= damage;
+                        enemyData.auraDamageAccumulator += damage;
                     }
 
                     // Mostra o dano acumulado a cada segundo
@@ -495,11 +468,13 @@
                 isSlowed = true; // Efeito de paralisia
 
                 if (enemyData.electrifiedTimer % 60 === 0) { // Dano de 25 a cada 1 segundo
-                    enemyData.hp -= 25;
+                    let damage = 25;
+                    damage *= getWeaknessMultiplier('lightning', enemyData.type);
+                    enemyData.hp -= damage;
                     if (enemyData.hp <= 0 && enemyData.isBoss) {
                         handleBossDefeat(enemy);
                     }
-                    createFloatingText('25', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
+                    createFloatingText(Math.floor(damage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
                     enemyData.hitTimer = 5; // Pequeno feedback visual
                 }
             }
@@ -508,8 +483,14 @@
             if (enemyData.burnTimer > 0 && enemyData.type !== 'ghost' && enemyData.type !== 'fire_elemental') {
                 enemyData.burnTimer--; // Dura 10 segundos (600 frames)
                 enemyData.isFleeing = true; // Ativa o status de fuga
-            } else {
-                enemyData.isFleeing = false; // Garante que o inimigo pare de fugir
+
+                if (enemyData.burnTimer % 120 === 0) { // Dano de 10 a cada 2 segundos
+                    enemyData.hp -= 10;
+                    if (enemyData.hp <= 0 && enemyData.isBoss) handleBossDefeat(enemy);
+                    
+                    createFloatingText('10', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff4500');
+                    enemyData.hitTimer = 5;
+                }
             }
 
             // --- LÓGICA DE MOVIMENTO ---
@@ -711,7 +692,7 @@
             // Inimigos de longa distância não causam dano de toque
             if (enemyData.type !== 'necromancer' && enemyData.type !== 'skeleton_archer') {
                 if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(enemy))) {
-                    if (enemyData.damageCooldown <= 0 && enemyData.electrifiedTimer <= 0) {
+                    if (enemyData.damageCooldown <= 0) {
                         damagePlayer(enemyData.damage);
                         createFloatingText(enemyData.damage, player.position.clone().setY(1.5), '#ff0000', '1.5rem');
                         if (enemyData.type === 'fire_elemental') {
@@ -745,10 +726,12 @@
                 gainExperience(enemyData.score); 
                 if (isBossWave) killsForSoulHarvest++; // Contador para o Arquilich
 
-                // Lógica de Recarga Híbrida: cada abate reduz o tempo de recarga
+                // CORREÇÃO: Incrementa os abates e limita ao máximo da habilidade ativa.
                 const activeId = player.userData.activeAbility;
                 if (activeId) {
-                    chargeTimer = Math.max(0, chargeTimer - 60); // Reduz 1 segundo (60 frames)
+                    const ability = upgrades[activeId];
+                    const maxKills = ability.getKillCost(player.userData.upgrades[activeId] || 1);
+                    killPoints = Math.min(maxKills, killPoints + 1);
                 }
                 killsSinceLastPotion++;
 
@@ -849,32 +832,6 @@
         }
     }
 
-    function updateStatusParticles() {
-        // Partículas para status (Queimadura)
-        enemies.forEach(enemy => {
-            if (enemy.userData.burnTimer > 0 && Math.random() < 0.3) {
-                const fireGeo = new THREE.SphereGeometry(0.1, 8, 8);
-                const fireMat = new THREE.MeshBasicMaterial({ color: 0xff4500, transparent: true, opacity: 0.8 });
-                const particle = new THREE.Mesh(fireGeo, fireMat);
-                particle.position.copy(enemy.position).add(new THREE.Vector3(Math.random() - 0.5, Math.random() * enemy.userData.modelHeight, Math.random() - 0.5));
-                statusParticles.push({ mesh: particle, life: 30 });
-                scene.add(particle);
-            }
-        });
-
-        // Atualiza a vida e posição das partículas
-        for (let i = statusParticles.length - 1; i >= 0; i--) {
-            const p = statusParticles[i];
-            p.life--;
-            p.mesh.position.y += 0.02;
-            p.mesh.material.opacity = 0.8 * (p.life / 30);
-            if (p.life <= 0) {
-                scene.remove(p.mesh);
-                statusParticles.splice(i, 1);
-            }
-        }
-    }
-
         // NOVO: Função para iniciar o tremor da câmera
         function triggerCameraShake(intensity, duration) {
             // Garante que um novo tremor mais forte substitua um mais fraco
@@ -933,24 +890,12 @@
             
             // Atualiza Cooldowns
             projectileCooldown = Math.max(0, projectileCooldown - 1);
+            specialCooldown = Math.max(0, specialCooldown - 1);
             if (repulsionBubbleTimer > 0) repulsionBubbleTimer--; // NOVO: Decrementa timer da bolha
             if (freezingAuraTimer > 0) freezingAuraTimer--; // NOVO: Decrementa timer da aura
             if (flamingAuraTimer > 0) flamingAuraTimer--;
             if (electrifyingAuraTimer > 0) electrifyingAuraTimer--;
             if (expBoostTimer > 0) expBoostTimer--; // NOVO: Decrementa timer do EXP
-
-            // NOVO: Lógica de recarga de habilidades
-            if (specialGlobalCooldown > 0) specialGlobalCooldown--;
-
-            const activeId = player.userData.activeAbility;
-            if (activeId) {
-                chargeTimer = Math.max(0, chargeTimer - 1);
-                if (chargeTimer <= 0) {
-                    player.userData.abilityCharges[activeId] = (player.userData.abilityCharges[activeId] || 0) + 1;
-                    chargeTimer = CHARGE_TIME_MAX; // Reseta o timer
-                    updateUI();
-                }
-            }
 
             if (repulsionBubbleTimer > 0) {
                 repulsionBubbleMesh.visible = true;
@@ -985,19 +930,36 @@
             if (electrifyingAuraTimer > 0) {
                 electrifyingAuraMesh.visible = true;
                 electrifyingAuraMesh.position.copy(player.position);
+                electrifyingAuraMesh.rotation.y += 0.05;
+                electrifyingAuraMesh.children.forEach(segment => {
+                    segment.rotation.z = Math.PI / 2; // Deixa os raios na horizontal
+                });
+            } else {
+                electrifyingAuraMesh.visible = false;
+            }
 
-                // Gera novos arcos elétricos dinamicamente
-                if (Math.random() < 0.4) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const radius = Math.random() * 6;
-                    const lightningGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8);
-                    const lightningMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
-                    const arc = new THREE.Mesh(lightningGeo, lightningMat);
-                    arc.position.set(player.position.x + Math.cos(angle) * radius, 0.5, player.position.z + Math.sin(angle) * radius);
-                    arc.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-                    scene.add(arc);
-                    setTimeout(() => scene.remove(arc), 100 + Math.random() * 100);
-                }
+            if (flamingAuraTimer > 0) {
+                flamingAuraMesh.visible = true;
+                flamingAuraMesh.position.copy(player.position);
+                flamingAuraMesh.children.forEach(particle => {
+                    particle.userData.angle += particle.userData.speed;
+                    particle.position.set(
+                        Math.cos(particle.userData.angle) * particle.userData.radius,
+                        particle.userData.yOffset,
+                        Math.sin(particle.userData.angle) * particle.userData.radius
+                    );
+                });
+            } else {
+                flamingAuraMesh.visible = false;
+            }
+
+            if (electrifyingAuraTimer > 0) {
+                electrifyingAuraMesh.visible = true;
+                electrifyingAuraMesh.position.copy(player.position);
+                electrifyingAuraMesh.rotation.y += 0.05;
+                electrifyingAuraMesh.children.forEach(segment => {
+                    segment.rotation.z = Math.PI / 2; // Deixa os raios na horizontal
+                });
             } else {
                 electrifyingAuraMesh.visible = false;
             }
@@ -1057,7 +1019,6 @@
             updateClone(); // NOVO: Atualiza a lógica do clone
             updatePowerUps(); // Checa colisão com poções e poderes
             updateRunes(); // NOVO: Atualiza a lógica das runas
-            updateStatusParticles(); // NOVO: Atualiza partículas de status
             updateFirePuddles(); // NOVO: Atualiza as poças de fogo
             spawnEnemies();
             spawnPowerUps(); // Tenta spawnar poção
@@ -1076,7 +1037,6 @@
             updateEnemyUI();
             updateFloatingText(); // NOVO: Atualiza o texto flutuante
             updatePowerUpLabels(); // NOVO: Atualiza labels dos itens
-            updateUI(); // CORREÇÃO: Atualiza a HUD principal a cada frame
 
             updatePassivePlayerAbilities();
 

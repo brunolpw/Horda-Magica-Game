@@ -183,6 +183,7 @@ function updateProjectiles() {
 
                     // Lógica do Míssil de Fogo Etéreo
                     if (projData.type === 'ethereal_fire') {
+                        finalDamage *= getWeaknessMultiplier('fire', enemy.userData.type);
                         const enemyType = enemy.userData.type;
                         if (enemyType.includes('skeleton') || enemyType === 'ghost') {
                             finalDamage = Math.ceil(finalDamage * 1.10); // +10% de dano
@@ -190,6 +191,11 @@ function updateProjectiles() {
                         if (enemyType !== 'ghost') {
                             enemy.userData.burnTimer = 600; // 10 segundos de queimadura
                         }
+                    }
+
+                    // Lógica da Lança de Gelo
+                    if (projData.type === 'ice_lance') {
+                        finalDamage *= getWeaknessMultiplier('ice', enemy.userData.type);
                     }
 
                     if (enemy.userData.isBoss && enemy.userData.soulShieldCharges > 0) {

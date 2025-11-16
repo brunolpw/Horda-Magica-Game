@@ -414,12 +414,28 @@ function updatePassivePlayerAbilities() {
 
     // Dano de queimadura nos inimigos (movido para cá para consistência)
     enemies.forEach(enemy => {
-        if (enemy.userData.burnTimer > 0 && enemy.userData.burnTimer % 120 === 0) {
-            enemy.userData.hp -= 10;
-            createFloatingText('10', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff4500');
+        if (enemy.userData.burnTimer > 0 && enemy.userData.burnTimer % 120 === 0) { // Queimadura
+            let damage = 10;
+            damage *= getWeaknessMultiplier('fire', enemy.userData.type);
+            enemy.userData.hp -= damage;
+            createFloatingText(Math.floor(damage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff4500');
             enemy.userData.hitTimer = 5;
         }
     });
+}
+
+function getWeaknessMultiplier(damageElement, enemyType) {
+    const weaknesses = {
+        'fire': 'lightning_elemental', // Fogo é forte contra Raio
+        'ice': 'fire_elemental',      // Gelo é forte contra Fogo
+        'lightning': 'ice_elemental'  // Raio é forte contra Gelo
+    };
+
+    if (weaknesses[damageElement] === enemyType) {
+        return 1.5; // 50% de dano aumentado
+    }
+
+    return 1.0; // Dano normal
 }
 
 function resetPlayerState() {

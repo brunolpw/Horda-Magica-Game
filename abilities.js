@@ -381,10 +381,12 @@ function triggerChainLightning(startEnemy) {
 
     for (let i = 0; i < chain.length; i++) {
         const enemy = chain[i];
-        enemy.userData.hp -= damage;
-        createFloatingText(damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
+        let finalDamage = damage;
+        finalDamage *= getWeaknessMultiplier('lightning', enemy.userData.type);
+        enemy.userData.hp -= finalDamage;
+        createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
         if (enemy.userData.type !== 'ghost') {
-            enemy.userData.electrifiedTimer = 300;
+            enemy.userData.electrifiedTimer = 120; // 2 segundos de paralisia
         }
         enemy.userData.hitTimer = 10;
 
@@ -802,12 +804,20 @@ function updateRunes() {
 
                 enemies.forEach(enemy => {
                     if (enemy.position.distanceToSquared(rune.position) <= radiusSq) {
-                        enemy.userData.hp -= rune.damage;
-                        createFloatingText(rune.damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff8c00');
+                        let finalDamage = rune.damage;
+                        let damageElement = '';
+                        if (rune.type === 'runa_fogo') damageElement = 'fire';
+                        else if (rune.type === 'runa_gelo') damageElement = 'ice';
+                        else if (rune.type === 'runa_raio') damageElement = 'lightning';
+
+                        finalDamage *= getWeaknessMultiplier(damageElement, enemy.userData.type);
+
+                        enemy.userData.hp -= finalDamage;
+                        createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff8c00');
                         enemy.userData.hitTimer = 10;
 
                         // Aplica status (fantasmas são imunes a todos os status de runas)
-                        if (enemy.userData.type !== 'ghost') {
+                        if (enemy.userData.type !== 'ghost' && enemy.userData.type !== 'fire_elemental' && enemy.userData.type !== 'ice_elemental' && enemy.userData.type !== 'lightning_elemental') {
                             enemy.userData[rune.statusEffect] = rune.statusTimer;
                         }
                     }
