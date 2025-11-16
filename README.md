@@ -21,45 +21,46 @@ A progressão do mago é feita através de um sistema de level up, onde você po
 
 ### Habilidades Ativas (Grimório)
 
-São magias poderosas que precisam ser carregadas com abates e ativadas manualmente.
+São magias poderosas que agora funcionam com um sistema de **cargas acumuladas**.
+
+#### Novo Sistema de Magias
+*   **Recarga Híbrida:** A magia equipada ganha **1 carga a cada 20 segundos**. Cada **abate** reduz o tempo restante para a próxima carga em **1 segundo**.
+*   **Cargas Ilimitadas:** Você pode acumular quantas cargas quiser! A estratégia é sua.
+*   **Cooldown Global:** Após usar uma magia, há um **cooldown de 2 segundos** antes que outra possa ser usada.
+*   **Grimório (📖):** Você pode pausar o jogo a qualquer momento para abrir seu Grimório e trocar a magia ativa entre as que já aprendeu. Trocar de magia zera o progresso da carga atual.
+
+---
 
 #### Míssil de Fogo Etéreo (🔥)
-*   **Custo:** 7 Abates.
 *   **Descrição:** Dispara um míssil teleguiado que atravessa paredes e obstáculos.
 *   **Efeitos Especiais:**
     *   Aplica o status **Queimadura** (ver seção "Status Elementais").
     *   Causa **+10% de dano** em Esqueletos e Fantasmas.
-    *   Fantasmas são imunes ao status de Queimadura.
 *   **Evolução (Dano):** 25 / 35 / 45 / 50 / 55.
 
 #### Explosão de Energia (🌀)
-*   **Custo:** 10 Abates.
 *   **Descrição:** Libera uma onda de projéteis teleguiados que atacam inimigos próximos. O número de projéteis aumenta com o nível.
 
 #### Corrente de Raios (⛓️)
-*   **Custo:** 8 Abates.
 *   **Descrição:** Seu próximo ataque se transforma em um raio que ricocheteia entre múltiplos inimigos.
 *   **Efeitos Especiais:**
     *   Aplica o status **Eletrificado** (ver seção "Status Elementais").
     *   Fantasmas recebem o dano do impacto, mas são imunes ao status Eletrificado.
 
 #### Carga Explosiva (💣)
-*   **Custo:** 15 Abates.
 *   **Descrição:** Lança uma granada mágica **teleguiada** que persegue um inimigo e explode em uma grande área.
 *   **Efeitos Especiais:**
     *   A partir do Nível 4, a explosão principal libera fragmentos que também explodem.
 
 #### Novas Runas de Armadilha (♨️ / ❄️ / ⚡)
-*   **Custo:** 12 Abates.
 *   **Mecânica:** Habilidades de mira manual. Coloca uma runa visível no chão que é acionada quando um inimigo (exceto Fantasmas) pisa nela, explodindo após um curto período.
 *   **Tipos:**
     *   **Runa de Fogo (♨️):** Causa dano e aplica **Queimadura**.
     *   **Runa de Gelo (❄️):** Causa dano e aplica **Congelamento**.
     *   **Runa de Raio (⚡):** Causa dano e aplica **Eletrificado**.
-*   **Evolução:** O raio da explosão e o dano aumentam a cada nível.
+*   **Evolução:** O raio da explosão aumenta a cada nível.
 
 #### Lança de Gelo Perfurante (🧊)
-*   **Custo:** 10 Abates.
 *   **Mecânica:** Dispara uma lança de gelo em linha reta que **perfura** múltiplos inimigos, aplicando o status **Congelado** em todos que atingir.
 *   **Evolução:** Aumenta o dano, o número de alvos perfurados e a largura da lança.
 *   **Nível 5 (Ultimate):** Ao atingir seu último alvo ou o limite do mapa, a lança **explode**, aplicando Congelamento em uma pequena área.
