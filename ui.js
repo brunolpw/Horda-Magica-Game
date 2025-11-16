@@ -714,7 +714,9 @@ function createPowerUpLabel(powerUp, type) {
         case 'shield': text = 'Escudo'; break;
         case 'repulsionBubble': text = 'Bolha Repulsora'; break;
         case 'clone': text = 'Clone'; break;
-        case 'freezingAura': text = 'Aura Congelante'; break;
+        case 'freezingAura': text = 'Aura Congelante'; break; // NOVO
+        case 'flamingAura': text = 'Aura Flamejante'; break;
+        case 'electrifyingAura': text = 'Aura Eletrizante'; break;
         case 'expBoost': text = 'EXP em Dobro'; break;
     }
 

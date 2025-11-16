@@ -333,9 +333,8 @@
             // Imunidades ao congelamento
             if (enemyData.type !== 'ghost' && enemyData.type !== 'ice_elemental' && enemyData.type !== 'lightning_elemental' && !(enemyData.type === 'juggernaut_troll' && enemyData.armor > 0)) {
                 const isInAura = freezingAuraTimer > 0 && enemy.position.distanceTo(player.position) < 6;
-
                 if (isInAura) {
-                    enemyData.freezeLingerTimer = 300; // 5 segundos
+                    enemyData.freezeLingerTimer = 600; // 10 segundos
                 }
 
                 if (enemyData.freezeLingerTimer > 0) {
@@ -343,10 +342,11 @@
                     enemyData.isFrozen = true;
                     isSlowed = true;
 
-                    // Aplica dano contínuo
-                    const damagePerFrame = 5 / 60;
-                    enemyData.hp -= damagePerFrame;
-                    enemyData.auraDamageAccumulator += damagePerFrame;
+                    // Dano de 5 a cada 1 segundo (60 frames)
+                    if (enemyData.freezeLingerTimer % 60 === 0) {
+                        enemyData.hp -= 5;
+                        enemyData.auraDamageAccumulator += 5;
+                    }
 
                     // Mostra o dano acumulado a cada segundo
                     if (enemyData.auraDamageAccumulator >= 5 && enemyData.hp > 0) {
@@ -447,25 +447,29 @@
 
             // NOVO: Lógica do status Eletrificado
             if (enemyData.electrifiedTimer > 0 && !(enemyData.type === 'juggernaut_troll' && enemyData.armor > 0) && enemyData.type !== 'lightning_elemental') {
-                enemyData.electrifiedTimer--;
-                if (enemyData.electrifiedTimer % 60 === 0) { // Causa dano a cada segundo
-                    enemyData.hp -= 5;
+                enemyData.electrifiedTimer--; // Dura 2 segundos (120 frames)
+                isSlowed = true; // Efeito de paralisia
+
+                if (enemyData.electrifiedTimer % 60 === 0) { // Dano de 25 a cada 1 segundo
+                    enemyData.hp -= 25;
                     if (enemyData.hp <= 0 && enemyData.isBoss) {
                         handleBossDefeat(enemy);
                     }
-                    createFloatingText('5', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
+                    createFloatingText('25', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
                     enemyData.hitTimer = 5; // Pequeno feedback visual
                 }
             }
 
             // NOVO: Lógica do status Queimado
             if (enemyData.burnTimer > 0 && enemyData.type !== 'ghost' && enemyData.type !== 'fire_elemental') {
-                enemyData.burnTimer--;
-                if (enemyData.burnTimer % 60 === 0) { // Dano a cada segundo
-                    enemyData.hp -= 5;
+                enemyData.burnTimer--; // Dura 10 segundos (600 frames)
+                enemyData.isFleeing = true; // Ativa o status de fuga
+
+                if (enemyData.burnTimer % 120 === 0) { // Dano de 10 a cada 2 segundos
+                    enemyData.hp -= 10;
                     if (enemyData.hp <= 0 && enemyData.isBoss) handleBossDefeat(enemy);
                     
-                    createFloatingText('5', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff4500');
+                    createFloatingText('10', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff4500');
                     enemyData.hitTimer = 5;
                 }
             }
@@ -474,10 +478,15 @@
             if (enemyData.isTeleporting) {
                 continue; // Pula movimento se estiver se teleportando
             }
-            if (isSlowed) { // Inimigos congelados têm prioridade de movimento
-                // Movimento lento se estiver congelado
+            if (isSlowed) { // Inimigos congelados ou eletrificados
+                // Movimento lento ou paralisado
                 const slowDirection = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                enemy.position.addScaledVector(slowDirection, finalSpeed * 0.5);
+                const speedMultiplier = (enemyData.electrifiedTimer > 0) ? 0 : 0.5; // Paralisado se eletrificado
+                enemy.position.addScaledVector(slowDirection, finalSpeed * speedMultiplier);
+            } else if (enemyData.isFleeing) {
+                // Lógica de Fuga
+                const fleeDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
+                enemy.position.addScaledVector(fleeDirection, finalSpeed);
             // BUGFIX 1: Comportamento de fuga específico para o Rei Goblin
             } else if (enemyData.type === 'goblin_king' && enemyData.hp / enemyData.maxHP < 0.3) {
                 // Foge do jogador
@@ -636,13 +645,15 @@
             }
 
             // Lógica das Auras dos Inimigos
-            if (enemyData.type === 'ice_elemental' && enemy.position.distanceTo(player.position) < enemyData.auraRadius) {
-                player.userData.slowTimer = 120;
-            }
-            if (enemyData.type === 'summoner_elemental' && enemy.position.distanceTo(player.position) < enemyData.auraRadius) {
-                player.userData.slowTimer = 60;
-                player.userData.burnTimer = 120;
-                player.userData.electrifiedTimer = 120;
+            if (repulsionBubbleTimer <= 0) { // Bolha protege contra auras
+                if (enemyData.type === 'ice_elemental' && enemy.position.distanceTo(player.position) < enemyData.auraRadius) {
+                    player.userData.slowTimer = 120;
+                }
+                if (enemyData.type === 'summoner_elemental' && enemy.position.distanceTo(player.position) < enemyData.auraRadius) {
+                    player.userData.slowTimer = 60;
+                    player.userData.burnTimer = 120;
+                    player.userData.electrifiedTimer = 120;
+                }
             }
 
             // Animação das partículas do Invocador
@@ -790,7 +801,9 @@
 
             const puddleBBox = new THREE.Box3().setFromObject(puddle.mesh);
             if (playerBBox.intersectsBox(puddleBBox)) {
-                damagePlayer(0.2); // Dano baixo, mas constante
+                if (repulsionBubbleTimer <= 0) { // Bolha protege do dano
+                    damagePlayer(0.2); // Dano baixo, mas constante
+                }
             }
 
             if (puddle.life <= 0) {
@@ -861,6 +874,8 @@
             specialCooldown = Math.max(0, specialCooldown - 1);
             if (repulsionBubbleTimer > 0) repulsionBubbleTimer--; // NOVO: Decrementa timer da bolha
             if (freezingAuraTimer > 0) freezingAuraTimer--; // NOVO: Decrementa timer da aura
+            if (flamingAuraTimer > 0) flamingAuraTimer--;
+            if (electrifyingAuraTimer > 0) electrifyingAuraTimer--;
             if (expBoostTimer > 0) expBoostTimer--; // NOVO: Decrementa timer do EXP
 
             if (repulsionBubbleTimer > 0) {

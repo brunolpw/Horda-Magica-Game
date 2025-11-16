@@ -27,20 +27,20 @@ São magias poderosas que precisam ser carregadas com abates e ativadas manualme
 *   **Custo:** 7 Abates.
 *   **Descrição:** Dispara um míssil teleguiado que atravessa paredes e obstáculos.
 *   **Efeitos Especiais:**
-    *   Aplica **Queimadura** no alvo (5 de dano por segundo durante 5 segundos).
+    *   Aplica o status **Queimadura** (ver seção "Status Elementais").
     *   Causa **+10% de dano** em Esqueletos e Fantasmas.
     *   Fantasmas são imunes ao status de Queimadura.
 *   **Evolução (Dano):** 25 / 35 / 45 / 50 / 55.
 
 #### Explosão de Energia (🌀)
 *   **Custo:** 10 Abates.
-*   **Descrição:** Libera uma onda de projéteis teleguiados que atacam todos os inimigos próximos. O número de projéteis aumenta com o nível.
+*   **Descrição:** Libera uma onda de projéteis teleguiados que atacam inimigos próximos. O número de projéteis aumenta com o nível.
 
 #### Corrente de Raios (⛓️)
 *   **Custo:** 8 Abates.
 *   **Descrição:** Seu próximo ataque se transforma em um raio que ricocheteia entre múltiplos inimigos.
 *   **Efeitos Especiais:**
-    *   Aplica o status **Eletrificado** (5 de dano por segundo durante 5 segundos).
+    *   Aplica o status **Eletrificado** (ver seção "Status Elementais").
     *   Fantasmas recebem o dano do impacto, mas são imunes ao status Eletrificado.
 
 #### Carga Explosiva (💣)
@@ -51,7 +51,7 @@ São magias poderosas que precisam ser carregadas com abates e ativadas manualme
 
 #### Novas Runas de Armadilha (♨️ / ❄️ / ⚡)
 *   **Custo:** 12 Abates.
-*   **Mecânica:** Habilidades de mira manual. Ao serem ativadas, colocam uma runa invisível no chão na posição do cursor. A runa é acionada quando um inimigo (exceto Fantasmas) pisa nela, explodindo após 3 segundos.
+*   **Mecânica:** Habilidades de mira manual. Coloca uma runa visível no chão que é acionada quando um inimigo (exceto Fantasmas) pisa nela, explodindo após um curto período.
 *   **Tipos:**
     *   **Runa de Fogo (♨️):** Causa dano e aplica **Queimadura**.
     *   **Runa de Gelo (❄️):** Causa dano e aplica **Congelamento**.
@@ -68,11 +68,13 @@ Power-ups aparecem no mapa através de diferentes mecânicas (tempo, abates ou r
 
 | Power-up          | Chance de Aparição |
 | ----------------- | :----------------: |
-| Poção de Cura     |        50%         |
-| Escudo            |        12%         |
-| Bolha Repulsora   |        17%         |
-| Aura Congelante   |        11%         |
-| Clone             |         3%         |
+| Poção de Cura     |        45%         |
+| Escudo            |        10%         |
+| Bolha Repulsora   |        15%         |
+| Clone             |         2%         |
+| Aura Congelante   |         7%         |
+| Aura Flamejante   |         7%         |
+| Aura Eletrizante  |         7%         |
 | EXP em Dobro      |         7%         |
 
 ### Aparição por Abates
@@ -81,6 +83,28 @@ Para garantir que o jogador sempre tenha acesso a itens, um power-up aleatório 
 
 *   **Ondas 1-10:** 1 item a cada **30 abates**.
 *   **A partir da Onda 11:** 1 item a cada **70 abates**.
+
+### Descrição dos Power-ups
+*   **Auras (Congelante, Flamejante, Eletrizante):** Cria uma aura elemental ao redor do mago que aplica o respectivo status em inimigos próximos.
+*   **Bolha Repulsora:** Empurra inimigos para longe e concede **imunidade** a danos de auras inimigas e poças de fogo.
+
+---
+
+## ♨️ Status Elementais
+
+Habilidades e auras podem aplicar status negativos nos inimigos, cada um com um efeito único e poderoso.
+
+### Queimadura (Burn)
+*   **Efeito:** Causa **10 de dano a cada 2 segundos** (total de 50 de dano em 10s).
+*   **Efeito Adicional:** Faz o inimigo entrar em pânico e **fugir** do jogador.
+
+### Congelamento (Frozen)
+*   **Efeito:** Causa **5 de dano por segundo** (total de 50 de dano em 10s).
+*   **Efeito Adicional:** Aplica **lentidão** de 50% no inimigo.
+
+### Eletrificado (Electrified)
+*   **Efeito:** Causa **25 de dano por segundo** (total de 50 de dano em 2s).
+*   **Efeito Adicional:** **Paralisa** completamente o inimigo por 2 segundos.
 
 ---
 

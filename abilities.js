@@ -5,6 +5,8 @@ let shieldLayers = [];
 let expBoostAuraMesh;
 let expBoostTimer = 0;
 let rangeIndicator;
+let flamingAuraTimer = 0;
+let electrifyingAuraTimer = 0;
 let freezingAuraTimer = 0;
 let freezingAuraMesh;
 let goblinKingAuraMesh;
@@ -196,6 +198,12 @@ function updatePowerUps() {
                     break;
                 case 'freezingAura':
                     freezingAuraTimer += data.duration;
+                    break;
+                case 'flamingAura':
+                    flamingAuraTimer += data.duration;
+                    break;
+                case 'electrifyingAura':
+                    electrifyingAuraTimer += data.duration;
                     break;
                 case 'expBoost':
                     expBoostTimer += data.duration;
@@ -757,11 +765,13 @@ function updateRunes() {
 
 function getRandomWeightedPowerUp() {
     const weights = {
-        'potion': 50,
-        'shield': 12,
-        'repulsionBubble': 17,
+        'potion': 45,
+        'shield': 10,
+        'repulsionBubble': 15,
         'clone': 3,
-        'freezingAura': 11,
+        'freezingAura': 7,
+        'flamingAura': 7,
+        'electrifyingAura': 7,
         'expBoost': 7
     };
 

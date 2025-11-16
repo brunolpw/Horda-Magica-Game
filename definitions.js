@@ -15,8 +15,10 @@ const powerUpProps = {
     shield: { color: 0xFFD700, geometry: new THREE.IcosahedronGeometry(0.3, 0) },
     repulsionBubble: { duration: 900, color: 0xADD8E6, geometry: new THREE.SphereGeometry(0.3, 16, 16) },
     clone: { duration: 600, color: 0x87CEEB, geometry: new THREE.OctahedronGeometry(0.4) },
-    freezingAura: { duration: 1200, color: 0x87CEFA, geometry: new THREE.TorusKnotGeometry(0.3, 0.1, 64, 8) },
-    expBoost: { duration: 3600, color: 0xFFFF00, geometry: new THREE.TorusKnotGeometry(0.3, 0.08, 50, 8) }
+    freezingAura: { duration: 1200, color: 0x87CEFA, geometry: new THREE.TorusKnotGeometry(0.3, 0.1, 64, 8, 2, 3) },
+    flamingAura: { duration: 1200, color: 0xff4500, geometry: new THREE.TorusKnotGeometry(0.3, 0.1, 64, 8, 3, 4) },
+    electrifyingAura: { duration: 1200, color: 0xFFFF00, geometry: new THREE.TorusKnotGeometry(0.3, 0.1, 64, 8, 4, 5) },
+    expBoost: { duration: 3600, color: 0xFFFF00, geometry: new THREE.TorusKnotGeometry(0.3, 0.08, 50, 8, 1, 1) }
 };
 
 // --- Funções de Criação de Modelos de Inimigos ---
