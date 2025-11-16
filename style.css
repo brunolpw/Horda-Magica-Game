@@ -59,6 +59,57 @@ canvas {
 }
 @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
+/* NOVO: Estilo para o botão de abrir o Grimório */
+#open-spellbook-button {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 54px;
+    height: 54px;
+    background-color: rgba(20, 20, 30, 0.85);
+    border: 2px solid #4a5568;
+    border-radius: 50%;
+    color: white;
+    font-size: 1.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    pointer-events: auto;
+    z-index: 15;
+    transition: all 0.2s ease;
+}
+#open-spellbook-button:hover {
+    border-color: #ffc700;
+}
+/* NOVO: Ajuste para centralizar o grid do grimório */
+#spellbook-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.5rem; /* Equivalente a gap-6 do Tailwind */
+}
+
+/* NOVO: Estilo para os cards dentro do Grimório */
+#spellbook-modal .spellbook-card {
+    background: rgba(43, 45, 66, 0.95);
+    border: 2px solid #a0aec0;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    width: 180px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+#spellbook-modal .spellbook-card:hover {
+    border-color: #ffc700;
+    transform: translateY(-5px);
+}
+#spellbook-modal .spellbook-card.selected {
+    border-color: #34d399; /* Verde para indicar seleção */
+    box-shadow: 0 0 15px #34d399;
+}
 
 /* NOVO: Estilo para o display de timers de power-ups */
 #powerup-timers-display {

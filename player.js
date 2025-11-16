@@ -6,7 +6,6 @@ let playerName = 'Mago Anônimo';
 let score = 0;
 let playerHP = 100;
 let maxHP = 100;
-let killPoints = 0;
 let killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 };
 let killsSinceLastPotion = 0;
 
@@ -19,7 +18,11 @@ let passiveHealTimer = 0;
 let playerSpeed = 0.15;
 let projectileCooldown = 0;
 let baseCooldown = 30;
-let specialCooldown = 0;
+
+// NOVO: Timers para o novo sistema de habilidades
+let specialGlobalCooldown = 0; // Cooldown após usar uma magia
+let chargeTimer = 0; // Timer para gerar a próxima carga
+const CHARGE_TIME_MAX = 1200; // 20 segundos a 60fps
 
 // --- Definições de Habilidades (Upgrades) ---
 const upgrades = {
@@ -63,7 +66,7 @@ const upgrades = {
         description: (level) => `Libera uma explosão de projéteis em todas as direções. Mais projéteis com o nível.`
     },
     corrente_raios: {
-        type: 'active', icon: '⛓️', title: "Corrente de Raios", maxLevel: 5, getKillCost: () => 8,
+        type: 'active', icon: '⛓️', title: "Corrente de Raios", maxLevel: 5, getChargeCost: () => 8,
         description: (level) => `Eletrifica seu próximo ataque, ricocheteando e aplicando dano contínuo.`
     },
     carga_explosiva: {
@@ -242,10 +245,14 @@ function attemptSpecialAttack() {
     const activeId = player.userData.activeAbility;
     if (!activeId) return;
 
-    const ability = upgrades[activeId];
-    const level = player.userData.upgrades[activeId] || 1;
+    // Verifica o cooldown global e se há cargas disponíveis
+    if (specialGlobalCooldown > 0 || !player.userData.abilityCharges[activeId] || player.userData.abilityCharges[activeId] <= 0) {
+        return;
+    }
 
-    if (killPoints < ability.getKillCost(level) || specialCooldown > 0) return;
+    const level = player.userData.upgrades[activeId] || 1;
+    // Gasta uma carga
+    player.userData.abilityCharges[activeId]--;
 
     switch (activeId) {
         case 'missil_fogo_etereo': {
@@ -364,8 +371,8 @@ function attemptSpecialAttack() {
         }
     }
 
-    killPoints = 0;
-    specialCooldown = 180;
+    // Ativa o cooldown global
+    specialGlobalCooldown = 120; // 2 segundos
     updateUI();
 }
 
@@ -426,14 +433,14 @@ function resetPlayerState() {
     playerSpeed = 0.15; 
     pendingLevelUps = 0;
 
-    killPoints = 0;
     killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 };
     killsSinceLastPotion = 0;
     
     projectileCooldown = 0;
     baseCooldown = 30;
-    specialCooldown = 0;
     passiveHealTimer = 0;
+    specialGlobalCooldown = 0;
+    chargeTimer = CHARGE_TIME_MAX;
 
     if (player) scene.remove(player);
     if (targetRing) scene.remove(targetRing);
@@ -442,9 +449,21 @@ function resetPlayerState() {
         maxHP: 100,
         upgrades: {},
         activeAbility: null,
+        abilityCharges: {},
         experienceForNextLevel: baseExperience,
         slowTimer: 0,
         burnTimer: 0,
         electrifiedTimer: 0
     };
+}
+
+function equipSpell(spellId) {
+    if (player.userData.activeAbility !== spellId) {
+        player.userData.activeAbility = spellId;
+        // Zera o timer de carga ao trocar de magia para evitar exploits
+        chargeTimer = CHARGE_TIME_MAX;
+        console.log(`Magia equipada: ${spellId}`);
+    }
+    closeSpellbook();
+    updateUI();
 }

@@ -4,6 +4,7 @@
 let scoreDisplay, hpBar, specialBar, killPointsDisplay, gameOverModal, finalScoreDisplay, playerNameDisplay, healingMessage, startMenuModal, waveLevelDisplay;
 let playerLevelDisplay, levelUpMessage, xpTextDisplay, levelUpModal, upgradeOptionsContainer, knownUpgradesContainer;
 let activeAbilityHud, activeAbilityIcon, activeAbilityProgressBar, activeAbilityKillCount;
+let spellbookModal, spellbookGrid, openSpellbookButton;
 
 const enemyLabelsContainer = document.getElementById('enemy-labels-container');
 const enemyLabels = new Map();
@@ -31,6 +32,9 @@ function setupUIElements() {
     activeAbilityIcon = document.getElementById('active-ability-icon');
     activeAbilityProgressBar = document.getElementById('active-ability-progress-bar');
     activeAbilityKillCount = document.getElementById('active-ability-kill-count');
+    spellbookModal = document.getElementById('spellbook-modal');
+    spellbookGrid = document.getElementById('spellbook-grid');
+    openSpellbookButton = document.getElementById('open-spellbook-button');
 
     document.getElementById('level-up-prompt-button').onclick = () => {
         showLevelUpOptions();
@@ -62,32 +66,64 @@ function updateUI() {
     if (activeAbilityId) {
         activeAbilityHud.classList.remove('hidden');
         const abilityTitle = document.getElementById('active-ability-title');
-        const ability = upgrades[activeAbilityId];
-        const maxKills = ability.getKillCost(player.userData.upgrades[activeAbilityId] || 1);
-        const progressPercent = Math.min(100, (killPoints / maxKills) * 100);
+        const ability = upgrades[activeAbilityId]; // Apenas para obter o ícone e o título
+        const charges = player.userData.abilityCharges[activeAbilityId] || 0;
+
+        // A barra de progresso agora mostra o tempo para a próxima carga
+        const progressPercent = ((CHARGE_TIME_MAX - chargeTimer) / CHARGE_TIME_MAX) * 100;
 
         activeAbilityIcon.textContent = ability.icon;
         activeAbilityProgressBar.style.width = `${progressPercent}%`;
-        activeAbilityKillCount.textContent = `${killPoints}/${maxKills}`;
+        activeAbilityKillCount.textContent = `x${charges}`; // Mostra o número de cargas
 
         const level = player.userData.upgrades[activeAbilityId] || 1;
         abilityTitle.textContent = `${ability.title} (Nv. ${level})`;
 
-        if (killPoints >= maxKills) {
+        if (charges > 0) {
             activeAbilityHud.classList.add('ready');
-            if (activeAbilityId === 'corrente_raios' || activeAbilityId === 'explosao_energia') {
-                const radius = activeAbilityId === 'corrente_raios' ? [5, 8, 11, 14, 17][level - 1] : 30;
-                rangeIndicator.scale.set(radius, radius, 1);
-                rangeIndicator.visible = true;
-            }
         } else {
             activeAbilityHud.classList.remove('ready');
-            rangeIndicator.visible = false;
-            targetRing.material.color.setHex(0xffffff); // Cor padrão branca
+        }
+
+        // Feedback visual para o cooldown global
+        if (specialGlobalCooldown > 0) {
+            activeAbilityHud.style.borderColor = '#4a5568'; // Borda cinza escura
+            activeAbilityHud.style.opacity = '0.6'; // Fica semitransparente
+            activeAbilityProgressBar.style.backgroundColor = '#6b7280'; // Barra cinza
+        } else {
+            activeAbilityHud.style.opacity = '1';
+            activeAbilityHud.style.borderColor = charges > 0 ? '#ffc700' : '#4a5568'; // Amarelo se pronto, cinza escuro se não
+            activeAbilityProgressBar.style.backgroundColor = ''; // Volta à cor padrão do CSS
         }
 
         // Lógica de cor da mira para as runas
-        if (killPoints >= maxKills) {
+        if (charges > 0) {
+            // Reseta o indicador de alcance antes de decidir se deve mostrá-lo
+            rangeIndicator.visible = false;
+
+            // Efeitos visuais para habilidades carregadas
+            if (activeAbilityId === 'corrente_raios') { // Lógica para Corrente de Raios
+                if (Math.random() < 0.5) { // Efeito de faíscas
+                    const sparkGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                    const sparkMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
+                    const spark = new THREE.Mesh(sparkGeo, sparkMat);
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = 0.8;
+                    spark.position.set(player.position.x + Math.cos(angle) * radius, 0.5 + Math.random(), player.position.z + Math.sin(angle) * radius);
+                    scene.add(spark);
+                    setTimeout(() => scene.remove(spark), 150 + Math.random() * 150);
+                }
+                const jumpDistance = [5, 8, 11, 14, 17][level - 1];
+                rangeIndicator.scale.set(jumpDistance, jumpDistance, 1);
+                rangeIndicator.visible = true;
+            } else if (activeAbilityId === 'explosao_energia') { // Lógica para Explosão de Energia
+                const radius = 25; // Raio da explosão
+                rangeIndicator.scale.set(radius, radius, 1);
+                rangeIndicator.visible = true;
+            } else {
+                rangeIndicator.visible = false;
+            }
+
             const isRune = activeAbilityId.startsWith('runa_');
             if (isRune) {
                 const runeLevel = player.userData.upgrades[activeAbilityId] || 1;
@@ -110,13 +146,25 @@ function updateUI() {
             } else {
                 // Reseta a escala para habilidades que não são runas
                 targetRing.scale.set(1, 1, 1);
+                targetRing.material.color.setHex(0xffffff); // Garante que a cor volte ao branco
             }
         } else {
             // Reseta a escala quando a habilidade não está pronta
+            rangeIndicator.visible = false;
             targetRing.scale.set(1, 1, 1);
+            targetRing.material.color.setHex(0xffffff);
         }
+
     } else {
         activeAbilityHud.classList.add('hidden');
+    }
+
+    // Mostra o botão do grimório se o jogador tiver mais de uma magia ativa
+    const activeAbilities = Object.keys(player.userData.upgrades).filter(key => upgrades[key].type === 'active');
+    if (activeAbilities.length > 0) {
+        openSpellbookButton.classList.remove('hidden');
+    } else {
+        openSpellbookButton.classList.add('hidden');
     }
 
     const timerDisplay = document.getElementById('powerup-timers-display');
@@ -447,7 +495,12 @@ function selectUpgrade(upgradeId, isMaxLevel) {
 
         if (upgrade.apply) upgrade.apply();
         displayLevelUpMessage();
-        promptEquipActiveAbility();
+
+        // Fecha o modal de level up e volta ao jogo para evitar inconsistências
+        levelUpModal.classList.add('hidden');
+        isGamePaused = false;
+        if (pendingLevelUps > 0) document.getElementById('level-up-prompt-button').classList.remove('hidden');
+        updateUI();
     } else if (upgrade.type === 'active') {
         const isNew = player.userData.activeAbility !== upgradeId;
         if (isNew) killPoints = 0;
@@ -555,6 +608,43 @@ function handleStartGameClick() {
 function handleViewRankingClick() {
     window.loadRanking();
     document.getElementById('full-ranking-modal').classList.remove('hidden');
+}
+
+// --- Funções do Grimório ---
+
+function openSpellbook() {
+    if (isGameOver) return;
+    isGamePaused = true;
+    spellbookModal.classList.remove('hidden');
+    spellbookGrid.innerHTML = '';
+
+    const playerUpgrades = player.userData.upgrades;
+    const activeAbilities = Object.keys(playerUpgrades).filter(key => upgrades[key].type === 'active');
+
+    activeAbilities.forEach(upgradeId => {
+        const upgrade = upgrades[upgradeId];
+        const currentLevel = playerUpgrades[upgradeId];
+        const card = document.createElement('div');
+        card.className = 'spellbook-card'; // Usa a nova classe CSS específica
+
+        card.innerHTML = `
+            <div class="upgrade-icon">${upgrade.icon}</div>
+            <div class="upgrade-title">${upgrade.title}</div>
+            <div class="upgrade-level">Nível ${currentLevel}</div>
+        `;
+
+        if (upgradeId === player.userData.activeAbility) {
+            card.classList.add('selected');
+        }
+
+        card.onclick = () => equipSpell(upgradeId);
+        spellbookGrid.appendChild(card);
+    });
+}
+
+function closeSpellbook() {
+    spellbookModal.classList.add('hidden');
+    isGamePaused = false;
 }
 
 function updateEnemyUI() {

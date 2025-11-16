@@ -508,8 +508,8 @@
             if (enemyData.burnTimer > 0 && enemyData.type !== 'ghost' && enemyData.type !== 'fire_elemental') {
                 enemyData.burnTimer--; // Dura 10 segundos (600 frames)
                 enemyData.isFleeing = true; // Ativa o status de fuga
-
-                // Dano e efeito visual agora são gerenciados em updatePassivePlayerAbilities e updateStatusParticles
+            } else {
+                enemyData.isFleeing = false; // Garante que o inimigo pare de fugir
             }
 
             // --- LÓGICA DE MOVIMENTO ---
@@ -745,12 +745,10 @@
                 gainExperience(enemyData.score); 
                 if (isBossWave) killsForSoulHarvest++; // Contador para o Arquilich
 
-                // CORREÇÃO: Incrementa os abates e limita ao máximo da habilidade ativa.
+                // Lógica de Recarga Híbrida: cada abate reduz o tempo de recarga
                 const activeId = player.userData.activeAbility;
                 if (activeId) {
-                    const ability = upgrades[activeId];
-                    const maxKills = ability.getKillCost(player.userData.upgrades[activeId] || 1);
-                    killPoints = Math.min(maxKills, killPoints + 1);
+                    chargeTimer = Math.max(0, chargeTimer - 60); // Reduz 1 segundo (60 frames)
                 }
                 killsSinceLastPotion++;
 
@@ -935,12 +933,24 @@
             
             // Atualiza Cooldowns
             projectileCooldown = Math.max(0, projectileCooldown - 1);
-            specialCooldown = Math.max(0, specialCooldown - 1);
             if (repulsionBubbleTimer > 0) repulsionBubbleTimer--; // NOVO: Decrementa timer da bolha
             if (freezingAuraTimer > 0) freezingAuraTimer--; // NOVO: Decrementa timer da aura
             if (flamingAuraTimer > 0) flamingAuraTimer--;
             if (electrifyingAuraTimer > 0) electrifyingAuraTimer--;
             if (expBoostTimer > 0) expBoostTimer--; // NOVO: Decrementa timer do EXP
+
+            // NOVO: Lógica de recarga de habilidades
+            if (specialGlobalCooldown > 0) specialGlobalCooldown--;
+
+            const activeId = player.userData.activeAbility;
+            if (activeId) {
+                chargeTimer = Math.max(0, chargeTimer - 1);
+                if (chargeTimer <= 0) {
+                    player.userData.abilityCharges[activeId] = (player.userData.abilityCharges[activeId] || 0) + 1;
+                    chargeTimer = CHARGE_TIME_MAX; // Reseta o timer
+                    updateUI();
+                }
+            }
 
             if (repulsionBubbleTimer > 0) {
                 repulsionBubbleMesh.visible = true;
@@ -1036,24 +1046,6 @@
                 }
             }
 
-            // Efeito visual para Corrente de Raios carregada
-            const activeId = player.userData.activeAbility;
-            if (activeId === 'corrente_raios') {
-                const ability = upgrades[activeId];
-                const maxKills = ability.getKillCost(player.userData.upgrades[activeId] || 1);
-                if (killPoints >= maxKills && Math.random() < 0.5) {
-                    const sparkGeo = new THREE.SphereGeometry(0.08, 8, 8);
-                    const sparkMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
-                    const spark = new THREE.Mesh(sparkGeo, sparkMat);
-                    const angle = Math.random() * Math.PI * 2;
-                    const radius = 0.8;
-                    spark.position.set(player.position.x + Math.cos(angle) * radius, 0.5 + Math.random(), player.position.z + Math.sin(angle) * radius);
-                    scene.add(spark);
-                    setTimeout(() => scene.remove(spark), 150 + Math.random() * 150);
-                }
-            }
-
-
             // 2. Lógica do Jogador
             handlePlayerMovement();
             
@@ -1084,6 +1076,7 @@
             updateEnemyUI();
             updateFloatingText(); // NOVO: Atualiza o texto flutuante
             updatePowerUpLabels(); // NOVO: Atualiza labels dos itens
+            updateUI(); // CORREÇÃO: Atualiza a HUD principal a cada frame
 
             updatePassivePlayerAbilities();
 

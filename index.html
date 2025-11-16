@@ -71,6 +71,11 @@
         <!-- Ex: <span class="powerup-active">Tiro Triplo! (10s)</span> -->
     </div>
 
+    <!-- NOVO: Botão para abrir o Grimório -->
+    <button id="open-spellbook-button" class="hidden" onclick="openSpellbook()">
+        📖
+    </button>
+
     <!-- Container para os labels 2D dos inimigos -->
     <div id="enemy-labels-container"></div>
 
@@ -141,6 +146,20 @@
             <button class="mt-6 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full transition duration-300 shadow-lg w-full" onclick="document.getElementById('full-ranking-modal').classList.add('hidden');">
                 Voltar
             </button>
+        </div>
+    </div>
+
+    <!-- NOVO: Modal do Grimório para Troca de Magias -->
+    <div id="spellbook-modal" class="modal fixed inset-0 flex-col items-center justify-center hidden z-50 overflow-y-auto py-8">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-indigo-300 mb-2">Grimório do Mago</h1>
+            <p class="text-lg text-gray-300">Selecione uma magia para equipar.</p>
+        </div>
+        <div id="spellbook-grid" class="grid grid-cols-4 gap-6">
+            <!-- As magias aprendidas serão inseridas aqui via JS -->
+        </div>
+        <div class="flex justify-center w-full mt-8">
+            <button id="close-spellbook-button" class="px-8 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition duration-300 shadow-lg" onclick="closeSpellbook()">Fechar</button>
         </div>
     </div>
 
