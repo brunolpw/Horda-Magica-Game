@@ -13,6 +13,7 @@
         let playerSlowTimer = 0;
         const enemies = []; const powerUps = [];
         const firePuddles = [];
+        const statusParticles = [];
 
         // Variável temporária para checagem de colisão
         let tempPlayer; 
@@ -67,6 +68,8 @@
             tempPlayer = createWizardModel(); // player.js
             createRepulsionBubbleMesh();
             createFreezingAuraMesh();
+            flamingAuraMesh = createFlamingAuraMesh(); scene.add(flamingAuraMesh);
+            electrifyingAuraMesh = createElectrifyingAuraMesh(); scene.add(electrifyingAuraMesh);
             createSmokeParticles();
             createExpBoostAuraMesh();
             createRangeIndicator();
@@ -277,13 +280,20 @@
                 const enemyData = enemy.userData;
 
                 // NOVO: Decrementa o cooldown de ataque do monstro
-                if (enemyData.damageCooldown > 0) {
-                    enemyData.damageCooldown--;
-                }
+                if (enemyData.damageCooldown > 0) enemyData.damageCooldown--;
 
                 // NOVO: Feedback de Hit (Piscar Branco)
-                if (enemyData.hitTimer > 0) {
-                    // CORREÇÃO: Percorre os filhos para aplicar o efeito
+                if (enemyData.electrifiedTimer > 0) {
+                    // Efeito de piscar amarelo para Eletrificado (tem prioridade)
+                    const flash = Math.abs(Math.sin(Date.now() * 0.05));
+                    enemy.traverse((child) => {
+                        if (child.isMesh && child.material && child.userData.originalColor) {
+                            const originalColor = new THREE.Color(child.userData.originalColor);
+                            const flashColor = new THREE.Color(0xFFFF00);
+                            child.material.color.lerpColors(originalColor, flashColor, flash);
+                        }
+                    });
+                } else if (enemyData.hitTimer > 0) {
                     enemy.traverse((child) => {
                         if (child.isMesh && child.material) {
                     if (!child.userData.originalColor) child.userData.originalColor = child.material.color.getHex();
@@ -326,15 +336,27 @@
 
             // Lógica de congelamento persistente e dano por segundo
             let finalSpeed = enemyData.speed;
-            if (goblinKingAura && enemyData.type === 'goblin' && enemy.position.distanceToSquared(currentBoss.position) < auraRadiusSq) {
+            if (goblinKingAura && enemyData.type === 'goblin' && !enemyData.isBoss && enemy.position.distanceToSquared(currentBoss.position) < auraRadiusSq) {
                 finalSpeed *= speedBoost;
             }
             let isSlowed = false;
             // Imunidades ao congelamento
             if (enemyData.type !== 'ghost' && enemyData.type !== 'ice_elemental' && enemyData.type !== 'lightning_elemental' && !(enemyData.type === 'juggernaut_troll' && enemyData.armor > 0)) {
-                const isInAura = freezingAuraTimer > 0 && enemy.position.distanceTo(player.position) < 6;
-                if (isInAura) {
+                const distanceToPlayer = enemy.position.distanceTo(player.position);
+                const auraRadius = 6;
+
+                if (freezingAuraTimer > 0 && distanceToPlayer < auraRadius) {
                     enemyData.freezeLingerTimer = 600; // 10 segundos
+                }
+                if (flamingAuraTimer > 0 && distanceToPlayer < auraRadius) {
+                    if (enemyData.type !== 'fire_elemental') {
+                        enemyData.burnTimer = 600; // 10 segundos
+                    }
+                }
+                if (electrifyingAuraTimer > 0 && distanceToPlayer < auraRadius) {
+                    if (enemyData.type !== 'lightning_elemental') {
+                        enemyData.electrifiedTimer = 120; // 2 segundos
+                    }
                 }
 
                 if (enemyData.freezeLingerTimer > 0) {
@@ -343,6 +365,27 @@
                     isSlowed = true;
 
                     // Dano de 5 a cada 1 segundo (60 frames)
+                    // Efeito de fumaça de gelo
+                    if (enemyData.freezeLingerTimer > 0 && Math.random() < 0.2) {
+                        const smokeGeo = new THREE.PlaneGeometry(0.4, 0.4);
+                        const smokeMat = new THREE.MeshBasicMaterial({ color: 0xADD8E6, transparent: true, opacity: 0.6 });
+                        const particle = new THREE.Mesh(smokeGeo, smokeMat);
+                        particle.position.copy(enemy.position).add(new THREE.Vector3(Math.random() - 0.5, Math.random() * enemyData.modelHeight, Math.random() - 0.5));
+                        
+                        const life = 30 + Math.random() * 30;
+                        let currentLife = 0;
+                        const interval = setInterval(() => {
+                            currentLife++;
+                            particle.position.y += 0.01;
+                            particle.material.opacity = 0.6 * (1 - (currentLife / life));
+                            if (currentLife >= life) {
+                                clearInterval(interval);
+                                scene.remove(particle);
+                            }
+                        }, 20);
+                        scene.add(particle);
+                    }
+
                     if (enemyData.freezeLingerTimer % 60 === 0) {
                         enemyData.hp -= 5;
                         enemyData.auraDamageAccumulator += 5;
@@ -383,8 +426,9 @@
             if (enemyData.type === 'goblin_king') {
                 enemyData.summonCooldown = Math.max(0, enemyData.summonCooldown - 1);
                 if (enemyData.summonCooldown <= 0 && enemies.length < maxActiveEnemies) {
-                    // Invoca 5 goblins normais
-                    for (let j = 0; j < 5; j++) {
+                    // Invoca entre 5 e 10 goblins
+                    const summonCount = 5 + Math.floor(Math.random() * 6);
+                    for (let j = 0; j < summonCount; j++) {
                         const offset = new THREE.Vector3((Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6);
                         const spawnPosition = enemy.position.clone().add(offset);
                         createEnemy('goblin', spawnPosition, true);
@@ -465,13 +509,7 @@
                 enemyData.burnTimer--; // Dura 10 segundos (600 frames)
                 enemyData.isFleeing = true; // Ativa o status de fuga
 
-                if (enemyData.burnTimer % 120 === 0) { // Dano de 10 a cada 2 segundos
-                    enemyData.hp -= 10;
-                    if (enemyData.hp <= 0 && enemyData.isBoss) handleBossDefeat(enemy);
-                    
-                    createFloatingText('10', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff4500');
-                    enemyData.hitTimer = 5;
-                }
+                // Dano e efeito visual agora são gerenciados em updatePassivePlayerAbilities e updateStatusParticles
             }
 
             // --- LÓGICA DE MOVIMENTO ---
@@ -673,7 +711,7 @@
             // Inimigos de longa distância não causam dano de toque
             if (enemyData.type !== 'necromancer' && enemyData.type !== 'skeleton_archer') {
                 if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(enemy))) {
-                    if (enemyData.damageCooldown <= 0) {
+                    if (enemyData.damageCooldown <= 0 && enemyData.electrifiedTimer <= 0) {
                         damagePlayer(enemyData.damage);
                         createFloatingText(enemyData.damage, player.position.clone().setY(1.5), '#ff0000', '1.5rem');
                         if (enemyData.type === 'fire_elemental') {
@@ -813,6 +851,32 @@
         }
     }
 
+    function updateStatusParticles() {
+        // Partículas para status (Queimadura)
+        enemies.forEach(enemy => {
+            if (enemy.userData.burnTimer > 0 && Math.random() < 0.3) {
+                const fireGeo = new THREE.SphereGeometry(0.1, 8, 8);
+                const fireMat = new THREE.MeshBasicMaterial({ color: 0xff4500, transparent: true, opacity: 0.8 });
+                const particle = new THREE.Mesh(fireGeo, fireMat);
+                particle.position.copy(enemy.position).add(new THREE.Vector3(Math.random() - 0.5, Math.random() * enemy.userData.modelHeight, Math.random() - 0.5));
+                statusParticles.push({ mesh: particle, life: 30 });
+                scene.add(particle);
+            }
+        });
+
+        // Atualiza a vida e posição das partículas
+        for (let i = statusParticles.length - 1; i >= 0; i--) {
+            const p = statusParticles[i];
+            p.life--;
+            p.mesh.position.y += 0.02;
+            p.mesh.material.opacity = 0.8 * (p.life / 30);
+            if (p.life <= 0) {
+                scene.remove(p.mesh);
+                statusParticles.splice(i, 1);
+            }
+        }
+    }
+
         // NOVO: Função para iniciar o tremor da câmera
         function triggerCameraShake(intensity, duration) {
             // Garante que um novo tremor mais forte substitua um mais fraco
@@ -856,7 +920,7 @@
             // NOVO: Aplica o efeito de tremor da câmera
             if (cameraShakeDuration > 0) {
                 cameraShakeDuration--;
-                if (playerSlowTimer > 0) playerSlowTimer--;
+                if (playerSlowTimer > 0) playerSlowTimer--; // Decrementa o timer global
                 // A intensidade do tremor diminui conforme o tempo passa
                 const currentShake = cameraShakeIntensity * (cameraShakeDuration / 20); 
                 const shakeX = (Math.random() - 0.5) * currentShake;
@@ -891,6 +955,41 @@
                 freezingAuraMesh.position.copy(player.position);
             } else {
                 freezingAuraMesh.visible = false;
+            }
+
+            if (flamingAuraTimer > 0) {
+                flamingAuraMesh.visible = true;
+                flamingAuraMesh.position.copy(player.position);
+                flamingAuraMesh.children.forEach(particle => {
+                    particle.userData.angle += particle.userData.speed;
+                    particle.position.set(
+                        Math.cos(particle.userData.angle) * particle.userData.radius,
+                        particle.userData.yOffset,
+                        Math.sin(particle.userData.angle) * particle.userData.radius
+                    );
+                });
+            } else {
+                flamingAuraMesh.visible = false;
+            }
+
+            if (electrifyingAuraTimer > 0) {
+                electrifyingAuraMesh.visible = true;
+                electrifyingAuraMesh.position.copy(player.position);
+
+                // Gera novos arcos elétricos dinamicamente
+                if (Math.random() < 0.4) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = Math.random() * 6;
+                    const lightningGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8);
+                    const lightningMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
+                    const arc = new THREE.Mesh(lightningGeo, lightningMat);
+                    arc.position.set(player.position.x + Math.cos(angle) * radius, 0.5, player.position.z + Math.sin(angle) * radius);
+                    arc.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+                    scene.add(arc);
+                    setTimeout(() => scene.remove(arc), 100 + Math.random() * 100);
+                }
+            } else {
+                electrifyingAuraMesh.visible = false;
             }
 
             if (freezingAuraTimer > 0) {
@@ -937,6 +1036,24 @@
                 }
             }
 
+            // Efeito visual para Corrente de Raios carregada
+            const activeId = player.userData.activeAbility;
+            if (activeId === 'corrente_raios') {
+                const ability = upgrades[activeId];
+                const maxKills = ability.getKillCost(player.userData.upgrades[activeId] || 1);
+                if (killPoints >= maxKills && Math.random() < 0.5) {
+                    const sparkGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                    const sparkMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
+                    const spark = new THREE.Mesh(sparkGeo, sparkMat);
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = 0.8;
+                    spark.position.set(player.position.x + Math.cos(angle) * radius, 0.5 + Math.random(), player.position.z + Math.sin(angle) * radius);
+                    scene.add(spark);
+                    setTimeout(() => scene.remove(spark), 150 + Math.random() * 150);
+                }
+            }
+
+
             // 2. Lógica do Jogador
             handlePlayerMovement();
             
@@ -948,6 +1065,7 @@
             updateClone(); // NOVO: Atualiza a lógica do clone
             updatePowerUps(); // Checa colisão com poções e poderes
             updateRunes(); // NOVO: Atualiza a lógica das runas
+            updateStatusParticles(); // NOVO: Atualiza partículas de status
             updateFirePuddles(); // NOVO: Atualiza as poças de fogo
             spawnEnemies();
             spawnPowerUps(); // Tenta spawnar poção

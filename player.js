@@ -14,9 +14,6 @@ let playerLevel = 1;
 let experiencePoints = 0;
 const baseExperience = 100;
 let pendingLevelUps = 0;
-let playerSlowTimer = 0;
-let playerBurnTimer = 0;
-let playerElectrifiedTimer = 0;
 let passiveHealTimer = 0;
 
 let playerSpeed = 0.15;
@@ -369,7 +366,7 @@ function updatePassivePlayerAbilities() {
     }
 
     // Lógica dos status negativos no jogador
-    if (player.userData.slowTimer > 0) player.userData.slowTimer--;
+    if (player.userData.slowTimer > 0) player.userData.slowTimer--; // Decrementa o timer correto
     if (player.userData.burnTimer > 0) {
         player.userData.burnTimer--;
         if (player.userData.burnTimer % 60 === 0) {
@@ -384,6 +381,15 @@ function updatePassivePlayerAbilities() {
             createFloatingText('2', player.position.clone().setY(1.5), '#fde047');
         }
     }
+
+    // Dano de queimadura nos inimigos (movido para cá para consistência)
+    enemies.forEach(enemy => {
+        if (enemy.userData.burnTimer > 0 && enemy.userData.burnTimer % 120 === 0) {
+            enemy.userData.hp -= 10;
+            createFloatingText('10', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff4500');
+            enemy.userData.hitTimer = 5;
+        }
+    });
 }
 
 function resetPlayerState() {
@@ -405,9 +411,6 @@ function resetPlayerState() {
     baseCooldown = 30;
     specialCooldown = 0;
     passiveHealTimer = 0;
-    playerSlowTimer = 0;
-    playerBurnTimer = 0;
-    playerElectrifiedTimer = 0;
 
     if (player) scene.remove(player);
     if (targetRing) scene.remove(targetRing);

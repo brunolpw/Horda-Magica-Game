@@ -168,7 +168,7 @@ function updateProjectiles() {
                             finalDamage = Math.ceil(finalDamage * 1.10); // +10% de dano
                         }
                         if (enemyType !== 'ghost') {
-                            enemy.userData.burnTimer = 300; // 5 segundos de queimadura
+                            enemy.userData.burnTimer = 600; // 10 segundos de queimadura
                         }
                     }
 

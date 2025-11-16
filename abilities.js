@@ -47,6 +47,58 @@ function createFreezingAuraMesh() {
     scene.add(freezingAuraMesh);
 }
 
+function createFlamingAuraMesh() {
+    const group = new THREE.Group();
+    const particleCount = 25; // Aumentado para um efeito mais denso
+    const particleGeo = new THREE.SphereGeometry(0.15, 8, 8);
+    const particleMat = new THREE.MeshBasicMaterial({ color: 0xff4500 });
+
+    for (let i = 0; i < particleCount; i++) {
+        const particle = new THREE.Mesh(particleGeo, particleMat);
+        particle.userData = {
+            angle: Math.random() * Math.PI * 2,
+            radius: 5.5 + Math.random(), // 5.5 to 6.5
+            speed: 0.03 + Math.random() * 0.02,
+            yOffset: (Math.random() - 0.5) * 2
+        };
+        group.add(particle);
+    }
+
+    // Anel delimitador
+    const ringGeo = new THREE.TorusGeometry(6, 0.1, 16, 100);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xff4500, transparent: true, opacity: 0.5 });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = Math.PI / 2;
+    group.add(ring);
+
+    return group;
+}
+
+function createElectrifyingAuraMesh() {
+    const group = new THREE.Group();
+    const segmentCount = 8;
+    const auraRadius = 6;
+    const segmentGeo = new THREE.CylinderGeometry(0.05, 0.05, 1, 8);
+    const segmentMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
+
+    for (let i = 0; i < segmentCount; i++) {
+        const segment = new THREE.Mesh(segmentGeo, segmentMat);
+        segment.userData = {
+            angle: (i / segmentCount) * Math.PI * 2,
+            radius: auraRadius
+        };
+        group.add(segment);
+    }
+
+    // Anel delimitador
+    const ringGeo = new THREE.TorusGeometry(auraRadius, 0.1, 16, 100);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00, transparent: true, opacity: 0.5 });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = Math.PI / 2;
+    group.add(ring);
+    return group;
+}
+
 function createGoblinKingAuraMesh() {
     const auraRadius = 15;
     const geometry = new THREE.TorusGeometry(auraRadius, 0.2, 16, 100);
@@ -118,10 +170,11 @@ function createPowerUp(type = 'potion', position = null) {
     }
     
     const height = props.geometry.parameters.height || 0.5;
-    powerUp.position.y = height / 2;
+    powerUp.position.y = height / 2 + 0.5; // Começa um pouco mais alto
     
     powerUp.userData = { type: type, ...props };
 
+    powerUp.userData.initialY = powerUp.position.y; // Guarda a posição Y inicial para a animação
     powerUps.push(powerUp);
     scene.add(powerUp);
     
@@ -214,6 +267,11 @@ function updatePowerUps() {
             removePowerUpLabel(powerUp);
             powerUps.splice(i, 1);
             updateUI();
+        } else {
+            // Animação de flutuação
+            const time = Date.now() * 0.002;
+            powerUp.position.y = powerUp.userData.initialY + Math.sin(time + i) * 0.2;
+            powerUp.rotation.y += 0.01;
         }
     }
 }

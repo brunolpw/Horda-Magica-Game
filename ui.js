@@ -124,6 +124,8 @@ function updateUI() {
     if (repulsionBubbleTimer > 0) timersHTML += `<span class="powerup-active">Bolha Repulsora! (${Math.ceil(repulsionBubbleTimer/60)}s)</span>`;
     if (cloneTimer > 0) timersHTML += `<span class="powerup-active">Clone Ativo! (${Math.ceil(cloneTimer/60)}s)</span>`;
     if (freezingAuraTimer > 0) timersHTML += `<span class="powerup-active">Aura Congelante! (${Math.ceil(freezingAuraTimer/60)}s)</span>`;
+    if (flamingAuraTimer > 0) timersHTML += `<span class="powerup-active">Aura Flamejante! (${Math.ceil(flamingAuraTimer/60)}s)</span>`;
+    if (electrifyingAuraTimer > 0) timersHTML += `<span class="powerup-active">Aura Eletrizante! (${Math.ceil(electrifyingAuraTimer/60)}s)</span>`;
     if (expBoostTimer > 0) timersHTML += `<span class="powerup-active">EXP em Dobro! (${Math.ceil(expBoostTimer/60)}s)</span>`;
 
     const totalSpheres = shieldLayers.reduce((acc, layer) => acc + layer.spheres.length, 0);
@@ -292,7 +294,9 @@ function createPowerUpLabel(powerUp, type) {
         case 'shield': text = 'Escudo'; break;
         case 'repulsionBubble': text = 'Bolha Repulsora'; break;
         case 'clone': text = 'Clone'; break;
-        case 'freezingAura': text = 'Aura Congelante'; break;
+        case 'freezingAura': text = 'Aura Congelante'; break; // NOVO
+        case 'flamingAura': text = 'Aura Flamejante'; break;
+        case 'electrifyingAura': text = 'Aura Eletrizante'; break;
         case 'expBoost': text = 'EXP em Dobro'; break;
     }
 
