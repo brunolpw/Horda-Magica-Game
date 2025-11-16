@@ -149,7 +149,8 @@
                 freezeLingerTimer: 0, // NOVO: Timer para o efeito de congelamento persistente
                 damageCooldown: 0, // NOVO: Cooldown para o ataque do monstro
                 auraDamageAccumulator: 0, // NOVO: Acumula dano da aura para feedback visual
-                electrifiedTimer: 0 // NOVO: Timer para o status Eletrificado
+                electrifiedTimer: 0, // NOVO: Timer para o status Eletrificado
+                burnTimer: 0 // NOVO: Timer para o status Queimado
             };
 
             // NOVO: Adiciona propriedades específicas para o Rei Goblin
@@ -228,17 +229,8 @@
                 const currentCooldown = Math.max(10, baseCooldown - (playerLevel - 1) * 2);
 
                 if (projectileCooldown <= 0) {
-                    // Lógica de ataque aprimorada por nível e power-up
-                    if (tripleShotTimer > 0) { // Apenas o power-up concede tiro múltiplo
-                        const angles = [-0.1745, 0, 0.1745]; // 3 projéteis
-                        angles.forEach(angle => {
-                            const shotDirection = direction.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-                            createProjectile('weak', shotDirection, player.position);
-                        });
-                    } else {
-                        // Disparo normal
-                        createProjectile('weak', direction, player.position);
-                    }
+                    // Disparo normal
+                    createProjectile('weak', direction, player.position);
                     projectileCooldown = currentCooldown;
                 }
             }
@@ -439,6 +431,18 @@
                     }
                     createFloatingText('5', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
                     enemyData.hitTimer = 5; // Pequeno feedback visual
+                }
+            }
+
+            // NOVO: Lógica do status Queimado
+            if (enemyData.burnTimer > 0 && enemyData.type !== 'ghost') {
+                enemyData.burnTimer--;
+                if (enemyData.burnTimer % 60 === 0) { // Dano a cada segundo
+                    enemyData.hp -= 5;
+                    if (enemyData.hp <= 0 && enemyData.isBoss) handleBossDefeat(enemy);
+                    
+                    createFloatingText('5', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff4500');
+                    enemyData.hitTimer = 5;
                 }
             }
 
@@ -705,7 +709,6 @@
             // Atualiza Cooldowns
             projectileCooldown = Math.max(0, projectileCooldown - 1);
             specialCooldown = Math.max(0, specialCooldown - 1);
-            if (tripleShotTimer > 0) tripleShotTimer--; // NOVO: Decrementa timer
             if (repulsionBubbleTimer > 0) repulsionBubbleTimer--; // NOVO: Decrementa timer da bolha
             if (freezingAuraTimer > 0) freezingAuraTimer--; // NOVO: Decrementa timer da aura
             if (expBoostTimer > 0) expBoostTimer--; // NOVO: Decrementa timer do EXP
@@ -779,6 +782,7 @@
             updateAiming();
             updateClone(); // NOVO: Atualiza a lógica do clone
             updatePowerUps(); // Checa colisão com poções e poderes
+            updateRunes(); // NOVO: Atualiza a lógica das runas
             spawnEnemies();
             spawnPowerUps(); // Tenta spawnar poção
             

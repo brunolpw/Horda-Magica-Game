@@ -12,10 +12,9 @@ const projectileProps = {
 // --- Definições de Power-Ups ---
 const powerUpProps = {
     potion: { healAmount: 30, color: 0xff4d4d, geometry: new THREE.CylinderGeometry(0.2, 0.2, 0.5, 8) },
-    tripleShot: { color: 0x00A8FF, geometry: new THREE.TorusGeometry(0.3, 0.1, 8, 16) },
     shield: { color: 0xFFD700, geometry: new THREE.IcosahedronGeometry(0.3, 0) },
     repulsionBubble: { duration: 900, color: 0xADD8E6, geometry: new THREE.SphereGeometry(0.3, 16, 16) },
-    clone: { duration: 1200, color: 0x87CEEB, geometry: new THREE.OctahedronGeometry(0.4) },
+    clone: { duration: 600, color: 0x87CEEB, geometry: new THREE.OctahedronGeometry(0.4) },
     freezingAura: { duration: 1200, color: 0x87CEFA, geometry: new THREE.TorusKnotGeometry(0.3, 0.1, 64, 8) },
     expBoost: { duration: 3600, color: 0xFFFF00, geometry: new THREE.TorusKnotGeometry(0.3, 0.08, 50, 8) }
 };

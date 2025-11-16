@@ -10,6 +10,11 @@ function createProjectile(type, direction, startPosition) {
         material = new THREE.MeshBasicMaterial({ color: 0x9333ea });
         props = { damage: 0, speed: 0.25 };
         isExplosive = true;
+    } else if (type === 'ethereal_fire') {
+        geometry = new THREE.CylinderGeometry(0.2, 0.2, 0.8, 8);
+        material = new THREE.MeshBasicMaterial({ color: 0xff4500 });
+        props = { damage: 0, speed: 0.2 }; // Dano definido na chamada, velocidade moderada
+        isExplosive = false;
     } else if (type === 'nova') {
         geometry = new THREE.SphereGeometry(0.2, 8, 8);
         material = new THREE.MeshBasicMaterial({ color: 0xFF00FF });
@@ -127,6 +132,12 @@ function updateProjectiles() {
             projData.isHoming = false;
         }
 
+        if (projData.type === 'ethereal_fire') {
+            // Lógica de rotação para o míssil de fogo
+            projectile.lookAt(projectile.position.clone().add(projData.direction));
+            projectile.rotateX(Math.PI / 2);
+        }
+
         if (projData.type === 'necro_bolt' || projData.type === 'arrow') {
             const playerBBox = new THREE.Box3().setFromObject(player);
             if (tempBBox.intersectsBox(playerBBox)) {
@@ -138,16 +149,27 @@ function updateProjectiles() {
             }
         }
 
-        if (projData.type !== 'necro_bolt' && projData.type !== 'arrow') {
+        if (projData.type !== 'necro_bolt' && projData.type !== 'arrow') { // Projéteis do jogador
             for (const enemy of enemies) {
                 const enemyBBox = new THREE.Box3().setFromObject(enemy);
                 if (tempBBox.intersectsBox(enemyBBox)) {
                     const damageLevel = player.userData.upgrades.increase_damage || 0;
                     let finalDamage = projData.damage;
                     if (damageLevel > 0) {
-                        const bonusPercentage = damageLevel * 0.10;
-                        const bonusAmount = Math.ceil(projData.damage * bonusPercentage);
+                        // +2 de dano por nível (2, 4, 6, 8, 10)
+                        const bonusAmount = damageLevel * 2;
                         finalDamage += bonusAmount;
+                    }
+
+                    // Lógica do Míssil de Fogo Etéreo
+                    if (projData.type === 'ethereal_fire') {
+                        const enemyType = enemy.userData.type;
+                        if (enemyType.includes('skeleton') || enemyType === 'ghost') {
+                            finalDamage = Math.ceil(finalDamage * 1.10); // +10% de dano
+                        }
+                        if (enemyType !== 'ghost') {
+                            enemy.userData.burnTimer = 300; // 5 segundos de queimadura
+                        }
                     }
 
                     if (enemy.userData.isBoss && enemy.userData.soulShieldCharges > 0) {
@@ -184,13 +206,16 @@ function updateProjectiles() {
             continue;
         }
 
-        if (!hit) {
-            for (const obstacle of obstacles) {
-                obstacle.updateMatrixWorld();
-                let obstacleBBox = obstacle.userData.collisionMesh ? new THREE.Box3().setFromObject(obstacle.userData.collisionMesh) : new THREE.Box3().setFromObject(obstacle);
-                if (tempBBox.intersectsBox(obstacleBBox)) {
-                    hit = true;
-                    break;
+        // Míssil de Fogo Etéreo ignora obstáculos
+        if (projData.type !== 'ethereal_fire') {
+            if (!hit) {
+                for (const obstacle of obstacles) {
+                    obstacle.updateMatrixWorld();
+                    let obstacleBBox = obstacle.userData.collisionMesh ? new THREE.Box3().setFromObject(obstacle.userData.collisionMesh) : new THREE.Box3().setFromObject(obstacle);
+                    if (tempBBox.intersectsBox(obstacleBBox)) {
+                        hit = true;
+                        break;
+                    }
                 }
             }
         }

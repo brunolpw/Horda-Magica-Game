@@ -25,13 +25,13 @@ let specialCooldown = 0;
 const upgrades = {
     increase_damage: {
         type: 'attribute', icon: '💥', title: "Poder Arcano", maxLevel: 5,
-        description: (level) => `Aumenta o dano do ataque básico em +10%.`,
+        description: (level) => `Aumenta o dano do ataque básico em +${level * 2} pontos.`,
         apply: () => { /* O dano é calculado dinamicamente */ }
     },
     increase_attack_speed: {
         type: 'attribute', icon: '⚡️', title: "Celeridade", maxLevel: 5,
-        description: (level) => `Aumenta a velocidade de ataque em +10%.`,
-        apply: () => { baseCooldown = Math.max(5, baseCooldown * 0.90); }
+        description: (level) => `Aumenta a velocidade de ataque em +5%.`,
+        apply: () => { baseCooldown = Math.max(5, baseCooldown * 0.95); }
     },
     increase_move_speed: {
         type: 'attribute', icon: '🏃', title: "Passos Ligeiros", maxLevel: 5,
@@ -44,19 +44,19 @@ const upgrades = {
         apply: () => { maxHP += 20; playerHP += 20; }
     },
     increase_xp_gain: {
-        type: 'attribute', icon: '🎓', title: "Sede de Conhecimento", maxLevel: 3,
-        description: (level) => `Aumenta o ganho de experiência em +20%.`,
+        type: 'attribute', icon: '🎓', title: "Sede de Conhecimento", maxLevel: 5,
+        description: (level) => `Aumenta o ganho de experiência em +${level * 20}%.`,
         apply: () => { /* A EXP é calculada dinamicamente */ }
     },
     auto_heal: {
         type: 'attribute', icon: '✨', title: "Regeneração", maxLevel: 5,
-        description: (level) => level < 5 ? `Recupera ${level + 1} de HP a cada 5 segundos.` : `Recupera 5 de HP a cada 3 segundos.`,
+        description: (level) => level < 5 ? `Recupera ${level + 1} de HP a cada 5 segundos.` : `Recupera 10 de HP a cada 5 segundos.`,
         apply: () => { /* A lógica é gerenciada no loop animate */ }
     },
-    missil_magico: {
-        type: 'active', icon: '🔥', title: "Míssil Mágico", maxLevel: 5,
-        getKillCost: (level) => level < 4 ? 5 : 10,
-        description: (level) => `Dispara ${level < 4 ? 1 : (level === 4 ? 2 : 3)} míssil(eis) teleguiado(s) no(s) inimigo(s) mais forte(s).`
+    missil_fogo_etereo: {
+        type: 'active', icon: '🔥', title: "Míssil de Fogo Etéreo", maxLevel: 5,
+        getKillCost: () => 7,
+        description: (level) => `Dispara um míssil teleguiado que atravessa paredes e queima o alvo, causando dano extra a mortos-vivos.`
     },
     explosao_energia: {
         type: 'active', icon: '🌀', title: "Explosão de Energia", maxLevel: 5, getKillCost: () => 10,
@@ -67,8 +67,20 @@ const upgrades = {
         description: (level) => `Eletrifica seu próximo ataque, ricocheteando e aplicando dano contínuo.`
     },
     carga_explosiva: {
-        type: 'active', icon: '💣', title: "Carga Explosiva", maxLevel: 5, getKillCost: () => 20,
-        description: (level) => `Cria uma grande explosão. Nv. 4+ libera fragmentos explosivos.`
+        type: 'active', icon: '💣', title: "Carga Explosiva", maxLevel: 5, getKillCost: () => 15,
+        description: (level) => `Lança uma granada teleguiada que explode em área. Nv. 4+ libera fragmentos.`
+    },
+    runa_fogo: {
+        type: 'active', icon: '♨️', title: "Runa de Fogo", maxLevel: 5, getKillCost: () => 12,
+        description: (level) => `Coloca uma armadilha de fogo invisível no chão que explode e queima inimigos.`
+    },
+    runa_gelo: {
+        type: 'active', icon: '❄️', title: "Runa de Gelo", maxLevel: 5, getKillCost: () => 12,
+        description: (level) => `Coloca uma armadilha de gelo invisível que explode e congela inimigos.`
+    },
+    runa_raio: {
+        type: 'active', icon: '⚡', title: "Runa de Raio", maxLevel: 5, getKillCost: () => 12,
+        description: (level) => `Coloca uma armadilha elétrica invisível que explode e eletrifica inimigos.`
     }
 };
 
@@ -106,8 +118,8 @@ function createPlayer() {
     player.userData = { maxHP: maxHP };
     scene.add(player);
 
-    const ringGeometry = new THREE.RingGeometry(1.5, 1.6, 32);
-    const ringMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    const ringGeometry = new THREE.TorusGeometry(1.5, 0.1, 16, 100); // Geometria de rosca para dar espessura
+    const ringMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 });
     targetRing = new THREE.Mesh(ringGeometry, ringMaterial);
     targetRing.rotation.x = -Math.PI / 2;
     targetRing.position.y = 0.01;
@@ -188,9 +200,9 @@ function damagePlayer(amount) {
 
 function gainExperience(amount) {
     let finalAmount = amount;
-    const xpGainLevel = player.userData.upgrades.increase_xp_gain || 0;
+    const xpGainLevel = player.userData.upgrades.increase_xp_gain || 0; // Níveis 1-5
     if (xpGainLevel > 0) {
-        const bonusPercentage = xpGainLevel * 0.20;
+        const bonusPercentage = xpGainLevel * 0.20; // 20%, 40%, 60%, 80%, 100%
         const bonusAmount = Math.ceil(finalAmount * bonusPercentage);
         finalAmount += bonusAmount;
     }
@@ -199,7 +211,7 @@ function gainExperience(amount) {
         finalAmount *= 2;
     }
 
-    createFloatingText(`+${finalAmount} EXP`, player.position.clone().setY(2.0), '#FFFF00', '1.2rem');
+    createFloatingText(`+${Math.floor(finalAmount)} EXP`, player.position.clone().setY(2.0), '#FFFF00', '1.2rem');
     experiencePoints += finalAmount;
     
     while (experiencePoints >= player.userData.experienceForNextLevel) {
@@ -229,18 +241,19 @@ function attemptSpecialAttack() {
     if (killPoints < ability.getKillCost(level) || specialCooldown > 0) return;
 
     switch (activeId) {
-        case 'missil_magico': {
-            const numMissiles = level >= 4 ? (level === 4 ? 2 : 3) : 1;
-            const damage = level === 1 ? 25 : (level === 2 ? 35 : 50);
-            const targets = findClosestEnemies(player.position, numMissiles, true);
+        case 'missil_fogo_etereo': {
+            const damage = [25, 35, 45, 50, 55][level - 1];
+            const target = findClosestEnemies(player.position, 1, true)[0];
             
-            if (targets.length === 0) return;
+            if (!target) return;
 
-            targets.forEach(target => {
-                const direction = new THREE.Vector3().subVectors(target.position, player.position).normalize();
-                createProjectile('strong', direction, player.position);
-                projectiles[projectiles.length - 1].userData.damage = damage;
-            });
+            const direction = new THREE.Vector3().subVectors(target.position, player.position).normalize();
+            createProjectile('ethereal_fire', direction, player.position);
+            const proj = projectiles[projectiles.length - 1];
+            proj.userData.damage = damage;
+            proj.userData.isHoming = true;
+            proj.userData.target = target;
+            proj.userData.hasBeenReflected = 'homing'; // Não pode ser refletido
             break;
         }
         case 'explosao_energia': {
@@ -248,7 +261,7 @@ function attemptSpecialAttack() {
             const damages = [5, 10, 15, 20, 25];
             const numProjectiles = sphereCounts[level - 1];
             const damage = damages[level - 1];
-            const radius = 30;
+            const radius = 25;
 
             const nearbyEnemies = enemies.filter(e => e.position.distanceTo(player.position) <= radius);
             if (nearbyEnemies.length === 0) return;
@@ -301,14 +314,27 @@ function attemptSpecialAttack() {
             const intersection = new THREE.Vector3();
             if (!raycaster.ray.intersectPlane(plane, intersection)) return;
 
-            const direction = new THREE.Vector3().subVectors(intersection, player.position).normalize();
+            const target = findClosestEnemies(player.position, 1, false)[0];
+            if (!target) return;
+
+            const direction = new THREE.Vector3().subVectors(target.position, player.position).normalize();
             
             createProjectile('explosion', direction, player.position);
             
             const lastProjectile = projectiles[projectiles.length - 1];
+            lastProjectile.userData.isHoming = true;
+            lastProjectile.userData.target = target;
+            lastProjectile.userData.hasBeenReflected = 'homing';
             lastProjectile.userData.explosionRadius = [5, 7, 8, 9, 10][level - 1];
             lastProjectile.userData.explosionDamage = [50, 60, 70, 80, 100][level - 1];
             lastProjectile.userData.explosionLevel = level;
+            break;
+        }
+        case 'runa_fogo':
+        case 'runa_gelo':
+        case 'runa_raio': {
+            const position = targetRing.position.clone();
+            createRune(activeId, position, level);
             break;
         }
     }
@@ -324,8 +350,8 @@ function updatePassivePlayerAbilities() {
     if (autoHealLevel > 0) {
         passiveHealTimer++;
 
-        const healAmount = Math.floor(Math.min(5, autoHealLevel + 1));
-        const currentHealInterval = autoHealLevel < 5 ? 300 : 180;
+        const healAmount = autoHealLevel < 5 ? autoHealLevel + 1 : 10;
+        const currentHealInterval = 300; // 5 segundos
 
         if (passiveHealTimer >= currentHealInterval) {
             const oldHP = playerHP;

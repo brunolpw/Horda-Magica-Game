@@ -1,7 +1,6 @@
 // Este arquivo contém a lógica para habilidades e power-ups.
 
 // --- Variáveis de Estado de Power-ups e Habilidades ---
-let tripleShotTimer = 0;
 let shieldLayers = [];
 let expBoostAuraMesh;
 let expBoostTimer = 0;
@@ -16,6 +15,7 @@ let repulsionBubbleMesh;
 let clone = null;
 let cloneTimer = 0;
 let powerUpTimer = 0;
+const activeRunes = [];
 
 // --- Funções de Criação de Efeitos Visuais ---
 
@@ -143,15 +143,17 @@ function spawnPowerUps() {
         powerUpTimer = 0;
     }
     
-    if (killsSinceLastPotion >= killsPerItemSpawn) {
+    // Aumenta o requisito de abates após a onda 10
+    const requiredKills = currentWave > 10 ? 70 : 30;
+
+    if (killsSinceLastPotion >= requiredKills) {
         spawnRandomItem();
         killsSinceLastPotion = 0;
     }
 }
 
 function spawnRandomItem(position = null) {
-    const powerUpTypes = Object.keys(powerUpProps);
-    const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
+    const randomType = getRandomWeightedPowerUp();
     createPowerUp(randomType, position);
 }
 
@@ -181,10 +183,6 @@ function updatePowerUps() {
                         displayHealingMessage(actualHeal);
                         createFloatingText(`+${actualHeal}`, player.position.clone().setY(1.5), '#00ff00', '1.5rem');
                     }
-                    break;
-                case 'tripleShot':
-                    const duration = playerLevel < 4 ? 1800 : 3600;
-                    tripleShotTimer += duration;
                     break;
                 case 'shield':
                     createShield(shieldLayers.length + 1);
@@ -232,6 +230,7 @@ function createClone() {
 
 function updateClone() {
     if (cloneTimer > 0 && clone) {
+        cloneTimer--; // CORREÇÃO: Decrementa o timer do clone a cada frame.
         const direction = new THREE.Vector3().subVectors(clone.position, player.position).normalize();
         const movementVector = new THREE.Vector2(direction.x, direction.z).normalize();
         const currentMovement = new THREE.Vector3(movementVector.x, 0, movementVector.y).multiplyScalar(playerSpeed * 0.8);
@@ -294,6 +293,10 @@ function triggerChainLightning(startEnemy) {
 
         enemies.forEach(enemy => {
             if (!chain.includes(enemy)) {
+                // Fantasmas não podem ser alvo secundário da corrente
+                if (enemy.userData.type === 'ghost') {
+                    return;
+                }
                 const distanceSq = enemy.position.distanceToSquared(currentEnemy.position);
                 if (distanceSq < minDistanceSq) {
                     minDistanceSq = distanceSq;
@@ -314,7 +317,9 @@ function triggerChainLightning(startEnemy) {
         const enemy = chain[i];
         enemy.userData.hp -= damage;
         createFloatingText(damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
-        enemy.userData.electrifiedTimer = 300;
+        if (enemy.userData.type !== 'ghost') {
+            enemy.userData.electrifiedTimer = 300;
+        }
         enemy.userData.hitTimer = 10;
 
         let startPoint = (i > 0) ? chain[i - 1].position.clone() : player.position.clone();
@@ -448,7 +453,7 @@ function createBossShield(charges) {
 }
 
 function triggerRockFall(targetPosition) {
-    const fallRadius = 7;
+    const fallRadius = 6;
     const damage = 15;
 
     const targetGeometry = new THREE.RingGeometry(fallRadius - 0.5, fallRadius, 32);
@@ -520,4 +525,187 @@ function triggerEarthquakeVisual(position, maxRadius) {
             scene.remove(ring);
         }
     }, 20);
+}
+
+function triggerRuneExplosionVisual(position, type) {
+    const numParticles = 12;
+    let particleColor;
+
+    switch (type) {
+        case 'runa_fogo':
+            particleColor = 0xff4500;
+            const fireRingGeo = new THREE.RingGeometry(0.1, 1, 64);
+            const fireRingMat = new THREE.MeshBasicMaterial({ color: particleColor, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+            const fireRing = new THREE.Mesh(fireRingGeo, fireRingMat);
+            fireRing.position.copy(position);
+            fireRing.position.y = 0.1;
+            fireRing.rotation.x = -Math.PI / 2;
+            scene.add(fireRing);
+
+            let scale = 1;
+            const expansionInterval = setInterval(() => {
+                scale += 1.5;
+                fireRing.scale.set(scale, scale, scale);
+                fireRing.material.opacity -= 0.05;
+                if (fireRing.material.opacity <= 0) {
+                    clearInterval(expansionInterval);
+                    scene.remove(fireRing);
+                }
+            }, 15);
+            break;
+
+        case 'runa_gelo':
+            particleColor = 0x87CEFA;
+            const iceGeo = new THREE.BoxGeometry(0.2, 0.2, 0.8);
+            for (let i = 0; i < numParticles; i++) {
+                const iceMat = new THREE.MeshBasicMaterial({ color: particleColor, transparent: true });
+                const shard = new THREE.Mesh(iceGeo, iceMat);
+                shard.position.copy(position);
+                shard.position.y = 0.4;
+                const angle = (i / numParticles) * Math.PI * 2;
+                const speed = 0.1 + Math.random() * 0.1;
+                shard.userData.velocity = new THREE.Vector3(Math.cos(angle) * speed, 0, Math.sin(angle) * speed);
+                scene.add(shard);
+                setTimeout(() => scene.remove(shard), 500 + Math.random() * 200);
+            }
+            break;
+
+        case 'runa_raio':
+            particleColor = 0xfde047;
+            const lightningGeo = new THREE.CylinderGeometry(0.05, 0.05, 2, 8);
+            for (let i = 0; i < numParticles / 2; i++) {
+                const lightningMat = new THREE.MeshBasicMaterial({ color: particleColor, transparent: true });
+                const segment = new THREE.Mesh(lightningGeo, lightningMat);
+                segment.position.copy(position);
+                segment.position.y = 0.5;
+                segment.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+                scene.add(segment);
+                setTimeout(() => {
+                    segment.material.opacity = 0;
+                    setTimeout(() => scene.remove(segment), 100);
+                }, 100 + Math.random() * 100);
+            }
+            break;
+    }
+}
+
+// --- Lógica das Runas ---
+
+function createRune(type, position, level) {
+    const radius = [3, 4, 5, 6, 7][level - 1];
+    const damage = [20, 25, 30, 35, 40][level - 1];
+    const activationTime = level <= 3 ? 30 : 60; // 0.5s para Nv 1-3, 1s para Nv 4-5
+    let statusEffect, statusTimer;
+
+    let runeColor;
+    switch (type) {
+        case 'runa_fogo':
+            statusEffect = 'burnTimer';
+            statusTimer = 300; // 5s
+            runeColor = 0xff4500;
+            break;
+        case 'runa_gelo':
+            statusEffect = 'freezeLingerTimer';
+            statusTimer = 300; // 5s
+            runeColor = 0x87CEFA;
+            break;
+        case 'runa_raio':
+            statusEffect = 'electrifiedTimer';
+            statusTimer = 300; // 5s
+            runeColor = 0xfde047;
+            break;
+    }
+
+    const runeGeometry = new THREE.CircleGeometry(radius, 64);
+    const runeMaterial = new THREE.MeshBasicMaterial({ color: runeColor, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+    const runeMesh = new THREE.Mesh(runeGeometry, runeMaterial);
+    runeMesh.position.copy(position);
+    runeMesh.position.y = 0.02;
+    runeMesh.rotation.x = -Math.PI / 2;
+    scene.add(runeMesh);
+
+    const rune = {
+        type: type,
+        position: position,
+        radius: radius,
+        damage: damage,
+        statusEffect: statusEffect,
+        statusTimer: statusTimer,
+        activationTime: activationTime,
+        activationTimer: -1, // Inicia inativo
+        mesh: runeMesh // Guarda a referência do modelo 3D
+    };
+
+    activeRunes.push(rune);
+}
+
+function updateRunes() {
+    for (let i = activeRunes.length - 1; i >= 0; i--) {
+        const rune = activeRunes[i];
+
+        // Se a runa ainda não foi ativada, checa por inimigos
+        if (rune.activationTimer < 0) {
+            let triggered = false;
+            for (const enemy of enemies) {
+                // Fantasmas não ativam runas
+                if (enemy.userData.type === 'ghost') continue;
+
+                if (enemy.position.distanceToSquared(rune.position) < rune.radius * rune.radius) {
+                    triggered = true;
+                    rune.activationTimer = rune.activationTime;
+                    // Efeito visual de ativação
+                    rune.mesh.material.opacity = 1.0;
+                    rune.mesh.scale.set(1.2, 1.2, 1.2);
+                    break;
+                }
+            }
+        } else {
+            // Se a runa foi ativada, conta o tempo para explodir
+            rune.activationTimer--;
+            if (rune.activationTimer <= 0) {
+                // Explode!
+                triggerRuneExplosionVisual(rune.position, rune.type);
+                triggerCameraShake(0.6, 30);
+                const radiusSq = rune.radius * rune.radius;
+
+                enemies.forEach(enemy => {
+                    if (enemy.position.distanceToSquared(rune.position) <= radiusSq) {
+                        enemy.userData.hp -= rune.damage;
+                        createFloatingText(rune.damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff8c00');
+                        enemy.userData.hitTimer = 10;
+
+                        // Aplica status (fantasmas são imunes a todos os status de runas)
+                        if (enemy.userData.type !== 'ghost') {
+                            enemy.userData[rune.statusEffect] = rune.statusTimer;
+                        }
+                    }
+                });
+
+                // Remove a runa da lista
+                scene.remove(rune.mesh);
+                activeRunes.splice(i, 1);
+            }
+        }
+    }
+}
+
+function getRandomWeightedPowerUp() {
+    const weights = {
+        'potion': 50,
+        'shield': 12,
+        'repulsionBubble': 17,
+        'clone': 3,
+        'freezingAura': 11,
+        'expBoost': 7
+    };
+
+    const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
+    let random = Math.random() * totalWeight;
+
+    for (const type in weights) {
+        if (random < weights[type]) {
+            return type;
+        }
+        random -= weights[type];
+    }
 }

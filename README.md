@@ -2,45 +2,119 @@
 
 **Horda Mágica** é um jogo de sobrevivência 3D do gênero *roguelite/bullet-heaven*, onde você controla um mago poderoso que deve enfrentar hordas infinitas de monstros. A cada nível, você aprimora suas habilidades e se torna mais forte para enfrentar desafios cada vez maiores, incluindo chefes épicos.
 
-## Chefes (Bosses)
+---
 
-A cada 10 ondas, um chefe poderoso surge para testar suas habilidades.
+## ✨ Habilidades do Mago
+
+A progressão do mago é feita através de um sistema de level up, onde você pode escolher entre aprimorar atributos passivos ou aprender/melhorar magias ativas.
+
+### Habilidades Passivas (Atributos)
+
+| Ícone | Habilidade            | Efeito por Nível (1 a 5)                                                                                             |
+| :---: | --------------------- | -------------------------------------------------------------------------------------------------------------------- |
+|  💥   | **Poder Arcano**      | Aumenta o dano do ataque básico em **+2 / +4 / +6 / +8 / +10** pontos.                                                |
+|  ⚡️  | **Celeridade**        | Aumenta a velocidade de ataque em **+5% / +10% / +15% / +20% / +25%**.                                                 |
+|  🏃   | **Passos Ligeiros**   | Aumenta a velocidade de movimento em **+7%** por nível.                                                              |
+|  ❤️   | **Vigor**             | Aumenta a vida máxima em **+20** por nível.                                                                          |
+|  🎓   | **Sede de Conhecimento** | Aumenta o ganho de experiência em **+20% / +40% / +60% / +80% / +100%**.                                             |
+|  ✨   | **Regeneração**       | Recupera **2 / 3 / 4 / 5 / 10** de HP a cada 5 segundos.                                                             |
+
+### Habilidades Ativas (Grimório)
+
+São magias poderosas que precisam ser carregadas com abates e ativadas manualmente.
+
+#### Míssil de Fogo Etéreo (🔥)
+*   **Custo:** 7 Abates.
+*   **Descrição:** Dispara um míssil teleguiado que atravessa paredes e obstáculos.
+*   **Efeitos Especiais:**
+    *   Aplica **Queimadura** no alvo (5 de dano por segundo durante 5 segundos).
+    *   Causa **+10% de dano** em Esqueletos e Fantasmas.
+    *   Fantasmas são imunes ao status de Queimadura.
+*   **Evolução (Dano):** 25 / 35 / 45 / 50 / 55.
+
+#### Explosão de Energia (🌀)
+*   **Custo:** 10 Abates.
+*   **Descrição:** Libera uma onda de projéteis teleguiados que atacam todos os inimigos próximos. O número de projéteis aumenta com o nível.
+
+#### Corrente de Raios (⛓️)
+*   **Custo:** 8 Abates.
+*   **Descrição:** Seu próximo ataque se transforma em um raio que ricocheteia entre múltiplos inimigos.
+*   **Efeitos Especiais:**
+    *   Aplica o status **Eletrificado** (5 de dano por segundo durante 5 segundos).
+    *   Fantasmas recebem o dano do impacto, mas são imunes ao status Eletrificado.
+
+#### Carga Explosiva (💣)
+*   **Custo:** 15 Abates.
+*   **Descrição:** Lança uma granada mágica **teleguiada** que persegue um inimigo e explode em uma grande área.
+*   **Efeitos Especiais:**
+    *   A partir do Nível 4, a explosão principal libera fragmentos que também explodem.
+
+#### Novas Runas de Armadilha (♨️ / ❄️ / ⚡)
+*   **Custo:** 12 Abates.
+*   **Mecânica:** Habilidades de mira manual. Ao serem ativadas, colocam uma runa invisível no chão na posição do cursor. A runa é acionada quando um inimigo (exceto Fantasmas) pisa nela, explodindo após 3 segundos.
+*   **Tipos:**
+    *   **Runa de Fogo (♨️):** Causa dano e aplica **Queimadura**.
+    *   **Runa de Gelo (❄️):** Causa dano e aplica **Congelamento**.
+    *   **Runa de Raio (⚡):** Causa dano e aplica **Eletrificado**.
+*   **Evolução:** O raio da explosão e o dano aumentam a cada nível.
 
 ---
 
-### Onda 10: Rei Goblin
+## 📦 Power-ups
+
+Power-ups aparecem no mapa através de diferentes mecânicas (tempo, abates ou recompensa de chefe). As chances de cada item aparecer **não são iguais**.
+
+### Taxa de Aparição Ponderada
+
+| Power-up          | Chance de Aparição |
+| ----------------- | :----------------: |
+| Poção de Cura     |        50%         |
+| Escudo            |        12%         |
+| Bolha Repulsora   |        17%         |
+| Aura Congelante   |        11%         |
+| Clone             |         3%         |
+| EXP em Dobro      |         7%         |
+
+### Aparição por Abates
+
+Para garantir que o jogador sempre tenha acesso a itens, um power-up aleatório é garantido após um certo número de abates.
+
+*   **Ondas 1-10:** 1 item a cada **30 abates**.
+*   **A partir da Onda 11:** 1 item a cada **70 abates**.
+
+---
+
+## Chefes (Bosses)
+
+A cada onda específica (7, 15 e 30), um chefe poderoso surge para testar suas habilidades.
+
+### Onda 7: Rei Goblin
 
 O líder supremo dos goblins. Ele não luta sozinho, preferindo fortalecer e comandar suas tropas para sobrecarregar o jogador.
 
 **Habilidades:**
 - **Chamado da Horda**: Periodicamente, invoca um grupo de 5 goblins normais para se juntarem à batalha.
 - **Aura Real**: Concede um bônus de 25% de velocidade de movimento a todos os goblins em um raio de 15 unidades ao seu redor.
-- **Fuga Covarde**: Quando sua vida fica abaixo de 30%, ele para de atacar e tenta fugir do jogador.
+- **Fuga Covarde**: Quando sua vida fica abaixo de 30%, ele para de atacar e tenta fugir do jogador, atirando pedras como defesa.
 
-**Recompensa**: Ao ser derrotado, dropa de 3 a 5 power-ups aleatórios.
-
----
-
-### Onda 20: Juggernaut Troll
+### Onda 15: Juggernaut Troll
 
 Uma besta colossal coberta por uma armadura de pedra. O Juggernaut Troll é um teste de pura resistência e dano bruto, forçando o jogador a quebrar suas defesas.
 
 **Habilidades:**
-- **Armadura de Pedra**: Possui 1000 pontos de armadura que devem ser destruídos antes que sua vida possa ser danificada. Enquanto tem armadura, é imune a efeitos de status (congelamento e eletrificado).
-- **Fúria**: Seu dano de contato aumenta conforme sua vida diminui, tornando-o mais perigoso no final da luta.
-- **Terremoto**: A cada 10 segundos, bate no chão, causando um tremor na câmera e dano em área ao seu redor.
-
-**Recompensa**: Ao ser derrotado, dropa de 3 a 5 power-ups aleatórios.
-
----
+- **Armadura de Pedra**: Possui 1000 pontos de armadura que devem ser destruídos antes que sua vida possa ser danificada. Enquanto tem armadura, é imune a efeitos de status.
+- **Fúria**: Seu dano de contato aumenta conforme sua vida diminui.
+- **Terremoto**: A cada 10 segundos, bate no chão, causando dano em área ao seu redor.
 
 ### Onda 30: Arquilich
 
-Um mestre da necromancia que utiliza táticas profanas para controlar o campo de batalha. A luta contra o Arquilich é um desafio tático que exige controle de multidão e quebra de defesas mágicas.
+Um mestre da necromancia que utiliza táticas profanas para controlar o campo de batalha.
 
 **Habilidades:**
-- **Escudo de Almas**: Começa a batalha com 5 esferas de alma que o orbitam. Cada esfera absorve completamente um projétil do jogador. O escudo deve ser quebrado para causar dano direto.
-- **Colheita de Almas**: A cada 5 monstros que o jogador derrota durante a batalha, o Arquilich invoca um poderoso Esqueleto Guerreiro.
-- **Prisão de Ossos**: Periodicamente, cria um círculo de paredes de osso ao redor do jogador, prendendo-o temporariamente.
+- **Escudo de Almas**: Começa a batalha com 5 esferas de alma que absorvem projéteis.
+- **Colheita de Almas**: A cada 5 monstros que o jogador derrota, o Arquilich invoca um Esqueleto Guerreiro.
+- **Prisão de Ossos**: Periodicamente, cria um círculo de paredes de osso ao redor do jogador.
 
-**Recompensa Especial**: Ao ser derrotado, abre uma tela de melhoria especial que permite ao jogador escolher **qualquer habilidade** do jogo para aprender ou aprimorar.
+**Recompensa Especial**: Ao ser derrotado, abre uma tela de melhoria que permite ao jogador escolher **qualquer habilidade** do jogo para aprender ou aprimorar.
+
+*(Esta seção permanece como estava, detalhando os chefes Rei Goblin, Juggernaut Troll e Arquilich).*
