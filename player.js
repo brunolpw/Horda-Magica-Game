@@ -81,6 +81,11 @@ const upgrades = {
     runa_raio: {
         type: 'active', icon: '⚡', title: "Runa de Raio", maxLevel: 5, getKillCost: () => 12,
         description: (level) => `Coloca uma armadilha elétrica invisível que explode e eletrifica inimigos.`
+    },
+    lanca_de_gelo: {
+        type: 'active', icon: '🧊', title: "Lança de Gelo", maxLevel: 5, getKillCost: () => 10,
+        description: (level) => `Dispara uma lança de gelo perfurante que atravessa inimigos.
+Nv. 5: A lança explode no final.`
     }
 };
 
@@ -337,6 +342,24 @@ function attemptSpecialAttack() {
         case 'runa_raio': {
             const position = targetRing.position.clone();
             createRune(activeId, position, level);
+            break;
+        }
+        case 'lanca_de_gelo': {
+            raycaster.setFromCamera(pointer, camera);
+            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            const intersection = new THREE.Vector3();
+            if (!raycaster.ray.intersectPlane(plane, intersection)) return;
+
+            const direction = new THREE.Vector3().subVectors(intersection, player.position).normalize();
+            createProjectile('ice_lance', direction, player.position);
+
+            const lance = projectiles[projectiles.length - 1];
+            lance.userData.damage = [40, 60, 60, 80, 100][level - 1];
+            lance.userData.maxPierce = (level < 3) ? 3 : 5;
+            lance.userData.width = (level < 4) ? 0.3 : 0.5;
+            lance.scale.x = lance.scale.z = (level < 4) ? 1.0 : 1.5; // Aumenta a largura visual
+            lance.userData.explodes = (level === 5);
+
             break;
         }
     }

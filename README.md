@@ -58,6 +58,12 @@ São magias poderosas que precisam ser carregadas com abates e ativadas manualme
     *   **Runa de Raio (⚡):** Causa dano e aplica **Eletrificado**.
 *   **Evolução:** O raio da explosão e o dano aumentam a cada nível.
 
+#### Lança de Gelo Perfurante (🧊)
+*   **Custo:** 10 Abates.
+*   **Mecânica:** Dispara uma lança de gelo em linha reta que **perfura** múltiplos inimigos, aplicando o status **Congelado** em todos que atingir.
+*   **Evolução:** Aumenta o dano, o número de alvos perfurados e a largura da lança.
+*   **Nível 5 (Ultimate):** Ao atingir seu último alvo ou o limite do mapa, a lança **explode**, aplicando Congelamento em uma pequena área.
+
 ---
 
 ## 📦 Power-ups

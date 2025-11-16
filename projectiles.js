@@ -20,6 +20,11 @@ function createProjectile(type, direction, startPosition) {
         material = new THREE.MeshBasicMaterial({ color: 0xFF00FF });
         props = { damage: 0, speed: 0.125 };
         isExplosive = false;
+    } else if (type === 'ice_lance') {
+        geometry = new THREE.CylinderGeometry(0.3, 0.1, 2.5, 8); // Forma de lança
+        material = new THREE.MeshLambertMaterial({ color: 0xADD8E6, emissive: 0xADD8E6, emissiveIntensity: 0.5 });
+        props = { damage: 0, speed: 0.4 };
+        isExplosive = false;
     } else if (type === 'necro_bolt' || type === 'arrow' || type === 'weak' || type === 'strong') {
         props = projectileProps[type];
         if (!props) {
@@ -47,7 +52,10 @@ function createProjectile(type, direction, startPosition) {
         explosionDamage: explosionDamage,
         isHoming: false,
         target: null,
-        hasBeenReflected: (type === 'necro_bolt' || type === 'arrow') ? null : true
+        hasBeenReflected: (type === 'necro_bolt' || type === 'arrow') ? null : true,
+        pierceCount: 0,
+        maxPierce: (type === 'ice_lance') ? 3 : 1, // Padrão para a lança
+        hitEnemies: [] // Guarda os inimigos já atingidos
     };
 
     projectiles.push(projectile);
@@ -138,6 +146,12 @@ function updateProjectiles() {
             projectile.rotateX(Math.PI / 2);
         }
 
+        if (projData.type === 'ice_lance') {
+            // Rotaciona a lança para apontar na direção do movimento
+            projectile.lookAt(projectile.position.clone().add(projData.direction));
+            projectile.rotateX(Math.PI / 2);
+        }
+
         if (projData.type === 'necro_bolt' || projData.type === 'arrow') {
             const playerBBox = new THREE.Box3().setFromObject(player);
             if (tempBBox.intersectsBox(playerBBox)) {
@@ -152,6 +166,12 @@ function updateProjectiles() {
         if (projData.type !== 'necro_bolt' && projData.type !== 'arrow') { // Projéteis do jogador
             for (const enemy of enemies) {
                 const enemyBBox = new THREE.Box3().setFromObject(enemy);
+
+                // Evita que um projétil perfurante atinja o mesmo inimigo duas vezes
+                if (projData.hitEnemies.includes(enemy.uuid)) {
+                    continue;
+                }
+
                 if (tempBBox.intersectsBox(enemyBBox)) {
                     const damageLevel = player.userData.upgrades.increase_damage || 0;
                     let finalDamage = projData.damage;
@@ -189,8 +209,19 @@ function updateProjectiles() {
                     createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
                     enemy.userData.hitTimer = 10;
 
-                    hit = true;
-                    break;
+                    // Lógica de perfuração
+                    if (projData.type === 'ice_lance') {
+                        enemy.userData.freezeLingerTimer = 600; // Aplica congelamento
+                        projData.hitEnemies.push(enemy.uuid);
+                        projData.pierceCount++;
+                        if (projData.pierceCount >= projData.maxPierce) {
+                            hit = true; // Destrói a lança após atingir o máximo de alvos
+                        }
+                    } else {
+                        hit = true;
+                    }
+
+                    if (hit) break; // Para de procurar inimigos neste frame se o projétil deve ser destruído
                 }
             }
         }
@@ -221,6 +252,11 @@ function updateProjectiles() {
         }
 
         if (hit) {
+            // Lógica de explosão para a Lança de Gelo Nv. 5
+            if (projData.type === 'ice_lance' && projData.explodes) {
+                triggerIceShatter(projectile.position);
+            }
+
             if (projData.isExplosive) {
                 triggerBigExplosion(projectile.position, projData.explosionRadius, projData.explosionDamage, projData.explosionLevel);
             }
