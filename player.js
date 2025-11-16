@@ -14,6 +14,9 @@ let playerLevel = 1;
 let experiencePoints = 0;
 const baseExperience = 100;
 let pendingLevelUps = 0;
+let playerSlowTimer = 0;
+let playerBurnTimer = 0;
+let playerElectrifiedTimer = 0;
 let passiveHealTimer = 0;
 
 let playerSpeed = 0.15;
@@ -136,8 +139,10 @@ function handlePlayerMovement() {
     if (keys['d'] || keys['D'] || keys['ArrowRight']) dx = 1;
 
     if (dx !== 0 || dz !== 0) {
+        let currentSpeed = playerSpeed;
+        if (player.userData.slowTimer > 0) currentSpeed *= 0.7; // Reduz a velocidade em 30%
         const movementVector = new THREE.Vector2(dx, dz).normalize();
-        const currentMovement = new THREE.Vector3(movementVector.x, 0, movementVector.y).multiplyScalar(playerSpeed);
+        const currentMovement = new THREE.Vector3(movementVector.x, 0, movementVector.y).multiplyScalar(currentSpeed);
         
         const angle = Math.atan2(movementVector.x, movementVector.y); 
         player.rotation.y = angle;
@@ -362,6 +367,23 @@ function updatePassivePlayerAbilities() {
             passiveHealTimer = 0;
         }
     }
+
+    // Lógica dos status negativos no jogador
+    if (player.userData.slowTimer > 0) player.userData.slowTimer--;
+    if (player.userData.burnTimer > 0) {
+        player.userData.burnTimer--;
+        if (player.userData.burnTimer % 60 === 0) {
+            damagePlayer(2); // 2 de dano de fogo por segundo
+            createFloatingText('2', player.position.clone().setY(1.5), '#ff4500');
+        }
+    }
+    if (player.userData.electrifiedTimer > 0) {
+        player.userData.electrifiedTimer--;
+        if (player.userData.electrifiedTimer % 60 === 0) {
+            damagePlayer(2); // 2 de dano de raio por segundo
+            createFloatingText('2', player.position.clone().setY(1.5), '#fde047');
+        }
+    }
 }
 
 function resetPlayerState() {
@@ -383,9 +405,20 @@ function resetPlayerState() {
     baseCooldown = 30;
     specialCooldown = 0;
     passiveHealTimer = 0;
+    playerSlowTimer = 0;
+    playerBurnTimer = 0;
+    playerElectrifiedTimer = 0;
 
     if (player) scene.remove(player);
     if (targetRing) scene.remove(targetRing);
     createPlayer();
-    player.userData = { maxHP: 100, upgrades: {}, activeAbility: null, experienceForNextLevel: baseExperience };
+    player.userData = {
+        maxHP: 100,
+        upgrades: {},
+        activeAbility: null,
+        experienceForNextLevel: baseExperience,
+        slowTimer: 0,
+        burnTimer: 0,
+        electrifiedTimer: 0
+    };
 }

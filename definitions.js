@@ -198,17 +198,109 @@ function createArchlichModel() {
     return group;
 }
 
+function createFireElementalModel() {
+    const group = new THREE.Group();
+    const coreGeometry = new THREE.IcosahedronGeometry(0.6, 1);
+    const coreMaterial = new THREE.MeshLambertMaterial({
+        color: 0xff4500,
+        emissive: 0xff0000,
+        emissiveIntensity: 1.5
+    });
+    const core = new THREE.Mesh(coreGeometry, coreMaterial);
+    core.position.y = 0.8;
+    core.castShadow = true;
+    group.add(core);
+
+    const pointLight = new THREE.PointLight(0xff4500, 2, 5);
+    pointLight.position.y = 0.8;
+    group.add(pointLight);
+
+    return group;
+}
+
+function createIceElementalModel() {
+    const group = new THREE.Group();
+    const coreGeometry = new THREE.DodecahedronGeometry(0.8, 0);
+    const coreMaterial = new THREE.MeshLambertMaterial({
+        color: 0xADD8E6,
+        transparent: true,
+        opacity: 0.8
+    });
+    const core = new THREE.Mesh(coreGeometry, coreMaterial);
+    core.position.y = 1.0;
+    core.castShadow = true;
+    group.add(core);
+
+    const pointLight = new THREE.PointLight(0xADD8E6, 2, 8);
+    pointLight.position.y = 1.0;
+    group.add(pointLight);
+
+    return group;
+}
+
+function createLightningElementalModel() {
+    const group = new THREE.Group();
+    const coreGeometry = new THREE.OctahedronGeometry(0.7, 0);
+    const coreMaterial = new THREE.MeshLambertMaterial({
+        color: 0xFFFF00,
+        emissive: 0xFFFF00,
+        emissiveIntensity: 2.0
+    });
+    const core = new THREE.Mesh(coreGeometry, coreMaterial);
+    core.position.y = 1.0;
+    core.castShadow = true;
+    group.add(core);
+
+    const pointLight = new THREE.PointLight(0xFFFF00, 2, 6);
+    pointLight.position.y = 1.0;
+    group.add(pointLight);
+
+    return group;
+}
+
+function createSummonerElementalModel() {
+    const group = new THREE.Group();
+    const coreGeometry = new THREE.IcosahedronGeometry(0.8, 1);
+    const coreMaterial = new THREE.MeshLambertMaterial({
+        color: 0x2d3748, // Dark gray-blue
+        emissive: 0x4a5568,
+        emissiveIntensity: 1
+    });
+    const core = new THREE.Mesh(coreGeometry, coreMaterial);
+    core.position.y = 1.0;
+    core.castShadow = true;
+    group.add(core);
+
+    // Orbiting elemental particles
+    const fireParticle = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshBasicMaterial({ color: 0xff4500 }));
+    const iceParticle = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshBasicMaterial({ color: 0x87CEFA }));
+    const lightningParticle = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshBasicMaterial({ color: 0xFFFF00 }));
+
+    fireParticle.userData = { angle: 0, radius: 1.5, speed: 0.02 };
+    iceParticle.userData = { angle: Math.PI * 2/3, radius: 1.5, speed: 0.02 };
+    lightningParticle.userData = { angle: Math.PI * 4/3, radius: 1.5, speed: 0.02 };
+
+    group.add(fireParticle, iceParticle, lightningParticle);
+    group.userData.particles = [fireParticle, iceParticle, lightningParticle];
+
+    return group;
+}
+
 // --- Definições de Inimigos (Stats) ---
 const entityProps = {
     goblin: { hp: 20, speed: 0.05, score: 7, damage: 10, name: "Goblin", modelFn: createGoblinModel, modelHeight: 0.9 },
     orc: { hp: 50, speed: 0.04, score: 15, damage: 15, name: "Orc", modelFn: createOrcModel, modelHeight: 1.35 },
     troll: { hp: 100, speed: 0.03, score: 25, damage: 25, name: "Troll", modelFn: createTrollModel, modelHeight: 2.2 },
-    necromancer: { hp: 80, speed: 0.025, score: 35, damage: 10, name: "Necromante", modelFn: createNecromancerModel, modelHeight: 1.9 },
     ghost: { hp: 75, speed: 0.06, score: 30, damage: 25, name: "Fantasma", modelFn: createGhostModel, modelHeight: 1.5 },
     skeleton: { hp: 80, speed: 0.05, score: 35, damage: 25, name: "Esqueleto", modelFn: createSkeletonModel, modelHeight: 1.4 },
     skeleton_warrior: { hp: 200, speed: 0.04, score: 55, damage: 35, name: "Esqueleto Guerreiro", modelFn: createSkeletonWarriorModel, modelHeight: 1.5 },
     skeleton_archer: { hp: 45, speed: 0.05, score: 45, damage: 5, name: "Esqueleto Arqueiro", modelFn: createSkeletonArcherModel, modelHeight: 1.4 },
     goblin_king: { hp: 800, speed: 0.045, score: 500, damage: 30, name: "Rei Goblin", modelFn: createGoblinKingModel, modelHeight: 1.8 },
     juggernaut_troll: { hp: 2500, speed: 0.025, score: 1500, damage: 40, name: "Juggernaut Troll", modelFn: createJuggernautTrollModel, modelHeight: 3.3, armor: 1000 },
-    archlich: { hp: 4000, speed: 0.03, score: 3000, damage: 0, name: "Arquilich", modelFn: createArchlichModel, modelHeight: 1.9 }
+    archlich: { hp: 4000, speed: 0.03, score: 3000, damage: 0, name: "Arquilich", modelFn: createArchlichModel, modelHeight: 1.9 },
+    necromancer: { hp: 80, speed: 0.025, score: 35, damage: 10, name: "Necromante", modelFn: createNecromancerModel, modelHeight: 1.9 },
+    fire_elemental: { hp: 250, speed: 0.055, score: 40, damage: 25, name: "Elemental de Fogo", modelFn: createFireElementalModel, modelHeight: 1.5 },
+    ice_elemental: { hp: 500, speed: 0.045, score: 45, damage: 20, name: "Elemental de Gelo", modelFn: createIceElementalModel, modelHeight: 1.6 },
+    lightning_elemental: { hp: 200, speed: 0.065, score: 45, damage: 15, name: "Elemental de Raio", modelFn: createLightningElementalModel, modelHeight: 1.5 },
+    summoner_elemental: { hp: 150, speed: 0.025, score: 70, damage: 5, name: "Invocador Elemental", modelFn: createSummonerElementalModel, modelHeight: 1.6 }
 };

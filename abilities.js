@@ -527,6 +527,72 @@ function triggerEarthquakeVisual(position, maxRadius) {
     }, 20);
 }
 
+function triggerTeleport(elemental) {
+    elemental.userData.isTeleporting = true;
+
+    // Animação de desaparecimento
+    let scale = 1.0;
+    const shrinkInterval = setInterval(() => {
+        scale -= 0.1;
+        if (scale <= 0) {
+            clearInterval(shrinkInterval);
+            
+            // Lógica do teleporte
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 5 + Math.random() * 5; // Reaparece entre 5 e 10 unidades do jogador
+            const newX = player.position.x + Math.cos(angle) * distance;
+            const newZ = player.position.z + Math.sin(angle) * distance;
+            elemental.position.set(newX, 0, newZ);
+
+            // Animação de reaparecimento
+            const growInterval = setInterval(() => {
+                scale += 0.1;
+                if (scale >= 1.0) {
+                    clearInterval(growInterval);
+                    elemental.scale.set(1, 1, 1);
+                    elemental.userData.isTeleporting = false;
+
+                    // Dispara projéteis ao reaparecer
+                    const numProjectiles = 3 + Math.floor(Math.random() * 3); // 3 a 5 projéteis
+                    for (let i = 0; i < numProjectiles; i++) {
+                        const projAngle = Math.random() * Math.PI * 2;
+                        const direction = new THREE.Vector3(Math.cos(projAngle), 0, Math.sin(projAngle));
+                        createProjectile('weak', direction, elemental.position);
+                    }
+                } else { elemental.scale.set(scale, scale, scale); }
+            }, 15);
+        } else { elemental.scale.set(scale, scale, scale); }
+    }, 15);
+}
+
+function triggerIceShatter(position) {
+    const shatterRadius = 8;
+    // Efeito visual da explosão de gelo
+    triggerRuneExplosionVisual(position, 'runa_gelo');
+
+    // Aplica lentidão ao jogador se estiver perto
+    if (player.position.distanceToSquared(position) < shatterRadius * shatterRadius) {
+        player.userData.slowTimer = 300; // 5 segundos de lentidão
+        const slowIndicator = document.createElement('div');
+        slowIndicator.className = 'floating-text';
+        slowIndicator.textContent = 'Lento!';
+        slowIndicator.style.color = '#87CEFA';
+        slowIndicator.style.fontSize = '1.5rem';
+        document.getElementById('floating-text-container').appendChild(slowIndicator);
+        setTimeout(() => slowIndicator.remove(), 2000);
+    }
+}
+
+function triggerElementalSummon(position) {
+    const elementals = ['fire_elemental', 'ice_elemental', 'lightning_elemental'];
+    const typeToSummon = elementals[Math.floor(Math.random() * elementals.length)];
+
+    const offset = new THREE.Vector3((Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6);
+    const spawnPosition = position.clone().add(offset);
+
+    createEnemy(typeToSummon, spawnPosition, true);
+}
+
 function triggerRuneExplosionVisual(position, type) {
     const numParticles = 12;
     let particleColor;

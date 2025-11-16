@@ -77,13 +77,30 @@ function spawnEnemies() {
                 else if (roll < 65) type = 'orc';
                 else if (roll < 85) type = 'troll';
                 else type = 'necromancer';
-            } else {
+            } else if (currentWave < 20) {
                 if (roll < 20) type = 'goblin';
                 else if (roll < 40) type = 'orc';
                 else if (roll < 55) type = 'troll';
                 else if (roll < 70) type = 'necromancer';
                 else if (roll < 85) type = 'skeleton';
                 else type = 'ghost';
+            } else if (currentWave < 25) { // Ondas 20-24
+                if (roll < 20) type = 'skeleton_warrior';
+                else if (roll < 40) type = 'ghost';
+                else if (roll < 55) type = 'necromancer';
+                else if (roll < 75) type = 'fire_elemental';
+                else if (roll < 90) type = 'ice_elemental';
+                else type = 'lightning_elemental';
+            } else if (currentWave < 30) { // Ondas 25-29 (Invocador aparece)
+                if (roll < 20) type = 'fire_elemental';
+                else if (roll < 40) type = 'ice_elemental';
+                else if (roll < 60) type = 'lightning_elemental';
+                else if (roll < 85) type = 'skeleton_warrior';
+                else type = 'summoner_elemental';
+            } else { // Onda 30+
+                if (roll < 30) type = 'summoner_elemental';
+                else if (roll < 60) type = 'juggernaut_troll'; // Juggernaut como inimigo comum
+                else type = 'archlich'; // Arquilich como inimigo comum
             }
 
             createEnemy(type, position);

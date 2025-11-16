@@ -10,7 +10,9 @@
         let isGameOver = true; // Inicia como TRUE para mostrar o menu
         let isGamePaused = false; // NOVO: Flag para pausar o jogo durante o level up
         let keys = {};
+        let playerSlowTimer = 0;
         const enemies = []; const powerUps = [];
+        const firePuddles = [];
 
         // Variável temporária para checagem de colisão
         let tempPlayer; 
@@ -150,7 +152,9 @@
                 damageCooldown: 0, // NOVO: Cooldown para o ataque do monstro
                 auraDamageAccumulator: 0, // NOVO: Acumula dano da aura para feedback visual
                 electrifiedTimer: 0, // NOVO: Timer para o status Eletrificado
-                burnTimer: 0 // NOVO: Timer para o status Queimado
+                burnTimer: 0, // NOVO: Timer para o status Queimado
+                fireTrailCooldown: 0, // NOVO: Cooldown para o rastro de fogo
+                teleportCooldown: 0 // NOVO: Cooldown para o teleporte
             };
 
             // NOVO: Adiciona propriedades específicas para o Rei Goblin
@@ -188,6 +192,26 @@
             if (type === 'skeleton_archer') {
                 enemy.userData.attackCooldown = 60; // Ataca a cada 1 segundo
                 enemy.userData.attackTimer = Math.random() * 60;
+            }
+
+            // NOVO: Adiciona propriedades para o Elemental de Gelo
+            if (type === 'ice_elemental') {
+                enemy.userData.auraRadius = 12; // Raio da aura de lentidão
+                enemy.userData.shatterOnDeath = true; // Habilidade ao morrer
+            }
+
+            // NOVO: Adiciona propriedades para o Elemental de Raio
+            if (type === 'lightning_elemental') {
+                enemy.userData.teleportCooldown = 300; // Teleporta a cada 5s
+                enemy.userData.isTeleporting = false;
+            }
+
+            // NOVO: Adiciona propriedades para o Invocador Elemental
+            if (type === 'summoner_elemental') {
+                enemy.userData.summonCooldown = 600; // Invoca a cada 10s
+                enemy.userData.attackCooldown = 240; // Ataca a cada 4s
+                enemy.userData.attackTimer = 120;
+                enemy.userData.auraRadius = 10;
             }
 
 
@@ -306,8 +330,8 @@
                 finalSpeed *= speedBoost;
             }
             let isSlowed = false;
-            // Juggernaut com armadura é imune a slow
-            if (enemyData.type !== 'ghost' && !(enemyData.type === 'juggernaut_troll' && enemyData.armor > 0)) {
+            // Imunidades ao congelamento
+            if (enemyData.type !== 'ghost' && enemyData.type !== 'ice_elemental' && enemyData.type !== 'lightning_elemental' && !(enemyData.type === 'juggernaut_troll' && enemyData.armor > 0)) {
                 const isInAura = freezingAuraTimer > 0 && enemy.position.distanceTo(player.position) < 6;
 
                 if (isInAura) {
@@ -422,7 +446,7 @@
             }
 
             // NOVO: Lógica do status Eletrificado
-            if (enemyData.electrifiedTimer > 0 && !(enemyData.type === 'juggernaut_troll' && enemyData.armor > 0)) {
+            if (enemyData.electrifiedTimer > 0 && !(enemyData.type === 'juggernaut_troll' && enemyData.armor > 0) && enemyData.type !== 'lightning_elemental') {
                 enemyData.electrifiedTimer--;
                 if (enemyData.electrifiedTimer % 60 === 0) { // Causa dano a cada segundo
                     enemyData.hp -= 5;
@@ -435,7 +459,7 @@
             }
 
             // NOVO: Lógica do status Queimado
-            if (enemyData.burnTimer > 0 && enemyData.type !== 'ghost') {
+            if (enemyData.burnTimer > 0 && enemyData.type !== 'ghost' && enemyData.type !== 'fire_elemental') {
                 enemyData.burnTimer--;
                 if (enemyData.burnTimer % 60 === 0) { // Dano a cada segundo
                     enemyData.hp -= 5;
@@ -447,6 +471,9 @@
             }
 
             // --- LÓGICA DE MOVIMENTO ---
+            if (enemyData.isTeleporting) {
+                continue; // Pula movimento se estiver se teleportando
+            }
             if (isSlowed) { // Inimigos congelados têm prioridade de movimento
                 // Movimento lento se estiver congelado
                 const slowDirection = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
@@ -537,6 +564,62 @@
                 const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
                 enemy.position.addScaledVector(direction, finalSpeed);
 
+            } else if (enemyData.type === 'fire_elemental') {
+                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
+                handleStandardMovement(enemy, newPosition, finalSpeed);
+
+                enemyData.fireTrailCooldown = Math.max(0, enemyData.fireTrailCooldown - 1);
+                if (enemyData.fireTrailCooldown <= 0) {
+                    createFirePuddle(enemy.position.clone());
+                    enemyData.fireTrailCooldown = 45; // Deixa uma poça a cada 0.75s
+                }
+            } else if (enemyData.type === 'ice_elemental') {
+                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
+                handleStandardMovement(enemy, newPosition, finalSpeed);
+                if (enemy.position.distanceTo(player.position) < enemyData.auraRadius) {
+                    playerSlowTimer = 120; // Aplica lentidão por 2 segundos
+                }
+            } else if (enemyData.type === 'lightning_elemental') {
+                enemyData.teleportCooldown = Math.max(0, enemyData.teleportCooldown - 1);
+                if (enemyData.teleportCooldown <= 0) {
+                    triggerTeleport(enemy);
+                    enemyData.teleportCooldown = 300; // Reseta cooldown
+                } else {
+                    // Movimento normal se não estiver teleportando
+                    const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                    const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
+                    handleStandardMovement(enemy, newPosition, finalSpeed);
+                }
+            } else if (enemyData.type === 'summoner_elemental') {
+                // Lógica de kiting
+                const distanceToPlayer = enemy.position.distanceTo(player.position);
+                const minDistance = 18;
+                let direction = new THREE.Vector3(0, 0, 0);
+                if (distanceToPlayer < minDistance) {
+                    direction.subVectors(enemy.position, player.position).normalize();
+                }
+                if (direction.lengthSq() > 0) {
+                    const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
+                    handleStandardMovement(enemy, newPosition, finalSpeed);
+                }
+
+                // Lógica de ataque
+                enemyData.attackTimer = Math.max(0, enemyData.attackTimer - 1);
+                if (enemyData.attackTimer <= 0) {
+                    const attackDirection = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
+                    createProjectile('necro_bolt', attackDirection, enemy.position);
+                    projectiles[projectiles.length - 1].userData.damage = enemyData.damage;
+                    enemyData.attackTimer = enemyData.attackCooldown;
+                }
+
+                // Lógica de invocação
+                enemyData.summonCooldown = Math.max(0, enemyData.summonCooldown - 1);
+                if (enemyData.summonCooldown <= 0) {
+                    triggerElementalSummon(enemy.position);
+                    enemyData.summonCooldown = 600;
+                }
             } else {
                 // Lógica de movimento padrão com colisão para outros inimigos
                 const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
@@ -552,6 +635,28 @@
                 enemy.position.z = Math.sign(enemy.position.z) * mapSize;
             }
 
+            // Lógica das Auras dos Inimigos
+            if (enemyData.type === 'ice_elemental' && enemy.position.distanceTo(player.position) < enemyData.auraRadius) {
+                player.userData.slowTimer = 120;
+            }
+            if (enemyData.type === 'summoner_elemental' && enemy.position.distanceTo(player.position) < enemyData.auraRadius) {
+                player.userData.slowTimer = 60;
+                player.userData.burnTimer = 120;
+                player.userData.electrifiedTimer = 120;
+            }
+
+            // Animação das partículas do Invocador
+            if (enemyData.particles) {
+                enemyData.particles.forEach(p => {
+                    p.userData.angle += p.userData.speed;
+                    p.position.set(
+                        enemy.position.x + Math.cos(p.userData.angle) * p.userData.radius,
+                        1.0,
+                        enemy.position.z + Math.sin(p.userData.angle) * p.userData.radius
+                    );
+                });
+            }
+
             // Checa colisão com o jogador APÓS o movimento
             const playerBBox = new THREE.Box3().setFromObject(player);
             // Inimigos de longa distância não causam dano de toque
@@ -560,6 +665,9 @@
                     if (enemyData.damageCooldown <= 0) {
                         damagePlayer(enemyData.damage);
                         createFloatingText(enemyData.damage, player.position.clone().setY(1.5), '#ff0000', '1.5rem');
+                        if (enemyData.type === 'fire_elemental') {
+                            player.userData.burnTimer = 300; // Aplica queimadura no contato
+                        }
                         enemyData.damageCooldown = 60; // Reseta o cooldown para 1 segundo (60 frames)
                     }
                 }
@@ -580,6 +688,11 @@
                     continue; // Pula para o próximo inimigo no loop
                 }
                 score += enemyData.score;
+
+                if (enemyData.shatterOnDeath) {
+                    triggerIceShatter(enemy.position);
+                }
+
                 gainExperience(enemyData.score); 
                 if (isBossWave) killsForSoulHarvest++; // Contador para o Arquilich
 
@@ -651,6 +764,42 @@
         }
     }
 
+    function createFirePuddle(position) {
+        const puddleGeometry = new THREE.CircleGeometry(0.8, 16);
+        const puddleMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff4500,
+            transparent: true,
+            opacity: 0.6,
+            side: THREE.DoubleSide
+        });
+        const puddle = new THREE.Mesh(puddleGeometry, puddleMaterial);
+        puddle.position.copy(position);
+        puddle.position.y = 0.03;
+        puddle.rotation.x = -Math.PI / 2;
+        scene.add(puddle);
+
+        firePuddles.push({ mesh: puddle, life: 300 }); // Dura 5 segundos
+    }
+
+    function updateFirePuddles() {
+        const playerBBox = new THREE.Box3().setFromObject(player);
+
+        for (let i = firePuddles.length - 1; i >= 0; i--) {
+            const puddle = firePuddles[i];
+            puddle.life--;
+
+            const puddleBBox = new THREE.Box3().setFromObject(puddle.mesh);
+            if (playerBBox.intersectsBox(puddleBBox)) {
+                damagePlayer(0.2); // Dano baixo, mas constante
+            }
+
+            if (puddle.life <= 0) {
+                scene.remove(puddle.mesh);
+                firePuddles.splice(i, 1);
+            }
+        }
+    }
+
         // NOVO: Função para iniciar o tremor da câmera
         function triggerCameraShake(intensity, duration) {
             // Garante que um novo tremor mais forte substitua um mais fraco
@@ -694,6 +843,7 @@
             // NOVO: Aplica o efeito de tremor da câmera
             if (cameraShakeDuration > 0) {
                 cameraShakeDuration--;
+                if (playerSlowTimer > 0) playerSlowTimer--;
                 // A intensidade do tremor diminui conforme o tempo passa
                 const currentShake = cameraShakeIntensity * (cameraShakeDuration / 20); 
                 const shakeX = (Math.random() - 0.5) * currentShake;
@@ -783,6 +933,7 @@
             updateClone(); // NOVO: Atualiza a lógica do clone
             updatePowerUps(); // Checa colisão com poções e poderes
             updateRunes(); // NOVO: Atualiza a lógica das runas
+            updateFirePuddles(); // NOVO: Atualiza as poças de fogo
             spawnEnemies();
             spawnPowerUps(); // Tenta spawnar poção
             

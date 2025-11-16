@@ -84,6 +84,38 @@ Para garantir que o jogador sempre tenha acesso a itens, um power-up aleatório 
 
 ---
 
+## 👹 Inimigos de Elite (Elementais)
+
+A partir da Onda 20, inimigos elementais poderosos começam a aparecer, cada um com habilidades e imunidades únicas que exigem novas estratégias.
+
+### Elemental de Fogo
+*   **Comportamento:** Agressivo e rápido, deixa um rastro de fogo que causa dano contínuo.
+*   **Habilidades:**
+    *   **Imunidade a Fogo:** Não pode ser afetado pelo status de Queimadura.
+    *   **Toque Incendiário:** Seu ataque de contato também aplica Queimadura no jogador.
+    *   **Rastro de Chamas:** Deixa poças de fogo no chão que causam dano ao jogador.
+
+### Elemental de Gelo
+*   **Comportamento:** Um tanque lento e resistente, cercado por uma aura de controle.
+*   **Habilidades:**
+    *   **Imunidade a Gelo:** Não pode ser congelado ou sofrer lentidão.
+    *   **Aura de Lentidão:** Reduz a velocidade de movimento do jogador que se aproxima.
+    *   **Estilhaçar Congelante:** Ao ser derrotado, explode em uma onda de gelo que aplica lentidão ao jogador próximo.
+
+### Elemental de Raio
+*   **Comportamento:** Extremamente rápido e imprevisível, difícil de acertar.
+*   **Habilidades:**
+    *   **Imunidade Elemental:** Imune aos status de Congelamento e Eletrificado.
+    *   **Teleporte Elétrico:** A cada 5 segundos, teleporta-se para uma nova posição perto do jogador e libera uma rajada de projéteis elétricos.
+
+### Invocador Elemental (A partir da Onda 25)
+*   **Comportamento:** Um inimigo de suporte que se mantém à distância, atacando com magia e invocando reforços.
+*   **Habilidades:**
+    *   **Invocação Elemental:** Periodicamente, invoca um dos três tipos de elementais (Fogo, Gelo ou Raio) para se juntar à batalha.
+    *   **Aura Tri-elemental:** Possui uma aura que aplica simultaneamente os status de Queimadura, Lentidão e Eletrificado no jogador que se aproxima.
+
+---
+
 ## Chefes (Bosses)
 
 A cada onda específica (7, 15 e 30), um chefe poderoso surge para testar suas habilidades.
