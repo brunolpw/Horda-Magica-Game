@@ -11,6 +11,8 @@
         let isGamePaused = false; // NOVO: Flag para pausar o jogo durante o level up
         let keys = {};
         let playerSlowTimer = 0;
+        const stormConduits = [];
+        const conduitBeams = [];
         const enemies = []; const powerUps = [];
         const firePuddles = [];
 
@@ -216,6 +218,32 @@
                 enemy.userData.auraRadius = 10;
             }
 
+            // NOVO: Adiciona propriedades para o Colosso de Magma
+            if (type === 'magma_colossus') {
+                enemy.userData.isBoss = true;
+                enemy.userData.eruptionCooldown = 900; // 15s
+                enemy.userData.meteorShowerCooldown = 600; // 10s
+                enemy.userData.isEnraged = false;
+            }
+
+            // NOVO: Adiciona propriedades para a Matriarca Glacial
+            if (type === 'glacial_matriarch') {
+                enemy.userData.isBoss = true;
+                enemy.userData.shardLaunchCooldown = 480; // 8s
+                enemy.userData.icePrisonCooldown = 1200; // 20s
+                enemy.userData.isEnraged = false;
+                enemy.userData.shardShields = [];
+                enemy.userData.maxShards = 5;
+                createIceShardShield(enemy); // Cria o escudo inicial
+            }
+
+            // NOVO: Adiciona propriedades para o Soberano da Tempestade
+            if (type === 'storm_sovereign') {
+                enemy.userData.isBoss = true;
+                enemy.userData.isInvulnerable = true;
+                enemy.userData.teleportCooldown = 480; // 8s
+                createStormConduits(enemy, 3);
+            }
 
             // NOVO: Guarda a cor original de cada parte do modelo para o feedback de hit
             enemy.traverse((child) => {
@@ -334,7 +362,7 @@
             let isSlowed = false;
             // Imunidades ao congelamento
             if (enemyData.type !== 'ghost' && enemyData.type !== 'ice_elemental' && enemyData.type !== 'lightning_elemental' && !(enemyData.type === 'juggernaut_troll' && enemyData.armor > 0)) {
-                const distanceToPlayer = enemy.position.distanceTo(player.position);
+                const distanceToPlayer = enemy.position.distanceTo(player.position); // Matriarca é imune a gelo
                 const auraRadius = 6;
 
                 if (freezingAuraTimer > 0 && distanceToPlayer < auraRadius) {
@@ -480,7 +508,10 @@
             }
 
             // NOVO: Lógica do status Queimado
-            if (enemyData.burnTimer > 0 && enemyData.type !== 'ghost' && enemyData.type !== 'fire_elemental') {
+            if (enemyData.burnTimer > 0 
+            && enemyData.type !== 'ghost' 
+            && enemyData.type !== 'fire_elemental' 
+            && enemyData.type !== 'magma_colossus') {
                 enemyData.burnTimer--; // Dura 10 segundos (600 frames)
                 enemyData.isFleeing = true; // Ativa o status de fuga
 
@@ -601,6 +632,7 @@
                 if (enemyData.fireTrailCooldown <= 0) {
                     createFirePuddle(enemy.position.clone());
                     enemyData.fireTrailCooldown = 45; // Deixa uma poça a cada 0.75s
+                    enemyData.fireTrailCooldown = 45;
                 }
             } else if (enemyData.type === 'ice_elemental') {
                 const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
@@ -648,6 +680,83 @@
                     triggerElementalSummon(enemy.position);
                     enemyData.summonCooldown = 600;
                 }
+            } else if (enemyData.type === 'magma_colossus') {
+                // Fúria
+                if (!enemyData.isEnraged && enemyData.hp / enemyData.maxHP < 0.5) {
+                    enemyData.isEnraged = true;
+                    enemyData.speed *= 1.5; // Aumenta a velocidade
+                }
+
+                // Movimento e rastro de lava
+                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
+                handleStandardMovement(enemy, newPosition, finalSpeed);
+                if (Math.random() < 0.1) {
+                    createFirePuddle(enemy.position.clone(), 1.5, 480); // Poças maiores e mais duradouras
+                }
+
+                // Habilidades
+                const furyMultiplier = enemyData.isEnraged ? 0.7 : 1.0; // Ataques mais rápidos na fúria
+                enemyData.eruptionCooldown = Math.max(0, enemyData.eruptionCooldown - 1);
+                if (enemyData.eruptionCooldown <= 0) {
+                    triggerEruption(enemy.position);
+                    enemyData.eruptionCooldown = 900 * furyMultiplier;
+                }
+                enemyData.meteorShowerCooldown = Math.max(0, enemyData.meteorShowerCooldown - 1);
+                if (enemyData.meteorShowerCooldown <= 0) {
+                    triggerMeteorShower(5);
+                    enemyData.meteorShowerCooldown = 600 * furyMultiplier;
+                }
+            } else if (enemyData.type === 'glacial_matriarch') {
+                // Fúria (Nevasca)
+                if (!enemyData.isEnraged && enemyData.hp / enemyData.maxHP < 0.5) {
+                    enemyData.isEnraged = true;
+                    triggerBlizzard(true);
+                }
+
+                // Movimento flutuante
+                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
+                handleStandardMovement(enemy, newPosition, finalSpeed);
+
+                // Regenera cacos do escudo
+                if (enemyData.shardShields.length < enemyData.maxShards) {
+                    if (Math.random() < 0.005) { // Chance de regenerar
+                        createIceShardShield(enemy, 1);
+                    }
+                }
+
+                // Habilidades
+                const furyMultiplier = enemyData.isEnraged ? 0.6 : 1.0;
+                enemyData.shardLaunchCooldown = Math.max(0, enemyData.shardLaunchCooldown - 1);
+                if (enemyData.shardLaunchCooldown <= 0 && enemyData.shardShields.length > 0) {
+                    const shardToLaunch = enemyData.shardShields.pop();
+                    scene.remove(shardToLaunch);
+                    const launchDir = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
+                    createProjectile('ice_shard', launchDir, enemy.position);
+                    enemyData.shardLaunchCooldown = 480 * furyMultiplier;
+                }
+
+                enemyData.icePrisonCooldown = Math.max(0, enemyData.icePrisonCooldown - 1);
+                if (enemyData.icePrisonCooldown <= 0) {
+                    triggerIcePrison();
+                    enemyData.icePrisonCooldown = 1200 * furyMultiplier;
+                }
+            } else if (enemyData.type === 'storm_sovereign') {
+                // Movimento errático
+                const randomDir = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
+                const newPosition = enemy.position.clone().addScaledVector(randomDir, finalSpeed);
+                handleStandardMovement(enemy, newPosition, finalSpeed);
+
+                // Animação de pulsação
+                const scale = 1.0 + Math.sin(Date.now() * 0.005) * 0.1;
+                enemy.scale.set(scale, scale, scale);
+
+                enemyData.teleportCooldown = Math.max(0, enemyData.teleportCooldown - 1);
+                if (enemyData.teleportCooldown <= 0) {
+                    triggerTeleport(enemy);
+                }
+
             } else {
                 // Lógica de movimento padrão com colisão para outros inimigos
                 const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
@@ -726,13 +835,9 @@
                 gainExperience(enemyData.score); 
                 if (isBossWave) killsForSoulHarvest++; // Contador para o Arquilich
 
-                // CORREÇÃO: Incrementa os abates e limita ao máximo da habilidade ativa.
-                const activeId = player.userData.activeAbility;
-                if (activeId) {
-                    const ability = upgrades[activeId];
-                    const maxKills = ability.getKillCost(player.userData.upgrades[activeId] || 1);
-                    killPoints = Math.min(maxKills, killPoints + 1);
-                }
+                // NOVO: Cada abate reduz o tempo de recarga da próxima carga em 1 segundo (60 frames)
+                chargeTimer = Math.max(0, chargeTimer - 60);
+
                 killsSinceLastPotion++;
 
                 if (killStats[enemyData.type] !== undefined) {
@@ -794,8 +899,8 @@
         }
     }
 
-    function createFirePuddle(position) {
-        const puddleGeometry = new THREE.CircleGeometry(0.8, 16);
+    function createFirePuddle(position, radius = 0.8, life = 300) {
+        const puddleGeometry = new THREE.CircleGeometry(radius, 16);
         const puddleMaterial = new THREE.MeshBasicMaterial({
             color: 0xff4500,
             transparent: true,
@@ -808,7 +913,7 @@
         puddle.rotation.x = -Math.PI / 2;
         scene.add(puddle);
 
-        firePuddles.push({ mesh: puddle, life: 300 }); // Dura 5 segundos
+        firePuddles.push({ mesh: puddle, life: life });
     }
 
     function updateFirePuddles() {
@@ -890,12 +995,24 @@
             
             // Atualiza Cooldowns
             projectileCooldown = Math.max(0, projectileCooldown - 1);
-            specialCooldown = Math.max(0, specialCooldown - 1);
+            specialGlobalCooldown = Math.max(0, specialGlobalCooldown - 1);
             if (repulsionBubbleTimer > 0) repulsionBubbleTimer--; // NOVO: Decrementa timer da bolha
             if (freezingAuraTimer > 0) freezingAuraTimer--; // NOVO: Decrementa timer da aura
             if (flamingAuraTimer > 0) flamingAuraTimer--;
             if (electrifyingAuraTimer > 0) electrifyingAuraTimer--;
             if (expBoostTimer > 0) expBoostTimer--; // NOVO: Decrementa timer do EXP
+
+            // NOVO: Lógica de recarga de habilidade ativa
+            const activeId = player.userData.activeAbility;
+            if (activeId) {
+                chargeTimer = Math.max(0, chargeTimer - 1);
+                if (chargeTimer <= 0) {
+                    player.userData.abilityCharges[activeId] = (player.userData.abilityCharges[activeId] || 0) + 1;
+                    chargeTimer = CHARGE_TIME_MAX; // Reseta o timer para a próxima carga
+                    updateUI(); // Atualiza a UI para mostrar a nova carga
+                }
+            }
+
 
             if (repulsionBubbleTimer > 0) {
                 repulsionBubbleMesh.visible = true;
@@ -1030,6 +1147,8 @@
             // 2. O Escudo ataca (e pode matar o inimigo que acabou de se mover)
             updateShield(); 
 
+            updateBossShields(); // NOVO: Atualiza escudos de chefes
+            checkBeamCollisions(); // NOVO: Checa colisão com raios do chefe
             // 4. Lógica dos Projéteis
             updateProjectiles();
             
@@ -1058,11 +1177,71 @@
             if (boss.userData.type === 'archlich') {
                 showSpecialLevelUpOptions();
             }
+                if (enemyData.type === 'storm_sovereign') {
+                    // Limpa os conduítes e raios restantes
+                    stormConduits.forEach(c => scene.remove(c));
+                    stormConduits.length = 0;
+                    conduitBeams.forEach(b => scene.remove(b));
+                    conduitBeams.length = 0;
+                }
+                if (enemyData.type === 'glacial_matriarch' && enemyData.isEnraged) {
+                    triggerBlizzard(false); // Desativa a nevasca
+                }
+                // Remove os cacos de gelo restantes
+                if (enemyData.shardShields) {
+                    enemyData.shardShields.forEach(shard => scene.remove(shard));
+                }
+                // Remove conduítes e raios restantes
+                stormConduits.forEach(c => scene.remove(c));
+                stormConduits.length = 0;
+                conduitBeams.forEach(b => scene.remove(b));
+                conduitBeams.length = 0;
 
             isBossWave = false;
             currentBoss = null;
             updateUI();
         }
+
+        function createIceShardShield(boss, count = 5) {
+            const shardGeo = new THREE.BoxGeometry(0.2, 1.5, 0.2);
+            const shardMat = new THREE.MeshLambertMaterial({ color: 0xE0FFFF, emissive: 0xADD8E6, emissiveIntensity: 1 });
+
+            for (let i = 0; i < count; i++) {
+                const shard = new THREE.Mesh(shardGeo, shardMat);
+                shard.userData.isShield = true; // Flag para colisão de projétil
+                shard.userData.angle = (boss.userData.shardShields.length / boss.userData.maxShards) * Math.PI * 2;
+                shard.userData.radius = 3.5;
+                shard.userData.boss = boss; // Referência ao chefe
+                boss.userData.shardShields.push(shard);
+                scene.add(shard);
+            }
+        }
+
+        function createStormConduits(boss, count) {
+            const conduitGeo = new THREE.CylinderGeometry(0.5, 0.5, 3, 8);
+            const conduitMat = new THREE.MeshLambertMaterial({ color: 0x9400D3, emissive: 0x8A2BE2, emissiveIntensity: 1.5 });
+
+            for (let i = 0; i < count; i++) {
+                const conduit = new THREE.Mesh(conduitGeo, conduitMat);
+                const angle = (i / count) * Math.PI * 2;
+                const radius = 20;
+                conduit.position.set(Math.cos(angle) * radius, 1.5, Math.sin(angle) * radius);
+                
+                conduit.userData = {
+                    isConduit: true,
+                    boss: boss,
+                    hp: boss.userData.maxHP / count,
+                    maxHP: boss.userData.maxHP / count
+                };
+                
+                stormConduits.push(conduit);
+                scene.add(conduit);
+            }
+            updateConduitBeams();
+        }
+
+
+
 
         // Função startGame agora recebe o nome do jogador
         window.startGame = function (name) {
@@ -1075,9 +1254,79 @@
             if (rangeIndicator) rangeIndicator.visible = false; // NOVO: Esconde indicador de alcance
 
             resetWaveState();
+            // Limpa conduítes e raios de jogos anteriores
+            stormConduits.forEach(c => scene.remove(c));
+            stormConduits.length = 0;
+            conduitBeams.forEach(b => scene.remove(b));
+            conduitBeams.length = 0;
+
+            triggerBlizzard(false); // Garante que a nevasca não esteja ativa
             
             // CORREÇÃO: Define como "jogo iniciado" APENAS DEPOIS que tudo foi criado
             isGameOver = false;
+        }
+
+        function updateBossShields() {
+            enemies.forEach(enemy => {
+                if (enemy.userData.type === 'glacial_matriarch' && enemy.userData.shardShields) {
+                    const shields = enemy.userData.shardShields;
+                    shields.forEach((shard, index) => {
+                        shard.userData.angle += 0.01;
+                        const x = enemy.position.x + Math.cos(shard.userData.angle) * shard.userData.radius;
+                        const z = enemy.position.z + Math.sin(shard.userData.angle) * shard.userData.radius;
+                        shard.position.set(x, 1.5, z);
+                        shard.lookAt(enemy.position);
+                    });
+                }
+            });
+        }
+
+        function triggerBlizzard(isActive) {
+            if (isActive) {
+                scene.fog.near = 10;
+                scene.fog.far = 35;
+            } else {
+                scene.fog.near = mapSize * 0.5;
+                scene.fog.far = mapSize * 2.0;
+            }
+        }
+
+        function updateConduitBeams() {
+            // Limpa raios antigos
+            conduitBeams.forEach(beam => scene.remove(beam));
+            conduitBeams.length = 0;
+
+            if (stormConduits.length < 2) return;
+
+            for (let i = 0; i < stormConduits.length; i++) {
+                const startPoint = stormConduits[i].position;
+                const endPoint = stormConduits[(i + 1) % stormConduits.length].position;
+
+                const distance = startPoint.distanceTo(endPoint);
+                const beamGeo = new THREE.CylinderGeometry(0.2, 0.2, distance, 8);
+                const beamMat = new THREE.MeshBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0.6 });
+                const beam = new THREE.Mesh(beamGeo, beamMat);
+
+                beam.position.copy(startPoint).lerp(endPoint, 0.5);
+                beam.lookAt(endPoint);
+                beam.rotateX(Math.PI / 2);
+
+                beam.userData.isBeam = true;
+                conduitBeams.push(beam);
+                scene.add(beam);
+            }
+        }
+
+        function checkBeamCollisions() {
+            if (conduitBeams.length === 0) return;
+
+            const playerBBox = new THREE.Box3().setFromObject(player);
+            for (const beam of conduitBeams) {
+                if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(beam))) {
+                    damagePlayer(0.5); // Dano contínuo
+                    break;
+                }
+            }
         }
 
         function endGame() {
@@ -1090,6 +1339,13 @@
             window.saveScore(score, playerName, killStats, playerLevel, currentWave);
             
             if (repulsionBubbleMesh) repulsionBubbleMesh.visible = false;
+            // Limpa conduítes e raios ao final do jogo
+            stormConduits.forEach(c => scene.remove(c));
+            stormConduits.length = 0;
+            conduitBeams.forEach(b => scene.remove(b));
+            conduitBeams.length = 0;
+
+            triggerBlizzard(false); // Garante que a nevasca seja desativada
             if (freezingAuraMesh) freezingAuraMesh.visible = false;
             if (clone) { scene.remove(clone); clone = null; }
             if (expBoostAuraMesh) expBoostAuraMesh.visible = false;

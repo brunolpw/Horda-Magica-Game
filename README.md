@@ -159,27 +159,27 @@ A partir da Onda 20, inimigos elementais poderosos começam a aparecer, cada um 
 
 ## Chefes (Bosses)
 
-A cada onda específica (7, 15 e 30), um chefe poderoso surge para testar suas habilidades.
+Chefes poderosos surgem em ondas específicas para testar suas habilidades.
 
 ### Onda 7: Rei Goblin
 
 O líder supremo dos goblins. Ele não luta sozinho, preferindo fortalecer e comandar suas tropas para sobrecarregar o jogador.
 
 **Habilidades:**
-- **Chamado da Horda**: Periodicamente, invoca um grupo de 5 goblins normais para se juntarem à batalha.
-- **Aura Real**: Concede um bônus de 25% de velocidade de movimento a todos os goblins em um raio de 15 unidades ao seu redor.
-- **Fuga Covarde**: Quando sua vida fica abaixo de 30%, ele para de atacar e tenta fugir do jogador, atirando pedras como defesa.
+- **Chamado da Horda**: Periodicamente, invoca um grupo de goblins.
+- **Aura Real**: Concede um bônus de velocidade de movimento a todos os goblins próximos.
+- **Fuga Covarde**: Tenta fugir quando sua vida está baixa, atirando pedras como defesa.
 
-### Onda 15: Juggernaut Troll
+### Onda 20: Juggernaut Troll
 
 Uma besta colossal coberta por uma armadura de pedra. O Juggernaut Troll é um teste de pura resistência e dano bruto, forçando o jogador a quebrar suas defesas.
 
 **Habilidades:**
 - **Armadura de Pedra**: Possui 1000 pontos de armadura que devem ser destruídos antes que sua vida possa ser danificada. Enquanto tem armadura, é imune a efeitos de status.
 - **Fúria**: Seu dano de contato aumenta conforme sua vida diminui.
-- **Terremoto**: A cada 10 segundos, bate no chão, causando dano em área ao seu redor.
+- **Terremoto**: Periodicamente, bate no chão, causando dano em área ao seu redor.
 
-### Onda 30: Arquilich
+### Onda 35: Arquilich
 
 Um mestre da necromancia que utiliza táticas profanas para controlar o campo de batalha.
 
@@ -187,7 +187,28 @@ Um mestre da necromancia que utiliza táticas profanas para controlar o campo de
 - **Escudo de Almas**: Começa a batalha com 5 esferas de alma que absorvem projéteis.
 - **Colheita de Almas**: A cada 5 monstros que o jogador derrota, o Arquilich invoca um Esqueleto Guerreiro.
 - **Prisão de Ossos**: Periodicamente, cria um círculo de paredes de osso ao redor do jogador.
+**Recompensa Especial**: Ao ser derrotado, abre uma tela de melhoria que permite ao jogador escolher **qualquer habilidade** do jogo.
 
-**Recompensa Especial**: Ao ser derrotado, abre uma tela de melhoria que permite ao jogador escolher **qualquer habilidade** do jogo para aprender ou aprimorar.
+### Ondas 50, 60, 70, 80: Chefes Elementais
+
+Nestas ondas, você enfrentará um dos três Lordes Elementais, sorteado aleatoriamente. Cada um deve aparecer pelo menos uma vez.
+
+#### Colosso de Magma (🔥)
+*   **Tema:** Força bruta e negação de área. Transforma o campo de batalha em um inferno.
+*   **Habilidades:** Deixa um rastro de lava, dispara ondas de fogo e invoca uma chuva de meteoros. Entra em fúria com vida baixa.
+
+#### Matriarca Glacial (❄️)
+*   **Tema:** Controle e defesa. Foca em paralisar o jogador para desferir ataques letais.
+*   **Habilidades:** Protegida por um escudo de cacos de gelo que bloqueiam projéteis, cria prisões de gelo e invoca uma nevasca com vida baixa.
+
+#### Soberano da Tempestade (⚡)
+*   **Tema:** Velocidade e imprevisibilidade. Um teste de reflexos e gerenciamento de múltiplos alvos.
+*   **Habilidades:** O chefe é invulnerável. Para derrotá-lo, você deve destruir os 3 "conduítes" que ele invoca, enquanto desvia de barreiras de raios e explosões de sobrecarga.
+
+### Onda 90: A Calamidade Elemental
+
+Prepare-se para o desafio supremo: enfrentar o **Colosso de Magma**, a **Matriarca Glacial** e o **Soberano da Tempestade** ao mesmo tempo!
+
+*(Esta seção permanece como estava, detalhando os chefes Rei Goblin, Juggernaut Troll e Arquilich).*
 
 *(Esta seção permanece como estava, detalhando os chefes Rei Goblin, Juggernaut Troll e Arquilich).*

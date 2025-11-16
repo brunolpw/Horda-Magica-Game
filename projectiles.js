@@ -24,8 +24,13 @@ function createProjectile(type, direction, startPosition) {
         geometry = new THREE.CylinderGeometry(0.3, 0.1, 2.5, 8); // Forma de lança
         material = new THREE.MeshLambertMaterial({ color: 0xADD8E6, emissive: 0xADD8E6, emissiveIntensity: 0.5 });
         props = { damage: 0, speed: 0.4 };
+    } else if (type === 'ice_shard') {
+        geometry = new THREE.BoxGeometry(0.2, 1.5, 0.2);
+        material = new THREE.MeshLambertMaterial({ color: 0xE0FFFF, emissive: 0xADD8E6, emissiveIntensity: 1 });
+        props = { damage: 35, speed: 0.35 };
         isExplosive = false;
     } else if (type === 'necro_bolt' || type === 'arrow' || type === 'weak' || type === 'strong') {
+    } else if (type === 'necro_bolt' || type === 'arrow' || type === 'weak' || type === 'strong' || type === 'shaman_bolt') {
         props = projectileProps[type];
         if (!props) {
             console.error("Tipo de projétil desconhecido:", type);
@@ -53,6 +58,7 @@ function createProjectile(type, direction, startPosition) {
         isHoming: false,
         target: null,
         hasBeenReflected: (type === 'necro_bolt' || type === 'arrow') ? null : true,
+        hasBeenReflected: (type === 'necro_bolt' || type === 'arrow' || type === 'shaman_bolt') ? null : true,
         pierceCount: 0,
         maxPierce: (type === 'ice_lance') ? 3 : 1, // Padrão para a lança
         hitEnemies: [] // Guarda os inimigos já atingidos
@@ -152,7 +158,8 @@ function updateProjectiles() {
             projectile.rotateX(Math.PI / 2);
         }
 
-        if (projData.type === 'necro_bolt' || projData.type === 'arrow') {
+        if (projData.type === 'necro_bolt' || projData.type === 'arrow' || projData.type === 'ice_shard') {
+        if (projData.type === 'necro_bolt' || projData.type === 'arrow' || projData.type === 'ice_shard' || projData.type === 'shaman_bolt') {
             const playerBBox = new THREE.Box3().setFromObject(player);
             if (tempBBox.intersectsBox(playerBBox)) {
                 damagePlayer(projData.damage);
@@ -163,71 +170,111 @@ function updateProjectiles() {
             }
         }
 
-        if (projData.type !== 'necro_bolt' && projData.type !== 'arrow') { // Projéteis do jogador
+        // Colisão de projéteis do jogador com escudos de chefes
+        if (projData.type !== 'necro_bolt' && projData.type !== 'arrow' && projData.type !== 'ice_shard') {
+        if (projData.type !== 'necro_bolt' && projData.type !== 'arrow' && projData.type !== 'ice_shard' && projData.type !== 'shaman_bolt') {
             for (const enemy of enemies) {
-                const enemyBBox = new THREE.Box3().setFromObject(enemy);
-
-                // Evita que um projétil perfurante atinja o mesmo inimigo duas vezes
-                if (projData.hitEnemies.includes(enemy.uuid)) {
-                    continue;
+                if (enemy.userData.shardShields && enemy.userData.shardShields.length > 0) {
+                    for (let s = enemy.userData.shardShields.length - 1; s >= 0; s--) {
+                        const shard = enemy.userData.shardShields[s];
+                        if (tempBBox.intersectsBox(new THREE.Box3().setFromObject(shard))) {
+                            scene.remove(shard);
+                            enemy.userData.shardShields.splice(s, 1);
+                            hit = true;
+                            break;
+                        }
+                    }
                 }
+                if (hit) break;
+            }
 
-                if (tempBBox.intersectsBox(enemyBBox)) {
-                    const damageLevel = player.userData.upgrades.increase_damage || 0;
-                    let finalDamage = projData.damage;
-                    if (damageLevel > 0) {
-                        // +2 de dano por nível (2, 4, 6, 8, 10)
-                        const bonusAmount = damageLevel * 2;
-                        finalDamage += bonusAmount;
-                    }
+            // Colisão com Conduítes do Chefe de Raio
+            if (!hit && stormConduits.length > 0) {
+                for (let c = stormConduits.length - 1; c >= 0; c--) {
+                    const conduit = stormConduits[c];
+                    if (tempBBox.intersectsBox(new THREE.Box3().setFromObject(conduit))) {
+                        conduit.userData.hp -= finalDamage;
+                        createFloatingText(Math.floor(finalDamage), conduit.position.clone().setY(3.5), 'white');
+                        hit = true; // Projétil é destruído
 
-                    // Lógica do Míssil de Fogo Etéreo
-                    if (projData.type === 'ethereal_fire') {
-                        finalDamage *= getWeaknessMultiplier('fire', enemy.userData.type);
-                        const enemyType = enemy.userData.type;
-                        if (enemyType.includes('skeleton') || enemyType === 'ghost') {
-                            finalDamage = Math.ceil(finalDamage * 1.10); // +10% de dano
+                        if (conduit.userData.hp <= 0) {
+                            triggerOverload(conduit.position);
+                            scene.remove(conduit);
+                            stormConduits.splice(c, 1);
+                            updateConduitBeams();
+                            if (stormConduits.length === 0) handleBossDefeat(conduit.userData.boss);
                         }
-                        if (enemyType !== 'ghost') {
-                            enemy.userData.burnTimer = 600; // 10 segundos de queimadura
+                        break;
+                    }
+                }
+            }
+
+            if (!hit) { // Se não atingiu um escudo, checa os inimigos
+                for (const enemy of enemies) {
+                    const enemyBBox = new THREE.Box3().setFromObject(enemy);
+
+                    // Evita que um projétil perfurante atinja o mesmo inimigo duas vezes
+                    if (projData.hitEnemies.includes(enemy.uuid)) {
+                        continue;
+                    }
+
+                    if (tempBBox.intersectsBox(enemyBBox)) {
+                        const damageLevel = player.userData.upgrades.increase_damage || 0;
+                        let finalDamage = projData.damage;
+                        if (damageLevel > 0) {
+                            // +2 de dano por nível (2, 4, 6, 8, 10)
+                            const bonusAmount = damageLevel * 2;
+                            finalDamage += bonusAmount;
                         }
-                    }
 
-                    // Lógica da Lança de Gelo
-                    if (projData.type === 'ice_lance') {
-                        finalDamage *= getWeaknessMultiplier('ice', enemy.userData.type);
-                    }
-
-                    if (enemy.userData.isBoss && enemy.userData.soulShieldCharges > 0) {
-                        enemy.userData.soulShieldCharges--;
-                        removeShield();
-                        if (enemy.userData.soulShieldCharges > 0) createBossShield(enemy.userData.soulShieldCharges);
-                        hit = true;
-                    } else if (enemy.userData.armor > 0) {
-                        const armorDamage = Math.min(enemy.userData.armor, finalDamage);
-                        enemy.userData.armor -= armorDamage;
-                        finalDamage -= armorDamage;
-                        createFloatingText(Math.floor(armorDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#A9A9A9');
-                    }
-
-                    if (hit || finalDamage <= 0) continue;
-                    enemy.userData.hp -= finalDamage;
-                    createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
-                    enemy.userData.hitTimer = 10;
-
-                    // Lógica de perfuração
-                    if (projData.type === 'ice_lance') {
-                        enemy.userData.freezeLingerTimer = 600; // Aplica congelamento
-                        projData.hitEnemies.push(enemy.uuid);
-                        projData.pierceCount++;
-                        if (projData.pierceCount >= projData.maxPierce) {
-                            hit = true; // Destrói a lança após atingir o máximo de alvos
+                        // Lógica do Míssil de Fogo Etéreo
+                        if (projData.type === 'ethereal_fire') {
+                            finalDamage *= getWeaknessMultiplier('fire', enemy.userData.type);
+                            const enemyType = enemy.userData.type;
+                            if (enemyType.includes('skeleton') || enemyType === 'ghost') {
+                                finalDamage = Math.ceil(finalDamage * 1.10); // +10% de dano
+                            }
+                            if (enemyType !== 'ghost') {
+                                enemy.userData.burnTimer = 600; // 10 segundos de queimadura
+                            }
                         }
-                    } else {
-                        hit = true;
-                    }
 
-                    if (hit) break; // Para de procurar inimigos neste frame se o projétil deve ser destruído
+                        // Lógica da Lança de Gelo
+                        if (projData.type === 'ice_lance') {
+                            finalDamage *= getWeaknessMultiplier('ice', enemy.userData.type);
+                        }
+
+                        if (enemy.userData.isBoss && enemy.userData.soulShieldCharges > 0) {
+                            enemy.userData.soulShieldCharges--;
+                            removeShield();
+                            if (enemy.userData.soulShieldCharges > 0) createBossShield(enemy.userData.soulShieldCharges);
+                            hit = true;
+                        } else if (enemy.userData.armor > 0) {
+                            const armorDamage = Math.min(enemy.userData.armor, finalDamage);
+                            enemy.userData.armor -= armorDamage;
+                            finalDamage -= armorDamage;
+                            createFloatingText(Math.floor(armorDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#A9A9A9');
+                        }
+
+                        if (hit || finalDamage <= 0) continue;
+                        enemy.userData.hp -= finalDamage;
+                        createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
+                        enemy.userData.hitTimer = 10;
+
+                        // Lógica de perfuração
+                        if (projData.type === 'ice_lance') {
+                            enemy.userData.freezeLingerTimer = 600; // Aplica congelamento
+                            projData.hitEnemies.push(enemy.uuid);
+                            projData.pierceCount++;
+                            if (projData.pierceCount >= projData.maxPierce) {
+                                hit = true; // Destrói a lança após atingir o máximo de alvos
+                            }
+                        } else {
+                            hit = true;
+                        }
+
+                        if (hit) break; // Para de procurar inimigos neste frame se o projétil deve ser destruído
+                    }
                 }
             }
         }

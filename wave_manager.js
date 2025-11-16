@@ -11,6 +11,7 @@ let intraWaveSpawnTimer = 0;
 let isBossWave = false;
 let currentBoss = null;
 let killsForSoulHarvest = 0;
+let unspawnedElementalBosses = [];
 
 const maxActiveEnemies = 40;
 
@@ -18,17 +19,44 @@ const maxActiveEnemies = 40;
 
 function startNextWave() {
     currentWave++;
-
-    const bossWaveCondition = currentWave === 7 || currentWave === 15 || currentWave === 30;
+    
+    const bossWaveCondition = [7, 20, 35, 50, 60, 70, 80, 90].includes(currentWave);
     if (bossWaveCondition) {
         let bossType;
-        switch(currentWave) {
-            case 7: bossType = 'goblin_king'; break;
-            case 15: bossType = 'juggernaut_troll'; break;
-            case 30:
+        const elementalBosses = ['magma_colossus', 'glacial_matriarch', 'storm_sovereign'];
+
+        if (currentWave === 7) {
+            bossType = 'goblin_king';
+        } else if (currentWave === 20) {
+            bossType = 'juggernaut_troll';
+        } else if (currentWave === 35) {
                 bossType = 'archlich';
                 createBossShield(5);
-                break;
+        } else if (currentWave >= 50 && currentWave <= 80) {
+            if (unspawnedElementalBosses.length > 0) {
+                // Garante que cada um apareça uma vez
+                const randomIndex = Math.floor(Math.random() * unspawnedElementalBosses.length);
+                bossType = unspawnedElementalBosses.splice(randomIndex, 1)[0];
+            } else {
+                // Se todos já apareceram, sorteia qualquer um
+                bossType = elementalBosses[Math.floor(Math.random() * elementalBosses.length)];
+            }
+        } else if (currentWave === 90) {
+            // Invoca os 3 chefes elementais
+            elementalBosses.forEach(type => {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 10;
+                const position = new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+                createEnemy(type, position);
+            });
+            isBossWave = true;
+            // Define o último chefe criado como o "principal" para fins de UI
+            currentBoss = enemies[enemies.length - 1]; 
+            // Zera os monstros da onda para não spawnar inimigos comuns
+            enemiesToSpawnThisWave = 0;
+            enemiesAliveThisWave = 3; // 3 chefes vivos
+            updateUI();
+            return; // Retorna para não executar a lógica de spawn padrão
         }
 
         if (bossType) createEnemy(bossType, new THREE.Vector3(0, 0, 0));
@@ -98,9 +126,12 @@ function spawnEnemies() {
                 else if (roll < 85) type = 'skeleton_warrior';
                 else type = 'summoner_elemental';
             } else { // Onda 30+
-                if (roll < 30) type = 'summoner_elemental';
-                else if (roll < 60) type = 'juggernaut_troll'; // Juggernaut como inimigo comum
-                else type = 'archlich'; // Arquilich como inimigo comum
+                // Ajustado para não spawnar chefes como inimigos comuns
+                if (roll < 30) type = 'summoner_elemental'; 
+                else if (roll < 50) type = 'fire_elemental';
+                else if (roll < 70) type = 'ice_elemental';
+                else if (roll < 90) type = 'lightning_elemental';
+                else type = 'skeleton_warrior';
             }
 
             createEnemy(type, position);
@@ -118,4 +149,5 @@ function resetWaveState() {
     enemiesToSpawnThisWave = 0;
     monstersInPreviousWave = 0;
     killsForSoulHarvest = 0;
+    unspawnedElementalBosses = ['magma_colossus', 'glacial_matriarch', 'storm_sovereign'];
 }

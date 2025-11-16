@@ -58,11 +58,11 @@ const upgrades = {
     },
     missil_fogo_etereo: {
         type: 'active', icon: '🔥', title: "Míssil de Fogo Etéreo", maxLevel: 5,
-        getKillCost: () => 7,
+        getChargeCost: () => 7,
         description: (level) => `Dispara um míssil teleguiado que atravessa paredes e queima o alvo, causando dano extra a mortos-vivos.`
     },
     explosao_energia: {
-        type: 'active', icon: '🌀', title: "Explosão de Energia", maxLevel: 5, getKillCost: () => 10,
+        type: 'active', icon: '🌀', title: "Explosão de Energia", maxLevel: 5, getChargeCost: () => 10,
         description: (level) => `Libera uma explosão de projéteis em todas as direções. Mais projéteis com o nível.`
     },
     corrente_raios: {
@@ -70,23 +70,23 @@ const upgrades = {
         description: (level) => `Eletrifica seu próximo ataque, ricocheteando e aplicando dano contínuo.`
     },
     carga_explosiva: {
-        type: 'active', icon: '💣', title: "Carga Explosiva", maxLevel: 5, getKillCost: () => 15,
+        type: 'active', icon: '💣', title: "Carga Explosiva", maxLevel: 5, getChargeCost: () => 15,
         description: (level) => `Lança uma granada teleguiada que explode em área. Nv. 4+ libera fragmentos.`
     },
     runa_fogo: {
-        type: 'active', icon: '♨️', title: "Runa de Fogo", maxLevel: 5, getKillCost: () => 12,
+        type: 'active', icon: '♨️', title: "Runa de Fogo", maxLevel: 5, getChargeCost: () => 12,
         description: (level) => `Coloca uma armadilha de fogo invisível no chão que explode e queima inimigos.`
     },
     runa_gelo: {
-        type: 'active', icon: '❄️', title: "Runa de Gelo", maxLevel: 5, getKillCost: () => 12,
+        type: 'active', icon: '❄️', title: "Runa de Gelo", maxLevel: 5, getChargeCost: () => 12,
         description: (level) => `Coloca uma armadilha de gelo invisível que explode e congela inimigos.`
     },
     runa_raio: {
-        type: 'active', icon: '⚡', title: "Runa de Raio", maxLevel: 5, getKillCost: () => 12,
+        type: 'active', icon: '⚡', title: "Runa de Raio", maxLevel: 5, getChargeCost: () => 12,
         description: (level) => `Coloca uma armadilha elétrica invisível que explode e eletrifica inimigos.`
     },
     lanca_de_gelo: {
-        type: 'active', icon: '🧊', title: "Lança de Gelo", maxLevel: 5, getKillCost: () => 10,
+        type: 'active', icon: '🧊', title: "Lança de Gelo", maxLevel: 5, getChargeCost: () => 10,
         description: (level) => `Dispara uma lança de gelo perfurante que atravessa inimigos.
 Nv. 5: A lança explode no final.`
     }

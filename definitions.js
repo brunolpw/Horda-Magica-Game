@@ -288,6 +288,81 @@ function createSummonerElementalModel() {
     return group;
 }
 
+function createMagmaColossusModel() {
+    const group = new THREE.Group();
+    const coreGeometry = new THREE.IcosahedronGeometry(1.5, 1);
+    const coreMaterial = new THREE.MeshLambertMaterial({
+        color: 0xff2000,
+        emissive: 0xdd1000,
+        emissiveIntensity: 2.0
+    });
+    const core = new THREE.Mesh(coreGeometry, coreMaterial);
+    core.position.y = 1.8;
+    core.castShadow = true;
+    group.add(core);
+
+    // Armor plates
+    const armorMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+    for (let i = 0; i < 10; i++) {
+        const plate = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), armorMat);
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 1.2 + Math.random() * 0.3;
+        plate.position.set(Math.cos(angle) * radius, 1.8, Math.sin(angle) * radius);
+        plate.lookAt(core.position);
+        group.add(plate);
+    }
+    return group;
+}
+
+function createGlacialMatriarchModel() {
+    const group = new THREE.Group();
+    const coreGeometry = new THREE.ConeGeometry(0.8, 2.5, 8);
+    const coreMaterial = new THREE.MeshLambertMaterial({
+        color: 0xADD8E6,
+        transparent: true,
+        opacity: 0.85,
+        emissive: 0x87CEFA,
+        emissiveIntensity: 1.0
+    });
+    const core = new THREE.Mesh(coreGeometry, coreMaterial);
+    core.position.y = 1.25;
+    core.castShadow = true;
+    group.add(core);
+
+    // Partículas de gelo flutuantes
+    const particleMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+    for (let i = 0; i < 15; i++) {
+        const particle = new THREE.Mesh(new THREE.SphereGeometry(0.05, 4, 4), particleMat);
+        particle.position.set((Math.random() - 0.5) * 2, Math.random() * 2.5, (Math.random() - 0.5) * 2);
+        group.add(particle);
+    }
+
+    group.userData.isBossModel = true; // Flag para identificar o modelo do chefe
+    return group;
+}
+
+function createStormSovereignModel() {
+    const group = new THREE.Group();
+    const coreMaterial = new THREE.MeshLambertMaterial({
+        color: 0xfde047,
+        emissive: 0xfbbF24,
+        emissiveIntensity: 2.5
+    });
+
+    // Corpo principal como uma esfera pulsante
+    const core = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 16), coreMaterial);
+    core.position.y = 1.5;
+    group.add(core);
+
+    // Partículas elétricas ao redor
+    for (let i = 0; i < 20; i++) {
+        const particle = new THREE.Mesh(new THREE.SphereGeometry(0.1, 4, 4), coreMaterial);
+        particle.position.set((Math.random() - 0.5) * 4, 1.5 + (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 4);
+        group.add(particle);
+    }
+    return group;
+}
+
 // --- Definições de Inimigos (Stats) ---
 const entityProps = {
     goblin: { hp: 20, speed: 0.05, score: 7, damage: 10, name: "Goblin", modelFn: createGoblinModel, modelHeight: 0.9 },
@@ -304,5 +379,8 @@ const entityProps = {
     fire_elemental: { hp: 250, speed: 0.055, score: 40, damage: 25, name: "Elemental de Fogo", modelFn: createFireElementalModel, modelHeight: 1.5 },
     ice_elemental: { hp: 500, speed: 0.045, score: 45, damage: 20, name: "Elemental de Gelo", modelFn: createIceElementalModel, modelHeight: 1.6 },
     lightning_elemental: { hp: 200, speed: 0.065, score: 45, damage: 15, name: "Elemental de Raio", modelFn: createLightningElementalModel, modelHeight: 1.5 },
-    summoner_elemental: { hp: 150, speed: 0.025, score: 70, damage: 5, name: "Invocador Elemental", modelFn: createSummonerElementalModel, modelHeight: 1.6 }
+    summoner_elemental: { hp: 150, speed: 0.025, score: 70, damage: 5, name: "Invocador Elemental", modelFn: createSummonerElementalModel, modelHeight: 1.6 },
+    magma_colossus: { hp: 6000, speed: 0.02, score: 5000, damage: 50, name: "Colosso de Magma", modelFn: createMagmaColossusModel, modelHeight: 3.0 },
+    glacial_matriarch: { hp: 7500, speed: 0.025, score: 7500, damage: 20, name: "Matriarca Glacial", modelFn: createGlacialMatriarchModel, modelHeight: 2.8 },
+    storm_sovereign: { hp: 10000, speed: 0.04, score: 10000, damage: 30, name: "Soberano da Tempestade", modelFn: createStormSovereignModel, modelHeight: 2.5 }
 };

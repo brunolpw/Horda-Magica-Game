@@ -544,6 +544,22 @@ function triggerRockFall(targetPosition) {
     }, 1000);
 }
 
+function triggerIcePrison() {
+    const numWalls = 16;
+    const radius = 7;
+    for (let i = 0; i < numWalls; i++) {
+        const angle = (i / numWalls) * Math.PI * 2;
+        const x = player.position.x + Math.cos(angle) * radius;
+        const z = player.position.z + Math.sin(angle) * radius;
+        
+        const wall = createWall(new THREE.Vector3(x, 0, z), 0.8, 3.0);
+        wall.material.color.setHex(0xADD8E6); // Cor de gelo
+        wall.lookAt(player.position);
+        
+        setTimeout(() => { if (wall.parent) scene.remove(wall); obstacles.splice(obstacles.indexOf(wall), 1); }, 10000);
+    }
+}
+
 function triggerBonePrison() {
     const numWalls = 12;
     const radius = 5;
@@ -648,6 +664,52 @@ function triggerIceShatter(position) {
         slowIndicator.style.fontSize = '1.5rem';
         document.getElementById('floating-text-container').appendChild(slowIndicator);
         setTimeout(() => slowIndicator.remove(), 2000);
+    }
+}
+
+function triggerEruption(position) {
+    const numWaves = 5;
+    for (let i = 0; i < numWaves; i++) {
+        const angle = (i / numWaves) * Math.PI * 2 + Math.random() * 0.2;
+        const direction = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
+
+        const waveGeo = new THREE.BoxGeometry(10, 0.5, 1);
+        const waveMat = new THREE.MeshBasicMaterial({ color: 0xff4500, transparent: true, opacity: 0.8 });
+        const wave = new THREE.Mesh(waveGeo, waveMat);
+        wave.position.copy(position);
+        wave.lookAt(position.clone().add(direction));
+
+        scene.add(wave);
+
+        let distance = 0;
+        const interval = setInterval(() => {
+            distance += 0.5;
+            wave.position.addScaledVector(direction, 0.5);
+            if (new THREE.Box3().setFromObject(wave).intersectsBox(new THREE.Box3().setFromObject(player))) {
+                damagePlayer(20);
+            }
+            if (distance > mapSize) {
+                clearInterval(interval);
+                scene.remove(wave);
+            }
+        }, 20);
+    }
+}
+
+function triggerMeteorShower(count) {
+    for (let i = 0; i < count; i++) {
+        const targetPos = player.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 20, 0, (Math.random() - 0.5) * 20));
+        triggerRockFall(targetPos); // Reutiliza a lógica do rockfall com tema de meteoro
+    }
+}
+
+function triggerOverload(position) {
+    const numProjectiles = 12;
+    for (let i = 0; i < numProjectiles; i++) {
+        const angle = (i / numProjectiles) * Math.PI * 2;
+        const direction = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
+        const proj = createProjectile('weak', direction, position);
+        if(proj) proj.material.color.setHex(0xfde047);
     }
 }
 
