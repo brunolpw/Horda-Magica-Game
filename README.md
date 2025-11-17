@@ -115,7 +115,25 @@ Habilidades e auras podem aplicar status negativos nos inimigos, cada um com um 
 
 ---
 
-## 🛡️ Fraquezas Elementais
+## 👾 Inimigos Comuns
+
+A horda é composta por uma variedade de monstros, desde os mais fracos até os mais resistentes.
+
+### Kobolds (Normal, Guerreiro, Xamã)
+*   **Comportamento:** Criaturas fracas que atacam em grandes bandos. Os Xamãs atacam à distância, enquanto os outros buscam o combate corpo a corpo.
+*   **Onda de Aparição:** A partir da Onda 2.
+
+### Goblins
+*   **Comportamento:** A espinha dorsal da horda. Inimigos básicos que tentam sobrecarregar o jogador pelo número.
+*   **Onda de Aparição:** A partir da Onda 1.
+
+### Orcs e Trolls
+*   **Comportamento:** Inimigos mais lentos, porém muito mais resistentes e com dano elevado.
+*   **Onda de Aparição:** A partir da Onda 5.
+
+---
+
+## �️ Fraquezas Elementais
 
 Para adicionar mais estratégia ao combate, os inimigos elementais agora possuem fraquezas. Explorar a fraqueza de um inimigo aumenta todo o dano elemental causado a ele em **50%**.
 
@@ -170,6 +188,16 @@ O líder supremo dos goblins. Ele não luta sozinho, preferindo fortalecer e com
 - **Aura Real**: Concede um bônus de velocidade de movimento a todos os goblins próximos.
 - **Fuga Covarde**: Tenta fugir quando sua vida está baixa, atirando pedras como defesa.
 
+### Onda 10: Rei Kobold Sucateiro
+
+Um líder engenhoso que luta usando armadilhas e invenções caóticas em vez de força bruta.
+
+**Habilidades:**
+- **Disparador de Lixo**: Lança bombas de sucata que criam perigos no campo de batalha:
+    - **Poça de Óleo:** Causa **lentidão extrema** (90%) no jogador.
+    - **Bomba de Fumaça:** Cria uma nuvem densa que deixa o jogador **cego**, impedindo-o de atacar ou usar habilidades.
+- **Chamado da Horda**: Periodicamente, invoca um bando de Kobolds mistos para se juntarem à luta.
+
 ### Onda 20: Juggernaut Troll
 
 Uma besta colossal coberta por uma armadura de pedra. O Juggernaut Troll é um teste de pura resistência e dano bruto, forçando o jogador a quebrar suas defesas.
@@ -209,6 +237,36 @@ Nestas ondas, você enfrentará um dos três Lordes Elementais, sorteado aleator
 
 Prepare-se para o desafio supremo: enfrentar o **Colosso de Magma**, a **Matriarca Glacial** e o **Soberano da Tempestade** ao mesmo tempo!
 
-*(Esta seção permanece como estava, detalhando os chefes Rei Goblin, Juggernaut Troll e Arquilich).*
+### Onda 100: Mestre Elemental
 
-*(Esta seção permanece como estava, detalhando os chefes Rei Goblin, Juggernaut Troll e Arquilich).*
+O verdadeiro desafio final. Um mago ancestral que domina todos os elementos e as táticas dos chefes anteriores. A batalha se desenrola em fases, cada uma testando uma habilidade diferente do jogador.
+
+#### Fase 1: O Mestre das Magias (100% - 75% HP)
+*   **Comportamento:** O Mestre Elemental se teleporta constantemente pelo mapa, atacando com versões aprimoradas das magias do jogador:
+    *   **Míssil de Fogo Etéreo:** Dispara mísseis teleguiados.
+    *   **Lança de Gelo Perfurante:** Lança lanças de gelo em linha reta.
+    *   **Corrente de Raios:** Invoca raios que ricocheteiam entre os inimigos.
+*   **Desafio:** Manter-se em movimento e desviar dos ataques elementais.
+
+#### Fase 2: O Senhor das Auras (75% - 50% HP)
+*   **Comportamento:** O chefe para de se teleportar e se move lentamente em direção ao jogador, alternando a cada 20 segundos entre as três auras elementais (Fogo, Gelo, Raio). O cristal correspondente em seu modelo brilha intensamente.
+*   **Efeitos das Auras (se o jogador estiver próximo):**
+    *   **Aura de Fogo:** Aplica **Queimadura**.
+    *   **Aura de Gelo:** Aplica **lentidão**.
+    *   **Aura de Raio:** Aplica **Eletrificado** (paralisia).
+*   **Desafio:** Adaptar a estratégia (distância vs. proximidade) e gerenciar os efeitos de status.
+
+#### Fase 3: O Invocador de Ecos (50% - 25% HP)
+*   **Comportamento:** O Mestre Elemental desativa suas auras e volta a se teleportar e usar suas magias básicas. No entanto, a cada 15 segundos, ele invoca um "eco" fantasmagórico de um dos chefes elementais, que executa uma de suas habilidades icônicas e desaparece:
+    *   **Eco do Colosso de Magma:** Desencadeia uma **Erupção** (ondas de fogo).
+    *   **Eco da Matriarca Glacial:** Prende o jogador em uma **Prisão de Gelo**.
+    *   **Eco do Soberano da Tempestade:** Cria **barreiras de raios** temporárias.
+*   **Desafio:** Lidar com os ataques do chefe principal e reagir rapidamente às ameaças dos ecos dos chefes anteriores.
+
+#### Fase 4: A Calamidade Suprema (<25% HP)
+*   **Comportamento:** O chefe entra em fúria total. Ele para de invocar ecos e de se teleportar, movendo-se agressivamente em direção ao jogador.
+*   **Auras Pulsantes:** Libera pulsos rápidos de todas as três auras, uma após a outra, a cada segundo.
+*   **Ataques Aprimorados:** Suas magias se tornam devastadoras:
+    *   **Lança de Gelo:** Lança duas lanças em um pequeno arco.
+    *   **Corrente de Raios:** Ricocheteia para um número muito maior de alvos.
+*   **Desafio:** Uma corrida desesperada contra o tempo, exigindo máxima agilidade e gerenciamento de recursos para sobreviver ao ataque final.

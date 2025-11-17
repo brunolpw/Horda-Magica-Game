@@ -5,8 +5,8 @@ let player;
 let playerName = 'Mago Anônimo';
 let score = 0;
 let playerHP = 100;
-let maxHP = 100;
-let killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 };
+let maxHP = 100; // Mantido para referência
+let killStats = { kobold: 0, kobold_warrior: 0, kobold_shaman: 0, goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 };
 let killsSinceLastPotion = 0;
 
 let playerLevel = 1;
@@ -145,7 +145,10 @@ function handlePlayerMovement() {
 
     if (dx !== 0 || dz !== 0) {
         let currentSpeed = playerSpeed;
-        if (player.userData.slowTimer > 0) currentSpeed *= 0.7; // Reduz a velocidade em 30%
+        // A lentidão do óleo agora é muito mais forte
+        if (player.userData.slowTimer > 0) {
+            currentSpeed *= 0.1; // Reduz a velocidade em 90%
+        }
         const movementVector = new THREE.Vector2(dx, dz).normalize();
         const currentMovement = new THREE.Vector3(movementVector.x, 0, movementVector.y).multiplyScalar(currentSpeed);
         
@@ -246,7 +249,7 @@ function attemptSpecialAttack() {
     if (!activeId) return;
 
     // Verifica o cooldown global e se há cargas disponíveis
-    if (specialGlobalCooldown > 0 || !player.userData.abilityCharges[activeId] || player.userData.abilityCharges[activeId] <= 0) {
+    if (specialGlobalCooldown > 0 || !player.userData.abilityCharges[activeId] || player.userData.abilityCharges[activeId] <= 0 || player.userData.isBlinded) {
         return;
     }
 
@@ -445,11 +448,11 @@ function resetPlayerState() {
     playerHP = maxHP;
     
     playerLevel = 1;
-    experiencePoints = 0;
+    experiencePoints = 0; // Mantido para referência
     playerSpeed = 0.15; 
     pendingLevelUps = 0;
 
-    killStats = { goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 };
+    killStats = { kobold: 0, kobold_warrior: 0, kobold_shaman: 0, goblin: 0, orc: 0, troll: 0, necromancer: 0, ghost: 0, skeleton: 0, skeleton_warrior: 0, skeleton_archer: 0 };
     killsSinceLastPotion = 0;
     
     projectileCooldown = 0;
@@ -468,8 +471,9 @@ function resetPlayerState() {
         abilityCharges: {},
         experienceForNextLevel: baseExperience,
         slowTimer: 0,
-        burnTimer: 0,
-        electrifiedTimer: 0
+        burnTimer: 0, // Mantido para referência
+        electrifiedTimer: 0,
+        isBlinded: false
     };
 }
 

@@ -14,6 +14,7 @@
         const stormConduits = [];
         const conduitBeams = [];
         const enemies = []; const powerUps = [];
+        const traps = [];
         const firePuddles = [];
 
         // Variável temporária para checagem de colisão
@@ -169,6 +170,29 @@
                 enemy.userData.rockThrowCooldown = 0; // NOVO: Cooldown para o ataque de fuga
             }
 
+            // NOVO: Adiciona propriedades para o Rei Kobold
+            if (type === 'kobold_king') {
+                enemy.userData.isBoss = true;
+                enemy.userData.junkLaunchCooldown = 600; // 10s
+                enemy.userData.summonCooldown = 900; // 15s
+                enemy.userData.isEnraged = false;
+            }
+
+            // NOVO: Adiciona propriedades para o Mestre Elemental
+            if (type === 'elemental_master') {
+                enemy.userData.isBoss = true;
+                enemy.userData.phase = 1;
+                enemy.userData.teleportCooldown = 480; // 8s
+                enemy.userData.fireMissileCooldown = 300; // 5s
+                enemy.userData.iceLanceCooldown = 420; // 7s
+                enemy.userData.chainLightningCooldown = 540; // 9s
+                enemy.userData.activeAura = null;
+                enemy.userData.auraChangeCooldown = 0;
+                enemy.userData.echoSummonCooldown = 0;
+                enemy.userData.furyAttackCooldown = 0;
+                enemy.userData.isTeleporting = false;
+            }
+
             // NOVO: Adiciona propriedades para o Juggernaut Troll
             if (type === 'juggernaut_troll') {
                 enemy.userData.isBoss = true;
@@ -191,6 +215,12 @@
                 enemy.userData.summonInterval = 480; // Invoca a cada 8 segundos
                 enemy.userData.attackCooldown = 120; // Ataca a cada 2 segundos
                 enemy.userData.attackTimer = Math.random() * 120; // Cooldown inicial aleatório
+            }
+            // NOVO: Adiciona propriedades para o Xamã Kobold
+            if (type === 'kobold_shaman') {
+                enemy.userData.isRanged = true; // Marca como inimigo de longa distância
+                enemy.userData.attackCooldown = 360; // Ataca a cada 6 segundos
+                enemy.userData.attackTimer = Math.random() * 180;
             }
             // NOVO: Adiciona propriedades para o Esqueleto Arqueiro
             if (type === 'skeleton_archer') {
@@ -282,7 +312,7 @@
                 // Reduz o cooldown em 2 frames por nível, com um mínimo de 10.
                 const currentCooldown = Math.max(10, baseCooldown - (playerLevel - 1) * 2);
 
-                if (projectileCooldown <= 0) {
+                if (projectileCooldown <= 0 && !player.userData.isBlinded) {
                     // Disparo normal
                     createProjectile('weak', direction, player.position);
                     projectileCooldown = currentCooldown;
@@ -507,22 +537,45 @@
                 }
             }
 
+            // Efeito de piscar amarelo do monstro quando eletrificado
+            if (enemyData.electrifiedTimer > 0) {
+                if (Math.random() > 0.5) {
+                    enemy.traverse(child => {
+                        if (child.isMesh) child.material.color.setHex(0xfde047);
+                    });
+                }
+            } else if (enemyData.hitTimer <= 0) { // Garante que não sobrescreva o piscar de dano
+                // Volta à cor normal (já tratado na lógica de hitTimer)
+                enemy.visible = true; // Garante que o monstro não fique invisível
+            }
+
             // NOVO: Lógica do status Queimado
             if (enemyData.burnTimer > 0 
             && enemyData.type !== 'ghost' 
-            && enemyData.type !== 'fire_elemental' 
+            && enemyData.type !== 'fire_elemental'
             && enemyData.type !== 'magma_colossus') {
                 enemyData.burnTimer--; // Dura 10 segundos (600 frames)
-                enemyData.isFleeing = true; // Ativa o status de fuga
+                enemyData.isFleeing = true;
 
-                if (enemyData.burnTimer % 120 === 0) { // Dano de 10 a cada 2 segundos
-                    enemyData.hp -= 10;
-                    if (enemyData.hp <= 0 && enemyData.isBoss) handleBossDefeat(enemy);
-                    
-                    createFloatingText('10', enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff4500');
-                    enemyData.hitTimer = 5;
+                // Efeito visual de fogo no inimigo
+                if (Math.random() < 0.3) { // Chance de criar partícula a cada frame
+                    const fireParticleGeo = new THREE.SphereGeometry(0.1, 4, 4);
+                    const fireParticleMat = new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xff4500 : 0xffa500 });
+                    const fireParticle = new THREE.Mesh(fireParticleGeo, fireParticleMat);
+                    const offset = new THREE.Vector3((Math.random() - 0.5) * 0.8, Math.random() * (enemyData.modelHeight || 1), (Math.random() - 0.5) * 0.8);
+                    fireParticle.position.copy(enemy.position).add(offset);
+                    scene.add(fireParticle);
+                    setTimeout(() => scene.remove(fireParticle), 200 + Math.random() * 200);
                 }
+            } else {
+                enemyData.isFleeing = false;
             }
+
+            // NOVO: Lógica de fuga do Kobold
+            if (enemyData.type.startsWith('kobold') && (enemyData.hp / enemyData.maxHP) < 0.6) {
+                enemyData.isFleeing = true;
+            }
+
 
             // --- LÓGICA DE MOVIMENTO ---
             if (enemyData.isTeleporting) {
@@ -530,28 +583,55 @@
             }
             if (isSlowed) { // Inimigos congelados ou eletrificados
                 // Movimento lento ou paralisado
-                const slowDirection = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
                 const speedMultiplier = (enemyData.electrifiedTimer > 0) ? 0 : 0.5; // Paralisado se eletrificado
-                enemy.position.addScaledVector(slowDirection, finalSpeed * speedMultiplier);
-            } else if (enemyData.isFleeing) {
-                // Lógica de Fuga
-                const fleeDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
-                enemy.position.addScaledVector(fleeDirection, finalSpeed);
-            // BUGFIX 1: Comportamento de fuga específico para o Rei Goblin
-            } else if (enemyData.type === 'goblin_king' && enemyData.hp / enemyData.maxHP < 0.3) {
+                if (speedMultiplier > 0) {
+                    const slowDirection = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                    const newPosition = enemy.position.clone().addScaledVector(slowDirection, finalSpeed * speedMultiplier);
+                    handleStandardMovement(enemy, newPosition, finalSpeed);
+                }
+            } else if (enemyData.type === 'goblin_king' && enemyData.hp / enemyData.maxHP < 0.3) { // Fuga do Rei Goblin
                 // Foge do jogador
                 const fleeDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
                 const newPosition = enemy.position.clone().addScaledVector(fleeDirection, finalSpeed);
                 handleStandardMovement(enemy, newPosition, finalSpeed);
 
-                // MELHORIA: Atira pedras enquanto foge
                 enemyData.rockThrowCooldown = Math.max(0, enemyData.rockThrowCooldown - 1);
                 if (enemyData.rockThrowCooldown <= 0) {
                     const rockTargetPosition = player.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 5, 0, (Math.random() - 0.5) * 5));
                     triggerRockFall(rockTargetPosition);
                     enemyData.rockThrowCooldown = 240; // Atira a cada 4 segundos
                 }
+            } else if (enemyData.type === 'kobold_king') {
+                // Fúria
+                if (!enemyData.isEnraged && enemyData.hp / enemyData.maxHP < 0.5) {
+                    enemyData.isEnraged = true;
+                    enemyData.speed *= 1.3;
+                }
+                // Movimento
+                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
+                handleStandardMovement(enemy, newPosition, finalSpeed);
 
+                // Habilidades
+                const furyMultiplier = enemyData.isEnraged ? 0.6 : 1.0;
+                enemyData.junkLaunchCooldown = Math.max(0, enemyData.junkLaunchCooldown - 1);
+                if (enemyData.junkLaunchCooldown <= 0) {
+                    triggerJunkLaunch(enemy.position, enemyData.isEnraged);
+                    enemyData.junkLaunchCooldown = 600 * furyMultiplier;
+                }
+
+                enemyData.summonCooldown = Math.max(0, enemyData.summonCooldown - 1);
+                if (enemyData.summonCooldown <= 0) {
+                    // Invoca um grupo de kobolds perto dele
+                    spawnKoboldGroup(enemy.position);
+                    enemyData.summonCooldown = 900 * furyMultiplier;
+                }
+
+            } else if (enemyData.isFleeing) {
+                // Lógica de Fuga para outros inimigos
+                const fleeDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
+                const newPosition = enemy.position.clone().addScaledVector(fleeDirection, finalSpeed);
+                handleStandardMovement(enemy, newPosition, finalSpeed);
             } else if (enemyData.type === 'necromancer') {
                 // Lógica de movimento do Necromante (kiting)
                  const distanceToPlayer = enemy.position.distanceTo(player.position);
@@ -585,7 +665,25 @@
                          enemy.position.copy(newPosition);
                      }
                  }
+            } else if (enemyData.type === 'kobold_shaman') {
+                 // Lógica de kiting do Xamã
+                 const distanceToPlayer = enemy.position.distanceTo(player.position);
+                 const idealDistance = 10;
+                 let direction = new THREE.Vector3(0, 0, 0);
 
+                 if (distanceToPlayer < idealDistance - 1) { // Se estiver muito perto, afasta-se
+                     direction.subVectors(enemy.position, player.position).normalize();
+                 } else if (distanceToPlayer > idealDistance + 1) { // Se estiver muito longe, aproxima-se
+                     direction.subVectors(player.position, enemy.position).normalize();
+                 }
+                 enemyData.attackTimer = Math.max(0, enemyData.attackTimer - 1);
+                 if (enemyData.attackTimer <= 0) {
+                     const attackDirection = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
+                     createProjectile('shaman_bolt', attackDirection, enemy.position);
+                     enemyData.attackTimer = enemyData.attackCooldown;
+                 }
+                 const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
+                 handleStandardMovement(enemy, newPosition, finalSpeed);
             } else if (enemyData.type === 'skeleton_archer') {
                 // Lógica de movimento do Arqueiro (similar ao Necromante)
                 const distanceToPlayer = enemy.position.distanceTo(player.position);
@@ -757,6 +855,154 @@
                     triggerTeleport(enemy);
                 }
 
+            } else if (enemyData.type === 'elemental_master') {
+                // Lógica de Fases
+                const hpPercent = enemyData.hp / enemyData.maxHP;
+                if (enemyData.phase === 1 && hpPercent <= 0.75) {
+                    enemyData.phase = 2;
+                    // Inicia a fase 2 com a aura de fogo
+                    enemyData.activeAura = 'fire';
+                    enemyData.auraChangeCooldown = 1200; // 20 segundos
+                    // Para de atacar com magias por um tempo para focar na aura
+                    enemyData.fireMissileCooldown = 300;
+                    enemyData.iceLanceCooldown = 300;
+                } else if (enemyData.phase === 2 && hpPercent <= 0.50) {
+                    enemyData.phase = 3;
+                    enemyData.activeAura = null; // Desativa as auras
+                    enemyData.echoSummonCooldown = 900; // 15s para o primeiro eco
+                    enemyData.teleportCooldown = 480; // Volta a se teleportar
+                } else if (enemyData.phase === 3 && hpPercent <= 0.25) {
+                    enemyData.phase = 4;
+                    enemyData.activeAura = 'fire'; // Começa o ciclo de pulsos com fogo
+                    enemyData.auraChangeCooldown = 60; // Pulsa a cada 1 segundo
+                    enemyData.furyAttackCooldown = 120; // Começa a atacar furiosamente após 2s
+                    // Aumenta a velocidade na fase final
+                    enemyData.speed *= 1.2;
+                }
+
+                // Animação dos cristais
+                if (enemyData.crystals) {
+                    const time = Date.now() * 0.001;
+                    enemyData.crystals.forEach((crystal, index) => {
+                        crystal.rotation.y += 0.02;
+                        crystal.position.y = 1.5 + Math.sin(time + index) * 0.2;
+
+                        // Lógica de brilho da aura ativa
+                        let targetIntensity = 0.5;
+                        if (enemyData.phase === 2 || enemyData.phase === 4) {
+                            if (
+                                (enemyData.activeAura === 'fire' && index === 0) ||
+                                (enemyData.activeAura === 'ice' && index === 1) ||
+                                (enemyData.activeAura === 'lightning' && index === 2)
+                            ) {
+                                targetIntensity = 3.0; // Brilha intensamente
+                            }
+                        }
+                        // Suaviza a transição da intensidade
+                        crystal.material.emissiveIntensity += (targetIntensity - crystal.material.emissiveIntensity) * 0.1;
+                    });
+                }
+
+                // Comportamento da Fase 1
+                if (enemyData.phase === 1) {
+                    enemyData.teleportCooldown = Math.max(0, enemyData.teleportCooldown - 1);
+                    if (enemyData.teleportCooldown <= 0) {
+                        triggerTeleport(enemy, 25); // Teleporta para mais longe
+                        enemyData.teleportCooldown = 480;
+                    }
+
+                    // Ataques
+                    enemyData.fireMissileCooldown = Math.max(0, enemyData.fireMissileCooldown - 1);
+                    if (enemyData.fireMissileCooldown <= 0) {
+                        const proj = createProjectile('ethereal_fire', new THREE.Vector3().subVectors(player.position, enemy.position).normalize(), enemy.position);
+                        if(proj) { proj.userData.damage = 40; proj.userData.isHoming = true; proj.userData.target = player; }
+                        enemyData.fireMissileCooldown = 300;
+                    }
+                } else if (enemyData.phase === 2) {
+                    // Movimento lento e ameaçador
+                    const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                    const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed * 0.5);
+                    handleStandardMovement(enemy, newPosition, finalSpeed);
+
+                    // Lógica de troca de aura
+                    enemyData.auraChangeCooldown = Math.max(0, enemyData.auraChangeCooldown - 1);
+                    if (enemyData.auraChangeCooldown <= 0) {
+                        if (enemyData.activeAura === 'fire') enemyData.activeAura = 'ice';
+                        else if (enemyData.activeAura === 'ice') enemyData.activeAura = 'lightning';
+                        else enemyData.activeAura = 'fire';
+                        enemyData.auraChangeCooldown = 1200; // Reseta para 20s
+                    }
+
+                    // Aplica efeito da aura se o jogador estiver perto
+                    const auraRadius = 12;
+                    if (player.position.distanceToSquared(enemy.position) < auraRadius * auraRadius) {
+                        if (enemyData.activeAura === 'fire') {
+                            player.userData.burnTimer = Math.max(player.userData.burnTimer, 120);
+                        } else if (enemyData.activeAura === 'ice') {
+                            player.userData.slowTimer = Math.max(player.userData.slowTimer, 60);
+                        } else if (enemyData.activeAura === 'lightning') {
+                            player.userData.electrifiedTimer = Math.max(player.userData.electrifiedTimer, 60);
+                        }
+                    }
+                } else if (enemyData.phase === 3) {
+                    // Comportamento de ataque e teleporte similar à fase 1
+                    enemyData.teleportCooldown = Math.max(0, enemyData.teleportCooldown - 1);
+                    if (enemyData.teleportCooldown <= 0) {
+                        triggerTeleport(enemy, 25);
+                        enemyData.teleportCooldown = 600; // Teleporta a cada 10s
+                    }
+
+                    enemyData.fireMissileCooldown = Math.max(0, enemyData.fireMissileCooldown - 1);
+                    if (enemyData.fireMissileCooldown <= 0) {
+                        const proj = createProjectile('ethereal_fire', new THREE.Vector3().subVectors(player.position, enemy.position).normalize(), enemy.position);
+                        if(proj) { proj.userData.damage = 40; proj.userData.isHoming = true; proj.userData.target = player; }
+                        enemyData.fireMissileCooldown = 420; // Ataca com menos frequência
+                    }
+
+                    // Invocação de Ecos
+                    enemyData.echoSummonCooldown = Math.max(0, enemyData.echoSummonCooldown - 1);
+                    if (enemyData.echoSummonCooldown <= 0) {
+                        triggerEchoSummon();
+                        enemyData.echoSummonCooldown = 900; // 15s de cooldown
+                    }
+                } else if (enemyData.phase === 4) {
+                    // Movimento agressivo
+                    const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                    const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
+                    handleStandardMovement(enemy, newPosition, finalSpeed);
+
+                    // Auras Pulsantes
+                    enemyData.auraChangeCooldown = Math.max(0, enemyData.auraChangeCooldown - 1);
+                    if (enemyData.auraChangeCooldown <= 0) {
+                        const auraRadius = 15; // Raio aumentado
+                        if (player.position.distanceToSquared(enemy.position) < auraRadius * auraRadius) {
+                            if (enemyData.activeAura === 'fire') player.userData.burnTimer = Math.max(player.userData.burnTimer, 120);
+                            else if (enemyData.activeAura === 'ice') player.userData.slowTimer = Math.max(player.userData.slowTimer, 60);
+                            else if (enemyData.activeAura === 'lightning') player.userData.electrifiedTimer = Math.max(player.userData.electrifiedTimer, 60);
+                        }
+                        // Cicla para a próxima aura
+                        if (enemyData.activeAura === 'fire') enemyData.activeAura = 'ice';
+                        else if (enemyData.activeAura === 'ice') enemyData.activeAura = 'lightning';
+                        else enemyData.activeAura = 'fire';
+                        enemyData.auraChangeCooldown = 60; // Pulsa a cada 1s
+                    }
+
+                    // Ataques Furiosos
+                    enemyData.furyAttackCooldown = Math.max(0, enemyData.furyAttackCooldown - 1);
+                    if (enemyData.furyAttackCooldown <= 0) {
+                        // Lança duas Lanças de Gelo
+                        const dir1 = new THREE.Vector3().subVectors(player.position, enemy.position).normalize().applyAxisAngle(new THREE.Vector3(0,1,0), -0.1);
+                        const dir2 = new THREE.Vector3().subVectors(player.position, enemy.position).normalize().applyAxisAngle(new THREE.Vector3(0,1,0), 0.1);
+                        createProjectile('ice_lance', dir1, enemy.position).userData.damage = 50;
+                        createProjectile('ice_lance', dir2, enemy.position).userData.damage = 50;
+
+                        // Corrente de Raios aprimorada
+                        const target = findClosestEnemies(enemy.position, 1, false)[0] || player;
+                        triggerChainLightning(target, 5); // Simula nível 5
+
+                        enemyData.furyAttackCooldown = 240; // Ataca a cada 4s
+                    }
+                }
             } else {
                 // Lógica de movimento padrão com colisão para outros inimigos
                 const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
@@ -799,7 +1045,7 @@
             // Checa colisão com o jogador APÓS o movimento
             const playerBBox = new THREE.Box3().setFromObject(player);
             // Inimigos de longa distância não causam dano de toque
-            if (enemyData.type !== 'necromancer' && enemyData.type !== 'skeleton_archer') {
+            if (enemyData.type !== 'necromancer' && enemyData.type !== 'skeleton_archer' && enemyData.type !== 'kobold_shaman' && enemyData.electrifiedTimer <= 0) {
                 if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(enemy))) {
                     if (enemyData.damageCooldown <= 0) {
                         damagePlayer(enemyData.damage);
@@ -937,6 +1183,44 @@
         }
     }
 
+    function updateTraps() {
+        const playerBBox = new THREE.Box3().setFromObject(player);
+        let isPlayerInSmoke = false;
+
+        for (let i = traps.length - 1; i >= 0; i--) {
+            const trap = traps[i];
+            trap.life--;
+
+            if (trap.life <= 0) {
+                scene.remove(trap.mesh);
+                // Se for uma nuvem de fumaça que sumiu, garante que o jogador não fique cego
+                if (trap.type === 'smoke') {
+                    const blindIndicator = document.getElementById('blind-indicator');
+                    if (blindIndicator) blindIndicator.classList.add('hidden');
+                }
+                traps.splice(i, 1);
+                continue;
+            }
+
+            if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(trap.mesh))) {
+                if (trap.type === 'oil') {
+                    player.userData.slowTimer = Math.max(player.userData.slowTimer, 2); // Aplica lentidão forte por 2 frames
+                } else if (trap.type === 'spring') {
+                    // Lógica da mola (implementação futura)
+                } else if (trap.type === 'smoke') {
+                    isPlayerInSmoke = true;
+                }
+            }
+        }
+
+        // Atualiza o status de cegueira do jogador
+        player.userData.isBlinded = isPlayerInSmoke;
+        const blindIndicator = document.getElementById('blind-indicator');
+        if (blindIndicator) {
+            blindIndicator.classList.toggle('hidden', !isPlayerInSmoke);
+        }
+    }
+
         // NOVO: Função para iniciar o tremor da câmera
         function triggerCameraShake(intensity, duration) {
             // Garante que um novo tremor mais forte substitua um mais fraco
@@ -1047,36 +1331,29 @@
             if (electrifyingAuraTimer > 0) {
                 electrifyingAuraMesh.visible = true;
                 electrifyingAuraMesh.position.copy(player.position);
-                electrifyingAuraMesh.rotation.y += 0.05;
-                electrifyingAuraMesh.children.forEach(segment => {
-                    segment.rotation.z = Math.PI / 2; // Deixa os raios na horizontal
-                });
-            } else {
-                electrifyingAuraMesh.visible = false;
-            }
+                
+                // Remove arcos antigos
+                for (let i = electrifyingAuraMesh.children.length - 1; i >= 0; i--) {
+                    const child = electrifyingAuraMesh.children[i];
+                    if (child.userData.isArc) {
+                        scene.remove(child);
+                        electrifyingAuraMesh.remove(child);
+                    }
+                }
 
-            if (flamingAuraTimer > 0) {
-                flamingAuraMesh.visible = true;
-                flamingAuraMesh.position.copy(player.position);
-                flamingAuraMesh.children.forEach(particle => {
-                    particle.userData.angle += particle.userData.speed;
-                    particle.position.set(
-                        Math.cos(particle.userData.angle) * particle.userData.radius,
-                        particle.userData.yOffset,
-                        Math.sin(particle.userData.angle) * particle.userData.radius
-                    );
-                });
-            } else {
-                flamingAuraMesh.visible = false;
-            }
-
-            if (electrifyingAuraTimer > 0) {
-                electrifyingAuraMesh.visible = true;
-                electrifyingAuraMesh.position.copy(player.position);
-                electrifyingAuraMesh.rotation.y += 0.05;
-                electrifyingAuraMesh.children.forEach(segment => {
-                    segment.rotation.z = Math.PI / 2; // Deixa os raios na horizontal
-                });
+                // Cria novos arcos elétricos aleatórios
+                if (Math.random() < 0.7) { // Chance aumentada para um efeito mais intenso
+                    const auraRadius = 6;
+                    const radius1 = Math.random() * auraRadius;
+                    const radius2 = Math.random() * auraRadius;
+                    const angle1 = Math.random() * Math.PI * 2;
+                    const angle2 = Math.random() * Math.PI * 2; // Ângulo totalmente aleatório
+                    
+                    const p1 = new THREE.Vector3(Math.cos(angle1) * radius1, 0.5, Math.sin(angle1) * radius1);
+                    const p2 = new THREE.Vector3(Math.cos(angle2) * radius2, 0.5, Math.sin(angle2) * radius2);
+                    const arc = createLightningArc(p1, p2);
+                    electrifyingAuraMesh.add(arc); // Adiciona ao grupo para ser posicionado corretamente
+                }
             } else {
                 electrifyingAuraMesh.visible = false;
             }
@@ -1136,6 +1413,7 @@
             updateClone(); // NOVO: Atualiza a lógica do clone
             updatePowerUps(); // Checa colisão com poções e poderes
             updateRunes(); // NOVO: Atualiza a lógica das runas
+            updateTraps(); // NOVO: Atualiza a lógica das armadilhas do chefe
             updateFirePuddles(); // NOVO: Atualiza as poças de fogo
             spawnEnemies();
             spawnPowerUps(); // Tenta spawnar poção
@@ -1158,6 +1436,7 @@
             updatePowerUpLabels(); // NOVO: Atualiza labels dos itens
 
             updatePassivePlayerAbilities();
+            updateUI(); // Garante que a UI seja atualizada a cada frame
 
             // 6. Renderização
             renderer.render(scene, camera);
@@ -1177,26 +1456,21 @@
             if (boss.userData.type === 'archlich') {
                 showSpecialLevelUpOptions();
             }
-                if (enemyData.type === 'storm_sovereign') {
-                    // Limpa os conduítes e raios restantes
-                    stormConduits.forEach(c => scene.remove(c));
-                    stormConduits.length = 0;
-                    conduitBeams.forEach(b => scene.remove(b));
-                    conduitBeams.length = 0;
-                }
-                if (enemyData.type === 'glacial_matriarch' && enemyData.isEnraged) {
-                    triggerBlizzard(false); // Desativa a nevasca
-                }
-                // Remove os cacos de gelo restantes
-                if (enemyData.shardShields) {
-                    enemyData.shardShields.forEach(shard => scene.remove(shard));
-                }
-                // Remove conduítes e raios restantes
+            if (boss.userData.type === 'storm_sovereign') {
+                // Limpa os conduítes e raios restantes
                 stormConduits.forEach(c => scene.remove(c));
                 stormConduits.length = 0;
                 conduitBeams.forEach(b => scene.remove(b));
                 conduitBeams.length = 0;
-
+            }
+            if (boss.userData.type === 'glacial_matriarch' && boss.userData.isEnraged) {
+                triggerBlizzard(false); // Desativa a nevasca
+            }
+            // Remove os cacos de gelo restantes
+            if (boss.userData.shardShields) {
+                boss.userData.shardShields.forEach(shard => scene.remove(shard));
+                boss.userData.shardShields.length = 0;
+            }
             isBossWave = false;
             currentBoss = null;
             updateUI();
@@ -1264,6 +1538,22 @@
             
             // CORREÇÃO: Define como "jogo iniciado" APENAS DEPOIS que tudo foi criado
             isGameOver = false;
+        }
+        
+        function createLightningArc(p1, p2) {
+            const distance = p1.distanceTo(p2);
+            const arcGeo = new THREE.CylinderGeometry(0.05, 0.05, distance, 5);
+            const arcMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
+            const arc = new THREE.Mesh(arcGeo, arcMat);
+            
+            arc.position.copy(p1).lerp(p2, 0.5);
+            arc.lookAt(p2);
+            arc.rotateX(Math.PI / 2);
+            
+            arc.userData.isArc = true;
+
+            // O arco é removido no próximo frame, criando o efeito de piscar
+            return arc;
         }
 
         function updateBossShields() {

@@ -29,7 +29,6 @@ function createProjectile(type, direction, startPosition) {
         material = new THREE.MeshLambertMaterial({ color: 0xE0FFFF, emissive: 0xADD8E6, emissiveIntensity: 1 });
         props = { damage: 35, speed: 0.35 };
         isExplosive = false;
-    } else if (type === 'necro_bolt' || type === 'arrow' || type === 'weak' || type === 'strong') {
     } else if (type === 'necro_bolt' || type === 'arrow' || type === 'weak' || type === 'strong' || type === 'shaman_bolt') {
         props = projectileProps[type];
         if (!props) {
@@ -57,7 +56,6 @@ function createProjectile(type, direction, startPosition) {
         explosionDamage: explosionDamage,
         isHoming: false,
         target: null,
-        hasBeenReflected: (type === 'necro_bolt' || type === 'arrow') ? null : true,
         hasBeenReflected: (type === 'necro_bolt' || type === 'arrow' || type === 'shaman_bolt') ? null : true,
         pierceCount: 0,
         maxPierce: (type === 'ice_lance') ? 3 : 1, // Padrão para a lança
@@ -158,7 +156,6 @@ function updateProjectiles() {
             projectile.rotateX(Math.PI / 2);
         }
 
-        if (projData.type === 'necro_bolt' || projData.type === 'arrow' || projData.type === 'ice_shard') {
         if (projData.type === 'necro_bolt' || projData.type === 'arrow' || projData.type === 'ice_shard' || projData.type === 'shaman_bolt') {
             const playerBBox = new THREE.Box3().setFromObject(player);
             if (tempBBox.intersectsBox(playerBBox)) {
@@ -171,7 +168,6 @@ function updateProjectiles() {
         }
 
         // Colisão de projéteis do jogador com escudos de chefes
-        if (projData.type !== 'necro_bolt' && projData.type !== 'arrow' && projData.type !== 'ice_shard') {
         if (projData.type !== 'necro_bolt' && projData.type !== 'arrow' && projData.type !== 'ice_shard' && projData.type !== 'shaman_bolt') {
             for (const enemy of enemies) {
                 if (enemy.userData.shardShields && enemy.userData.shardShields.length > 0) {

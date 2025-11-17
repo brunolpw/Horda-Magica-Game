@@ -233,10 +233,12 @@ function updateEnemyUI() {
         }
 
         if (electrifiedMarker) {
-            electrifiedMarker.style.display = enemy.userData.electrifiedTimer > 0 ? 'block' : 'none';
             if (enemy.userData.electrifiedTimer > 0) {
+                electrifiedMarker.style.display = 'block';
                 electrifiedMarker.style.left = `${x + 10}px`;
                 electrifiedMarker.style.top = `${y - 18}px`;
+            } else {
+                electrifiedMarker.style.display = 'none';
             }
         }
     });
@@ -489,8 +491,8 @@ function selectUpgrade(upgradeId, isMaxLevel) {
 
         if (upgrade.type === 'active' && player.userData.activeAbility !== upgradeId) {
             const isNew = !player.userData.upgrades[upgradeId] || player.userData.upgrades[upgradeId] === 1;
-            if (isNew) killPoints = 0;
             player.userData.activeAbility = upgradeId;
+            if (isNew) chargeTimer = CHARGE_TIME_MAX; // Reseta o timer apenas se for uma magia nova
         }
 
         if (upgrade.apply) upgrade.apply();
@@ -502,10 +504,11 @@ function selectUpgrade(upgradeId, isMaxLevel) {
         if (pendingLevelUps > 0) document.getElementById('level-up-prompt-button').classList.remove('hidden');
         updateUI();
     } else if (upgrade.type === 'active') {
-        const isNew = player.userData.activeAbility !== upgradeId;
-        if (isNew) killPoints = 0;
-        player.userData.activeAbility = upgradeId;
-        promptEquipActiveAbility();
+        // Se a magia já está no nível máximo, apenas equipa
+        equipSpell(upgradeId);
+        // Fecha o modal após equipar para evitar confusão
+        levelUpModal.classList.add('hidden');
+        isGamePaused = false;
     }
 }
 
@@ -531,11 +534,7 @@ function promptEquipActiveAbility() {
         if (upgradeId === player.userData.activeAbility) card.classList.add('selected');
 
         card.onclick = () => {
-            if (player.userData.activeAbility !== upgradeId) {
-                const newAbility = upgrades[upgradeId];
-                const newMaxKills = newAbility.getKillCost(player.userData.upgrades[upgradeId] || 1);
-                if (killPoints > newMaxKills) killPoints = newMaxKills;
-            }
+            // A lógica de troca agora está centralizada em equipSpell
             player.userData.activeAbility = upgradeId;
             promptEquipActiveAbility();
         };
@@ -645,103 +644,6 @@ function openSpellbook() {
 function closeSpellbook() {
     spellbookModal.classList.add('hidden');
     isGamePaused = false;
-}
-
-function updateEnemyUI() {
-    const tempV = new THREE.Vector3();
-    enemies.forEach(enemy => {
-        const uiElements = enemyLabels.get(enemy.uuid);
-        if (!uiElements) return;
-
-        if (enemy.userData.isBoss && uiElements.hpBar) {
-            uiElements.hpBar.style.backgroundColor = '#FFD700';
-        }
-
-        const { nameLabel, hpBar, hpFill, armorBar, armorFill, summonMarker, frozenMarker, electrifiedMarker } = uiElements;
-        const modelHeight = enemy.userData.modelHeight || 1.0;
-
-        const labelBaseY = enemy.position.y + modelHeight;
-        tempV.set(enemy.position.x, labelBaseY, enemy.position.z);
-        tempV.project(camera);
-
-        const x = (tempV.x * 0.5 + 0.5) * window.innerWidth;
-        const y = (-tempV.y * 0.5 + 0.5) * window.innerHeight;
-
-        nameLabel.style.left = `${x}px`;
-        nameLabel.style.top = `${y - 8}px`;
-
-        if (enemy.userData.armor > 0) {
-            armorBar.style.display = 'block';
-            armorBar.style.left = `${x}px`;
-            armorBar.style.top = `${y}px`;
-            hpBar.style.left = `${x}px`;
-            hpBar.style.top = `${y + 8}px`;
-        } else {
-            if (armorBar) armorBar.style.display = 'none';
-            hpBar.style.left = `${x}px`;
-            hpBar.style.top = `${y}px`;
-        }
-
-        if (armorFill) armorFill.style.width = `${(enemy.userData.armor / enemy.userData.maxArmor) * 100}%`;
-        hpFill.style.width = `${(enemy.userData.hp / enemy.userData.maxHP) * 100}%`;
-
-        if (summonMarker) {
-            summonMarker.style.left = `${x}px`;
-            summonMarker.style.top = `${y - 18}px`;
-        }
-
-        if (frozenMarker) {
-            frozenMarker.style.display = enemy.userData.isFrozen ? 'block' : 'none';
-            if (enemy.userData.isFrozen) {
-                frozenMarker.style.left = `${x}px`;
-                frozenMarker.style.top = `${y - 18}px`;
-            }
-        }
-
-        if (electrifiedMarker) {
-            electrifiedMarker.style.display = enemy.userData.electrifiedTimer > 0 ? 'block' : 'none';
-            if (enemy.userData.electrifiedTimer > 0) {
-                electrifiedMarker.style.left = `${x + 10}px`;
-                electrifiedMarker.style.top = `${y - 18}px`;
-            }
-        }
-    });
-}
-
-function updatePowerUpLabels() {
-    const tempV = new THREE.Vector3();
-    powerUps.forEach(powerUp => {
-        const label = powerUpLabels.get(powerUp.uuid);
-        if (!label) return;
-
-        const height = powerUp.userData.geometry.parameters.height || 0.5;
-        tempV.set(powerUp.position.x, powerUp.position.y + height, powerUp.position.z);
-        tempV.project(camera);
-
-        const x = (tempV.x * 0.5 + 0.5) * window.innerWidth;
-        const y = (-tempV.y * 0.5 + 0.5) * window.innerHeight;
-
-        label.style.left = `${x}px`;
-        label.style.top = `${y}px`;
-    });
-}
-
-function updateFloatingText() {
-    for (let i = floatingTexts.length - 1; i >= 0; i--) {
-        const ft = floatingTexts[i];
-        ft.life--;
-        ft.position.add(ft.velocity);
-
-        if (ft.life <= 0) {
-            ft.element.remove();
-            floatingTexts.splice(i, 1);
-        } else {
-            const tempV = ft.position.clone().project(camera);
-            ft.element.style.left = `${(tempV.x * 0.5 + 0.5) * window.innerWidth}px`;
-            ft.element.style.top = `${(-tempV.y * 0.5 + 0.5) * window.innerHeight}px`;
-            ft.element.style.opacity = ft.life / 60;
-        }
-    }
 }
 
 // --- Funções de Criação/Remoção de Elementos da UI ---

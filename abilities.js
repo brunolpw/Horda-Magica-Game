@@ -76,23 +76,11 @@ function createFlamingAuraMesh() {
 
 function createElectrifyingAuraMesh() {
     const group = new THREE.Group();
-    const segmentCount = 8;
     const auraRadius = 6;
-    const segmentGeo = new THREE.CylinderGeometry(0.05, 0.05, 1, 8);
-    const segmentMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
-
-    for (let i = 0; i < segmentCount; i++) {
-        const segment = new THREE.Mesh(segmentGeo, segmentMat);
-        segment.userData = {
-            angle: (i / segmentCount) * Math.PI * 2,
-            radius: auraRadius
-        };
-        group.add(segment);
-    }
 
     // Anel delimitador
     const ringGeo = new THREE.TorusGeometry(auraRadius, 0.1, 16, 100);
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00, transparent: true, opacity: 0.5 });
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00, transparent: true, opacity: 0.7 });
     const ring = new THREE.Mesh(ringGeo, ringMat);
     ring.rotation.x = Math.PI / 2;
     group.add(ring);
@@ -384,9 +372,9 @@ function triggerChainLightning(startEnemy) {
         let finalDamage = damage;
         finalDamage *= getWeaknessMultiplier('lightning', enemy.userData.type);
         enemy.userData.hp -= finalDamage;
-        createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
-        if (enemy.userData.type !== 'ghost') {
-            enemy.userData.electrifiedTimer = 120; // 2 segundos de paralisia
+        createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047'); // Amarelo elétrico
+        if (enemy.userData.type !== 'ghost' && enemy.userData.type !== 'lightning_elemental') {
+            enemy.userData.electrifiedTimer = 120; // Aplica paralisia por 2 segundos
         }
         enemy.userData.hitTimer = 10;
 
@@ -542,6 +530,37 @@ function triggerRockFall(targetPosition) {
         scene.remove(targetMarker);
         setTimeout(() => scene.remove(rock), 200);
     }, 1000);
+}
+
+function triggerJunkLaunch(position, isEnraged) {
+    const bombCount = isEnraged ? 5 : 3;
+    for (let i = 0; i < bombCount; i++) {
+        setTimeout(() => {
+            const targetPos = player.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 15, 0, (Math.random() - 0.5) * 15));
+            
+            // Efeito visual da bomba sendo lançada
+            const bombGeo = new THREE.SphereGeometry(0.4, 6, 6);
+            const bombMat = new THREE.MeshLambertMaterial({ color: 0x594534 });
+            const bomb = new THREE.Mesh(bombGeo, bombMat);
+            bomb.position.copy(position);
+            scene.add(bomb);
+
+            // Animação simples de arco
+            const duration = 60; // 1 segundo
+            for (let t = 0; t < duration; t++) {
+                setTimeout(() => {
+                    if (!bomb.parent) return;
+                    const progress = t / duration;
+                    bomb.position.lerp(targetPos, 1 / (duration - t + 1));
+                    bomb.position.y = Math.sin(progress * Math.PI) * 3; // Arco
+                    if (t === duration - 1) {
+                        scene.remove(bomb);
+                        createScrapHazard(targetPos);
+                    }
+                }, t * (1000 / 60));
+            }
+        }, i * 200); // Lança as bombas em sequência
+    }
 }
 
 function triggerIcePrison() {
@@ -713,6 +732,87 @@ function triggerOverload(position) {
     }
 }
 
+function triggerEchoSummon() {
+    const echoType = ['magma', 'glacial', 'storm'][Math.floor(Math.random() * 3)];
+    const position = new THREE.Vector3((Math.random() - 0.5) * (mapSize * 1.5), 0, (Math.random() - 0.5) * (mapSize * 1.5));
+
+    let echoModel;
+    let action;
+
+    switch (echoType) {
+        case 'magma':
+            echoModel = createMagmaColossusModel();
+            action = () => triggerEruption(position);
+            break;
+        case 'glacial':
+            echoModel = createGlacialMatriarchModel();
+            action = () => triggerIcePrison();
+            break;
+        case 'storm':
+            echoModel = createStormSovereignModel();
+            action = () => triggerEchoLightningWalls();
+            break;
+    }
+
+    // Torna o modelo fantasmagórico
+    echoModel.traverse(child => {
+        if (child.isMesh) {
+            child.material = child.material.clone();
+            child.material.transparent = true;
+            child.material.opacity = 0.4;
+        }
+    });
+
+    echoModel.position.copy(position);
+    scene.add(echoModel);
+
+    // O eco aparece, ataca e desaparece
+    setTimeout(() => {
+        action();
+        setTimeout(() => {
+            scene.remove(echoModel);
+        }, 2000); // O modelo do eco desaparece 2s após o ataque
+    }, 1500); // O ataque acontece 1.5s após o eco aparecer
+}
+
+function triggerEchoLightningWalls() {
+    const echoConduits = [];
+    for (let i = 0; i < 3; i++) {
+        const conduit = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshBasicMaterial({visible: false}));
+        conduit.position.set((Math.random() - 0.5) * mapSize, 1.5, (Math.random() - 0.5) * mapSize);
+        echoConduits.push(conduit);
+    }
+    // Usa a mesma lógica do chefe, mas com objetos temporários
+    updateConduitBeams(echoConduits);
+    setTimeout(() => updateConduitBeams([]), 5000); // Os raios desaparecem após 5s
+}
+
+function createScrapHazard(position) {
+    const hazardType = ['oil', 'smoke'][Math.floor(Math.random() * 2)]; // Mola será implementada depois
+    let hazardMesh;
+
+    if (hazardType === 'oil') {
+        const oilGeo = new THREE.CircleGeometry(2.5, 16);
+        const oilMat = new THREE.MeshBasicMaterial({ color: 0x1a1a1a, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
+        hazardMesh = new THREE.Mesh(oilGeo, oilMat);
+        hazardMesh.rotation.x = -Math.PI / 2;
+    } else { // smoke
+        const smokeGeo = new THREE.SphereGeometry(6, 16, 16); // Aumentado o raio para 6
+        const smokeMat = new THREE.MeshBasicMaterial({ color: 0x808080, transparent: true, opacity: 0.4 });
+        hazardMesh = new THREE.Mesh(smokeGeo, smokeMat);
+    }
+
+    hazardMesh.position.copy(position);
+    hazardMesh.position.y = 0.1;
+    scene.add(hazardMesh);
+
+    traps.push({
+        mesh: hazardMesh,
+        type: hazardType,
+        life: 900 // Dura 15 segundos
+    });
+}
+
 function triggerElementalSummon(position) {
     const elementals = ['fire_elemental', 'ice_elemental', 'lightning_elemental'];
     const typeToSummon = elementals[Math.floor(Math.random() * elementals.length)];
@@ -867,15 +967,18 @@ function updateRunes() {
                 enemies.forEach(enemy => {
                     if (enemy.position.distanceToSquared(rune.position) <= radiusSq) {
                         let finalDamage = rune.damage;
-                        let damageElement = '';
-                        if (rune.type === 'runa_fogo') damageElement = 'fire';
-                        else if (rune.type === 'runa_gelo') damageElement = 'ice';
-                        else if (rune.type === 'runa_raio') damageElement = 'lightning';
+                        let damageElement = '', damageColor = '#ff8c00';
+                        if (rune.type === 'runa_fogo') { damageElement = 'fire'; damageColor = '#ff4500'; }
+                        else if (rune.type === 'runa_gelo') { damageElement = 'ice'; damageColor = '#87CEFA'; }
+                        else if (rune.type === 'runa_raio') { damageElement = 'lightning'; damageColor = '#fde047'; }
 
                         finalDamage *= getWeaknessMultiplier(damageElement, enemy.userData.type);
 
                         enemy.userData.hp -= finalDamage;
-                        createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff8c00');
+                        createFloatingText(
+                            Math.floor(finalDamage), 
+                            enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 
+                            damageColor);
                         enemy.userData.hitTimer = 10;
 
                         // Aplica status (fantasmas são imunes a todos os status de runas)

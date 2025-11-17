@@ -20,13 +20,15 @@ const maxActiveEnemies = 40;
 function startNextWave() {
     currentWave++;
     
-    const bossWaveCondition = [7, 20, 35, 50, 60, 70, 80, 90].includes(currentWave);
+    const bossWaveCondition = [7, 10, 20, 35, 50, 60, 70, 80, 90, 100].includes(currentWave);
     if (bossWaveCondition) {
         let bossType;
         const elementalBosses = ['magma_colossus', 'glacial_matriarch', 'storm_sovereign'];
 
         if (currentWave === 7) {
             bossType = 'goblin_king';
+        } else if (currentWave === 10) {
+            bossType = 'kobold_king';
         } else if (currentWave === 20) {
             bossType = 'juggernaut_troll';
         } else if (currentWave === 35) {
@@ -57,6 +59,8 @@ function startNextWave() {
             enemiesAliveThisWave = 3; // 3 chefes vivos
             updateUI();
             return; // Retorna para não executar a lógica de spawn padrão
+        } else if (currentWave === 100) {
+            bossType = 'elemental_master';
         }
 
         if (bossType) createEnemy(bossType, new THREE.Vector3(0, 0, 0));
@@ -89,11 +93,28 @@ function spawnEnemies() {
             const z = Math.sin(angle) * radius;
             const position = new THREE.Vector3(x, 0, z);
 
-            let type;
+            let type, isKoboldGroup = false;
             const roll = Math.random() * 100;
 
-            if (currentWave < 5) {
-                type = 'goblin';
+            if (currentWave < 2) {
+                type = 'goblin'; // Apenas goblins na primeira onda
+            } else if (currentWave < 3) { // Onda 2
+                type = roll < 50 ? 'kobold' : 'goblin';
+                isKoboldGroup = type === 'kobold';
+            } else if (currentWave < 4) { // Onda 3
+                if (roll < 40) { type = 'kobold_warrior'; isKoboldGroup = true; }
+                else if (roll < 70) { type = 'kobold'; isKoboldGroup = true; }
+                else { type = 'goblin'; }
+            } else if (currentWave < 5) { // Onda 4
+                if (roll < 30) { type = 'kobold_shaman'; isKoboldGroup = true; }
+                else if (roll < 60) { type = 'kobold_warrior'; isKoboldGroup = true; }
+                else { type = 'goblin'; }
+            } else if (currentWave < 7) { // Ondas 5 e 6
+                if (roll < 20) { type = 'kobold_shaman'; isKoboldGroup = true; }
+                else if (roll < 40) { type = 'kobold_warrior'; isKoboldGroup = true; }
+                else if (roll < 60) { type = 'kobold'; isKoboldGroup = true; }
+                else if (roll < 85) { type = 'goblin'; }
+                else { type = 'orc'; }
             } else if (currentWave < 8) {
                 type = roll < 70 ? 'goblin' : 'orc';
             } else if (currentWave < 12) {
@@ -134,11 +155,46 @@ function spawnEnemies() {
                 else type = 'skeleton_warrior';
             }
 
-            createEnemy(type, position);
+            if (isKoboldGroup) {
+                spawnKoboldGroup(position);
+            } else {
+                createEnemy(type, position);
+            }
+
             enemiesToSpawnThisWave--;
             intraWaveSpawnTimer = 0;
         }
     }
+}
+
+function resetWaveState() {
+    // ... (código existente)
+}
+
+function spawnKoboldGroup(centerPosition) {
+    const groupSize = 5 + Math.floor(Math.random() * 3); // 5 a 7
+    const composition = [];
+
+    // Define a composição do grupo com base na onda
+    for (let i = 0; i < groupSize; i++) {
+        const roll = Math.random() * 100;
+        if (currentWave >= 4 && roll < 30) { // Xamãs aparecem a partir da onda 4
+            composition.push('kobold_shaman');
+        } else if (currentWave >= 3 && roll < 65) { // Guerreiros a partir da onda 3
+            composition.push('kobold_warrior');
+        } else {
+            composition.push('kobold');
+        }
+    }
+
+    for (let i = 0; i < groupSize; i++) {
+        const type = composition[i];
+        const offset = new THREE.Vector3((Math.random() - 0.5) * 8, 0, (Math.random() - 0.5) * 8);
+        const spawnPosition = centerPosition.clone().add(offset);
+        createEnemy(type, spawnPosition, true); // Marca como invocação para o marcador visual
+    }
+    // Ajusta a contagem de inimigos vivos, mas não a de spawns
+    enemiesAliveThisWave += groupSize - 1;
 }
 
 function resetWaveState() {
