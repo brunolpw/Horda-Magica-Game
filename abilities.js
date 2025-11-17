@@ -335,8 +335,9 @@ function updateClone() {
 
 function triggerChainLightning(startEnemy) {
     const level = player.userData.upgrades.corrente_raios || 1;
-    const configs = [[2, 5, 20], [3, 8, 30], [5, 11, 40], [7, 14, 50], [10, 17, 55]];
-    const [maxJumps, jumpDistance, damage] = configs[level - 1];
+    let damage = [20, 30, 40, 50, 55][level - 1];
+    damage = getArcanePowerBonus(damage); // Aplica bônus
+    const [maxJumps, jumpDistance] = [[2, 5], [3, 8], [5, 11], [7, 14], [10, 17]][level - 1];
     const maxJumpDistanceSq = jumpDistance * jumpDistance;
     const chain = [startEnemy];
     let currentEnemy = startEnemy;
@@ -889,7 +890,8 @@ function triggerRuneExplosionVisual(position, type) {
 
 function createRune(type, position, level) {
     const radius = [3, 4, 5, 6, 7][level - 1];
-    const damage = [20, 25, 30, 35, 40][level - 1];
+    let damage = [20, 25, 30, 35, 40][level - 1];
+    damage = getArcanePowerBonus(damage); // Aplica bônus
     const activationTime = level <= 3 ? 30 : 60; // 0.5s para Nv 1-3, 1s para Nv 4-5
     let statusEffect, statusTimer;
 

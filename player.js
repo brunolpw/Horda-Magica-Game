@@ -259,7 +259,8 @@ function attemptSpecialAttack() {
 
     switch (activeId) {
         case 'missil_fogo_etereo': {
-            const damage = [25, 35, 45, 50, 55][level - 1];
+            let damage = [25, 35, 45, 50, 55][level - 1];
+            damage = getArcanePowerBonus(damage); // Aplica bônus
             const target = findClosestEnemies(player.position, 1, true)[0];
             
             if (!target) return;
@@ -275,9 +276,9 @@ function attemptSpecialAttack() {
         }
         case 'explosao_energia': {
             const sphereCounts = [5, 7, 10, 15, 20];
-            const damages = [5, 10, 15, 20, 25];
+            let damage = [5, 10, 15, 20, 25][level - 1];
+            damage = getArcanePowerBonus(damage); // Aplica bônus
             const numProjectiles = sphereCounts[level - 1];
-            const damage = damages[level - 1];
             const radius = 25;
 
             const nearbyEnemies = enemies.filter(e => e.position.distanceTo(player.position) <= radius);
@@ -340,10 +341,11 @@ function attemptSpecialAttack() {
             
             const lastProjectile = projectiles[projectiles.length - 1];
             lastProjectile.userData.isHoming = true;
-            lastProjectile.userData.target = target;
+            lastProjectile.userData.target = target; // Mantido para referência
             lastProjectile.userData.hasBeenReflected = 'homing';
             lastProjectile.userData.explosionRadius = [5, 7, 8, 9, 10][level - 1];
-            lastProjectile.userData.explosionDamage = [50, 60, 70, 80, 100][level - 1];
+            let explosionDamage = [50, 60, 70, 80, 100][level - 1];
+            lastProjectile.userData.explosionDamage = getArcanePowerBonus(explosionDamage); // Aplica bônus
             lastProjectile.userData.explosionLevel = level;
             break;
         }
@@ -364,7 +366,8 @@ function attemptSpecialAttack() {
             createProjectile('ice_lance', direction, player.position);
 
             const lance = projectiles[projectiles.length - 1];
-            lance.userData.damage = [40, 60, 60, 80, 100][level - 1];
+            let damage = [40, 60, 60, 80, 100][level - 1];
+            lance.userData.damage = getArcanePowerBonus(damage); // Aplica bônus
             lance.userData.maxPierce = (level < 3) ? 3 : 5;
             lance.userData.width = (level < 4) ? 0.3 : 0.5;
             lance.scale.x = lance.scale.z = (level < 4) ? 1.0 : 1.5; // Aumenta a largura visual
@@ -440,6 +443,13 @@ function getWeaknessMultiplier(damageElement, enemyType) {
 
     return 1.0; // Dano normal
 }
+
+function getArcanePowerBonus(baseDamage) {
+    const bonusMultiplier = 1 + (Math.floor(playerLevel / 5) * 0.10); // +10% a cada 5 níveis
+    const finalDamage = baseDamage * bonusMultiplier;
+    return Math.ceil(finalDamage); // Arredonda para cima
+}
+
 
 function resetPlayerState() {
     isGameOver = false;

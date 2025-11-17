@@ -223,6 +223,10 @@ function updateProjectiles() {
                             finalDamage += bonusAmount;
                         }
 
+                        // NOVO: Bônus de Poder Arcano Inerente (Dano Flat)
+                        const inherentBonus = Math.floor(playerLevel / 5);
+                        finalDamage += inherentBonus;
+
                         // Lógica do Míssil de Fogo Etéreo
                         if (projData.type === 'ethereal_fire') {
                             finalDamage *= getWeaknessMultiplier('fire', enemy.userData.type);
