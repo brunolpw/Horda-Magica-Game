@@ -240,7 +240,11 @@ function levelUp() {
     pendingLevelUps++;
     document.getElementById('level-up-prompt-button').classList.remove('hidden');
 
-    player.userData.experienceForNextLevel = Math.floor(baseExperience * Math.pow(playerLevel, 1.5));
+    // NOVO: Aumenta a vida máxima e atual a cada nível
+    maxHP += 10;
+    playerHP += 10;
+
+    player.userData.experienceForNextLevel = Math.floor(baseExperience * Math.pow(playerLevel, 1.2));
     displayLevelUpMessage();
 }
 
