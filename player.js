@@ -56,6 +56,11 @@ const upgrades = {
         description: (level) => level < 5 ? `Recupera ${level + 1} de HP a cada 5 segundos.` : `Recupera 10 de HP a cada 5 segundos.`,
         apply: () => { /* A lógica é gerenciada no loop animate */ }
     },
+    magic_shield: {
+        type: 'attribute', icon: '🛡️', title: "Escudo Mágico", maxLevel: 5,
+        description: (level) => `Reduz o dano físico recebido em ${Math.min(30, level * 10)}%. ${level >= 4 ? `Reduz o dano elemental em ${level === 4 ? 15 : 30}%.` : ''}`,
+        apply: () => { createMagicShieldMesh(); }
+    },
     missil_fogo_etereo: {
         type: 'active', icon: '🔥', title: "Míssil de Fogo Etéreo", maxLevel: 5,
         getChargeCost: () => 7,
@@ -192,6 +197,21 @@ function handlePlayerMovement() {
 
 function damagePlayer(amount) {
     if (isGameOver) return;
+
+    let finalDamage = amount;
+    const shieldLevel = player.userData.upgrades.magic_shield || 0;
+    if (shieldLevel > 0) {
+        let reductionPercent = 0;
+        if (isElemental && shieldLevel >= 4) {
+            reductionPercent = shieldLevel === 4 ? 0.15 : 0.30;
+        } else if (!isElemental) {
+            reductionPercent = Math.min(0.3, shieldLevel * 0.1);
+        }
+
+        const reductionAmount = Math.max(1, Math.ceil(finalDamage * reductionPercent));
+        finalDamage -= reductionAmount;
+    }
+    finalDamage = Math.max(0, finalDamage);
 
     playerHP = Math.max(0, playerHP - amount);
     triggerCameraShake(0.5, 20);

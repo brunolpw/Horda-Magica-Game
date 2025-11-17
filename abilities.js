@@ -11,6 +11,7 @@ let freezingAuraTimer = 0;
 let freezingAuraMesh;
 let goblinKingAuraMesh;
 let smokeParticles = [];
+let magicShieldMesh;
 const numSmokeParticles = 50;
 let repulsionBubbleTimer = 0;
 let repulsionBubbleMesh;
@@ -135,6 +136,26 @@ function createRangeIndicator() {
     rangeIndicator.rotation.x = -Math.PI / 2;
     rangeIndicator.visible = false;
     scene.add(rangeIndicator);
+}
+
+function createMagicShieldMesh() {
+    if (magicShieldMesh) scene.remove(magicShieldMesh);
+
+    const group = new THREE.Group();
+    const radius = 1.0;
+    const segmentAngle = (Math.PI * 2 / 3) * 0.8; // 80% de 1/3 do círculo
+
+    const segmentGeo = new THREE.TorusGeometry(radius, 0.08, 16, 100, segmentAngle);
+    const segmentMat = new THREE.MeshBasicMaterial({ color: 0x00D7FE, side: THREE.DoubleSide });
+
+    for (let i = 0; i < 3; i++) {
+        const segment = new THREE.Mesh(segmentGeo, segmentMat);
+        segment.rotation.z = (i / 3) * Math.PI * 2;
+        group.add(segment);
+    }
+    group.rotation.x = Math.PI / 2;
+    magicShieldMesh = group;
+    scene.add(magicShieldMesh);
 }
 
 // --- Funções de Lógica de Power-ups ---

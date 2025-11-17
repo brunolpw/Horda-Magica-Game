@@ -590,6 +590,7 @@
                     handleStandardMovement(enemy, newPosition, finalSpeed);
                 }
             } else if (enemyData.type === 'goblin_king' && enemyData.hp / enemyData.maxHP < 0.3) { // Fuga do Rei Goblin
+            if (enemyData.type === 'goblin_king' && enemyData.hp / enemyData.maxHP < 0.3) { // Fuga do Rei Goblin
                 // Foge do jogador
                 const fleeDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
                 const newPosition = enemy.position.clone().addScaledVector(fleeDirection, finalSpeed);
@@ -601,6 +602,20 @@
                     triggerRockFall(rockTargetPosition);
                     enemyData.rockThrowCooldown = 240; // Atira a cada 4 segundos
                 }
+            } else if (enemyData.isFleeing) {
+                // Lógica de Fuga para outros inimigos
+                let fleeSpeed = finalSpeed;
+                if (isSlowed) fleeSpeed *= 0.5; // Aplica lentidão à fuga
+
+                const fleeDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
+                const newPosition = enemy.position.clone().addScaledVector(fleeDirection, fleeSpeed);
+                handleStandardMovement(enemy, newPosition, finalSpeed);
+            } else if (isSlowed) { // Inimigos congelados ou eletrificados (que não estão fugindo)
+                // Movimento lento ou paralisado
+                const speedMultiplier = (enemyData.electrifiedTimer > 0) ? 0 : 0.5; // Paralisado se eletrificado
+                const slowDirection = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
+                const newPosition = enemy.position.clone().addScaledVector(slowDirection, finalSpeed * speedMultiplier);
+                handleStandardMovement(enemy, newPosition, finalSpeed * speedMultiplier);
             } else if (enemyData.type === 'kobold_king') {
                 // Fúria
                 if (!enemyData.isEnraged && enemyData.hp / enemyData.maxHP < 0.5) {
@@ -1047,7 +1062,7 @@
             // Inimigos de longa distância não causam dano de toque
             if (enemyData.type !== 'necromancer' && enemyData.type !== 'skeleton_archer' && enemyData.type !== 'kobold_shaman' && enemyData.electrifiedTimer <= 0) {
                 if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(enemy))) {
-                    if (enemyData.damageCooldown <= 0) {
+                    if (enemyData.damageCooldown <= 0) { // Dano físico
                         damagePlayer(enemyData.damage);
                         createFloatingText(enemyData.damage, player.position.clone().setY(1.5), '#ff0000', '1.5rem');
                         if (enemyData.type === 'fire_elemental') {
@@ -1171,7 +1186,7 @@
 
             const puddleBBox = new THREE.Box3().setFromObject(puddle.mesh);
             if (playerBBox.intersectsBox(puddleBBox)) {
-                if (repulsionBubbleTimer <= 0) { // Bolha protege do dano
+                if (repulsionBubbleTimer <= 0) { // Dano elemental
                     damagePlayer(0.2); // Dano baixo, mas constante
                 }
             }
@@ -1273,6 +1288,12 @@
                 camera.position.set(targetCameraX + shakeX, targetCameraY, targetCameraZ + shakeZ);
             } else {
                 camera.position.set(targetCameraX, targetCameraY, targetCameraZ);
+            }
+
+            // Animação do Escudo Mágico
+            if (magicShieldMesh) {
+                magicShieldMesh.position.copy(player.position);
+                magicShieldMesh.rotation.z += 0.02;
             }
 
             camera.lookAt(player.position);
@@ -1612,7 +1633,7 @@
 
             const playerBBox = new THREE.Box3().setFromObject(player);
             for (const beam of conduitBeams) {
-                if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(beam))) {
+                if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(beam))) { // Dano elemental
                     damagePlayer(0.5); // Dano contínuo
                     break;
                 }
@@ -1631,6 +1652,7 @@
             if (repulsionBubbleMesh) repulsionBubbleMesh.visible = false;
             // Limpa conduítes e raios ao final do jogo
             stormConduits.forEach(c => scene.remove(c));
+            if (magicShieldMesh) scene.remove(magicShieldMesh);
             stormConduits.length = 0;
             conduitBeams.forEach(b => scene.remove(b));
             conduitBeams.length = 0;

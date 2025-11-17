@@ -18,6 +18,7 @@ A progressão do mago é feita através de um sistema de level up, onde você po
 |  ❤️   | **Vigor**             | Aumenta a vida máxima em **+20** por nível.                                                                          |
 |  🎓   | **Sede de Conhecimento** | Aumenta o ganho de experiência em **+20% / +40% / +60% / +80% / +100%**.                                             |
 |  ✨   | **Regeneração**       | Recupera **2 / 3 / 4 / 5 / 10** de HP a cada 5 segundos.                                                             |
+|  🛡️   | **Escudo Mágico**     | Reduz o dano físico em **10% a 30%**. A partir do Nv. 4, também reduz o dano elemental em **15% a 30%**.             |
 
 ### Habilidades Ativas (Grimório)
 
