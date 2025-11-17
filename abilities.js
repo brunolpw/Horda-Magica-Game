@@ -726,8 +726,8 @@ function triggerEruption(position) {
         const interval = setInterval(() => {
             distance += 0.5;
             wave.position.addScaledVector(direction, 0.5);
-            if (new THREE.Box3().setFromObject(wave).intersectsBox(new THREE.Box3().setFromObject(player))) { // Dano elemental
-                damagePlayer(20);
+            if (new THREE.Box3().setFromObject(wave).intersectsBox(new THREE.Box3().setFromObject(player))) {
+                damagePlayer(20, true); // Dano elemental
             }
             if (distance > mapSize) {
                 clearInterval(interval);

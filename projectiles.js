@@ -185,6 +185,15 @@ function updateProjectiles() {
             }
 
             // Colisão com Conduítes do Chefe de Raio
+            // CORREÇÃO: O cálculo do dano final foi movido para cá para ser usado em todas as colisões.
+            const damageLevel = player.userData.upgrades.increase_damage || 0;
+            let finalDamage = projData.damage;
+            if (damageLevel > 0) {
+                const bonusAmount = damageLevel * 2;
+                finalDamage += bonusAmount;
+            }
+            const inherentBonus = Math.floor(playerLevel / 5);
+            finalDamage += inherentBonus;
             if (!hit && stormConduits.length > 0) {
                 for (let c = stormConduits.length - 1; c >= 0; c--) {
                     const conduit = stormConduits[c];
@@ -212,21 +221,9 @@ function updateProjectiles() {
                     // Evita que um projétil perfurante atinja o mesmo inimigo duas vezes
                     if (projData.hitEnemies.includes(enemy.uuid)) {
                         continue;
+
                     }
-
                     if (tempBBox.intersectsBox(enemyBBox)) {
-                        const damageLevel = player.userData.upgrades.increase_damage || 0;
-                        let finalDamage = projData.damage;
-                        if (damageLevel > 0) {
-                            // +2 de dano por nível (2, 4, 6, 8, 10)
-                            const bonusAmount = damageLevel * 2;
-                            finalDamage += bonusAmount;
-                        }
-
-                        // NOVO: Bônus de Poder Arcano Inerente (Dano Flat)
-                        const inherentBonus = Math.floor(playerLevel / 5);
-                        finalDamage += inherentBonus;
-
                         // Lógica do Míssil de Fogo Etéreo
                         if (projData.type === 'ethereal_fire') {
                             finalDamage *= getWeaknessMultiplier('fire', enemy.userData.type);

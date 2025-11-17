@@ -133,14 +133,19 @@ function spawnEnemies() {
                 else if (roll < 70) type = 'necromancer';
                 else if (roll < 85) type = 'skeleton';
                 else type = 'ghost';
-            } else if (currentWave < 25) { // Ondas 20-24
+            } else if (currentWave < 23) { // Ondas 20-22 (sem elementais)
+                if (roll < 30) type = 'skeleton_warrior';
+                else if (roll < 60) type = 'ghost';
+                else if (roll < 85) type = 'necromancer';
+                else type = 'troll';
+            } else if (currentWave < 25) { // Ondas 23-24 (Elementais aparecem)
                 if (roll < 20) type = 'skeleton_warrior';
                 else if (roll < 40) type = 'ghost';
                 else if (roll < 55) type = 'necromancer';
                 else if (roll < 75) type = 'fire_elemental';
                 else if (roll < 90) type = 'ice_elemental';
                 else type = 'lightning_elemental';
-            } else if (currentWave < 30) { // Ondas 25-29 (Invocador aparece)
+            } else if (currentWave < 35) { // Ondas 25-34 (Invocador aparece)
                 if (roll < 20) type = 'fire_elemental';
                 else if (roll < 40) type = 'ice_elemental';
                 else if (roll < 60) type = 'lightning_elemental';

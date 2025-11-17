@@ -128,7 +128,7 @@
         }
 
         function handleMouseClick(event) {
-            if (event.button === 0 && !isGameOver && !isGamePaused) {
+            if (event.button === 0 && !isGameOver && !isGamePaused) { // Garante que nenhuma magia seja usada com o jogo pausado
                 attemptSpecialAttack();
             }
         }
