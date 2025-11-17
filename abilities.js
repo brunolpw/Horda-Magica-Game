@@ -533,7 +533,7 @@ function createBossShield(charges) {
 function triggerRockFall(targetPosition) {
     const fallRadius = 6;
     const damage = 15;
-
+ 
     const targetGeometry = new THREE.RingGeometry(fallRadius - 0.5, fallRadius, 32);
     const targetMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
     const targetMarker = new THREE.Mesh(targetGeometry, targetMaterial);
@@ -544,7 +544,7 @@ function triggerRockFall(targetPosition) {
 
     setTimeout(() => {
         if (player.position.distanceToSquared(targetPosition) < fallRadius * fallRadius) {
-            damagePlayer(damage);
+            damagePlayer(damage, false); // Dano físico
             createFloatingText(damage, player.position.clone().setY(1.5), '#ff4500', '1.5rem');
         }
         const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1), new THREE.MeshLambertMaterial({ color: 0x8B4513 }));
@@ -726,7 +726,7 @@ function triggerEruption(position) {
         const interval = setInterval(() => {
             distance += 0.5;
             wave.position.addScaledVector(direction, 0.5);
-            if (new THREE.Box3().setFromObject(wave).intersectsBox(new THREE.Box3().setFromObject(player))) {
+            if (new THREE.Box3().setFromObject(wave).intersectsBox(new THREE.Box3().setFromObject(player))) { // Dano elemental
                 damagePlayer(20);
             }
             if (distance > mapSize) {

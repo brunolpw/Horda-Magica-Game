@@ -581,15 +581,6 @@
             if (enemyData.isTeleporting) {
                 continue; // Pula movimento se estiver se teleportando
             }
-            if (isSlowed) { // Inimigos congelados ou eletrificados
-                // Movimento lento ou paralisado
-                const speedMultiplier = (enemyData.electrifiedTimer > 0) ? 0 : 0.5; // Paralisado se eletrificado
-                if (speedMultiplier > 0) {
-                    const slowDirection = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                    const newPosition = enemy.position.clone().addScaledVector(slowDirection, finalSpeed * speedMultiplier);
-                    handleStandardMovement(enemy, newPosition, finalSpeed);
-                }
-            } else if (enemyData.type === 'goblin_king' && enemyData.hp / enemyData.maxHP < 0.3) { // Fuga do Rei Goblin
             if (enemyData.type === 'goblin_king' && enemyData.hp / enemyData.maxHP < 0.3) { // Fuga do Rei Goblin
                 // Foge do jogador
                 const fleeDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
@@ -641,12 +632,6 @@
                     spawnKoboldGroup(enemy.position);
                     enemyData.summonCooldown = 900 * furyMultiplier;
                 }
-
-            } else if (enemyData.isFleeing) {
-                // Lógica de Fuga para outros inimigos
-                const fleeDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
-                const newPosition = enemy.position.clone().addScaledVector(fleeDirection, finalSpeed);
-                handleStandardMovement(enemy, newPosition, finalSpeed);
             } else if (enemyData.type === 'necromancer') {
                 // Lógica de movimento do Necromante (kiting)
                  const distanceToPlayer = enemy.position.distanceTo(player.position);
@@ -1062,7 +1047,7 @@
             // Inimigos de longa distância não causam dano de toque
             if (enemyData.type !== 'necromancer' && enemyData.type !== 'skeleton_archer' && enemyData.type !== 'kobold_shaman' && enemyData.electrifiedTimer <= 0) {
                 if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(enemy))) {
-                    if (enemyData.damageCooldown <= 0) { // Dano físico
+                    if (enemyData.damageCooldown <= 0) {
                         damagePlayer(enemyData.damage);
                         createFloatingText(enemyData.damage, player.position.clone().setY(1.5), '#ff0000', '1.5rem');
                         if (enemyData.type === 'fire_elemental') {
@@ -1186,7 +1171,7 @@
 
             const puddleBBox = new THREE.Box3().setFromObject(puddle.mesh);
             if (playerBBox.intersectsBox(puddleBBox)) {
-                if (repulsionBubbleTimer <= 0) { // Dano elemental
+                if (repulsionBubbleTimer <= 0) {
                     damagePlayer(0.2); // Dano baixo, mas constante
                 }
             }
@@ -1633,7 +1618,7 @@
 
             const playerBBox = new THREE.Box3().setFromObject(player);
             for (const beam of conduitBeams) {
-                if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(beam))) { // Dano elemental
+                if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(beam))) {
                     damagePlayer(0.5); // Dano contínuo
                     break;
                 }

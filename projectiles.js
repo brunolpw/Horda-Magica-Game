@@ -159,7 +159,7 @@ function updateProjectiles() {
         if (projData.type === 'necro_bolt' || projData.type === 'arrow' || projData.type === 'ice_shard' || projData.type === 'shaman_bolt') {
             const playerBBox = new THREE.Box3().setFromObject(player);
             if (tempBBox.intersectsBox(playerBBox)) {
-                damagePlayer(projData.damage, true); // Dano elemental
+                damagePlayer(projData.damage, true);
                 createFloatingText(projData.damage, player.position.clone().setY(1.5), '#ff0000', '1.5rem');
                 scene.remove(projectile);
                 projectiles.splice(i, 1);
@@ -271,6 +271,11 @@ function updateProjectiles() {
                             }
                         } else {
                             hit = true;
+                        }
+
+                        // Garante que a Carga Explosiva sempre exploda no hit
+                        if (projData.isExplosive) {
+                            triggerBigExplosion(projectile.position, projData.explosionRadius, projData.explosionDamage, projData.explosionLevel);
                         }
 
                         if (hit) break; // Para de procurar inimigos neste frame se o projétil deve ser destruído

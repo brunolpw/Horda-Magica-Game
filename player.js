@@ -195,7 +195,7 @@ function handlePlayerMovement() {
     }
 }
 
-function damagePlayer(amount) {
+function damagePlayer(amount, isElemental = false) {
     if (isGameOver) return;
 
     let finalDamage = amount;
@@ -213,7 +213,7 @@ function damagePlayer(amount) {
     }
     finalDamage = Math.max(0, finalDamage);
 
-    playerHP = Math.max(0, playerHP - amount);
+    playerHP = Math.max(0, playerHP - finalDamage);
     triggerCameraShake(0.5, 20);
 
     const robe = player.children[0];
