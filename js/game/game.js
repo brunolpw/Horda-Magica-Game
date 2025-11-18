@@ -169,6 +169,8 @@
                 enemy = new KoboldKing();
             } else if (type === 'juggernaut_troll') {
                 enemy = new JuggernautTroll();
+            } else if (type === 'archlich') {
+                enemy = new Archlich();
             } else {
                 // Lógica antiga para inimigos não refatorados
                 const props = entityProps[type];
@@ -329,26 +331,6 @@
             // Se chegou aqui, não está congelado
             if (enemyData.freezeLingerTimer <= 0) {
                 enemyData.isFrozen = false;
-            }
-
-            // NOVO: Lógica do Arquilich
-            if (enemyData.type === 'archlich') {
-                // Colheita de Almas
-                if (killsForSoulHarvest >= 5) {
-                    const numWarriors = Math.floor(killsForSoulHarvest / 5);
-                    for (let k = 0; k < numWarriors; k++) {
-                        const offset = new THREE.Vector3((Math.random() - 0.5) * 8, 0, (Math.random() - 0.5) * 8);
-                        createEnemy('skeleton_warrior', enemy.position.clone().add(offset), true);
-                    }
-                    killsForSoulHarvest %= 5; // Mantém o resto
-                }
-
-                // Prisão de Ossos
-                enemyData.bonePrisonCooldown = Math.max(0, enemyData.bonePrisonCooldown - 1);
-                if (enemyData.bonePrisonCooldown <= 0) {
-                    triggerBonePrison();
-                    enemyData.bonePrisonCooldown = 1200; // Reseta cooldown
-                }
             }
 
             // NOVO: Lógica do status Eletrificado
