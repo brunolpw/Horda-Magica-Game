@@ -476,3 +476,7 @@ const entityProps = {
     storm_sovereign: { hp: 10000, speed: 0.04, score: 10000, damage: 30, name: "Soberano da Tempestade", modelFn: createStormSovereignModel, modelHeight: 2.5 },
     elemental_master: { hp: 20000, speed: 0.03, score: 25000, damage: 50, name: "Mestre Elemental", modelFn: createElementalMasterModel, modelHeight: 2.5 }
 };
+
+// --- Constantes de Jogo ---
+const CHARGE_TIME_MAX = 1200; // 20 segundos a 60fps
+const baseExperience = 100;

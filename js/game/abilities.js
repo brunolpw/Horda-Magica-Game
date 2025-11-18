@@ -196,7 +196,7 @@ function spawnPowerUps() {
 
     const baseSpawnChance = 0.2;
     const spawnChancePerLevel = 0.1;
-    const spawnChance = Math.min(0.7, baseSpawnChance + (playerLevel - 1) * spawnChancePerLevel);
+    const spawnChance = Math.min(0.7, baseSpawnChance + ((player.level || 1) - 1) * spawnChancePerLevel);
 
     if (powerUpTimer >= timeSpawnInterval) {
         if (Math.random() < spawnChance) { 
@@ -210,9 +210,9 @@ function spawnPowerUps() {
     // Aumenta o requisito de abates após a onda 10
     const requiredKills = currentWave > 10 ? 70 : 30;
 
-    if (killsSinceLastPotion >= requiredKills) {
+    if (player && player.killsSinceLastPotion >= requiredKills) {
         spawnRandomItem();
-        killsSinceLastPotion = 0;
+        player.killsSinceLastPotion = 0;
     }
 }
 
@@ -240,9 +240,9 @@ function updatePowerUps() {
             switch(data.type) {
                 case 'potion':
                     const healValue = data.healAmount;
-                    const oldHP = playerHP;
-                    playerHP = Math.min(maxHP, playerHP + healValue);
-                    const actualHeal = playerHP - oldHP;
+                    const oldHP = player.hp;
+                    player.hp = Math.min(player.maxHP, player.hp + healValue);
+                    const actualHeal = player.hp - oldHP;
                     if (actualHeal > 0) {
                         displayHealingMessage(actualHeal);
                         createFloatingText(`+${actualHeal}`, player.position.clone().setY(1.5), '#00ff00', '1.5rem');
@@ -485,7 +485,7 @@ function updateShield() {
 
             const sphereBBox = new THREE.Box3().setFromObject(sphere);
             let hitEnemy = null;
-
+            
             for (const enemy of enemies) {
                 const enemyBBox = new THREE.Box3().setFromObject(enemy);
                 if (sphereBBox.intersectsBox(enemyBBox)) {
@@ -724,8 +724,8 @@ function triggerEruption(position) {
         const interval = setInterval(() => {
             distance += 0.5;
             wave.position.addScaledVector(direction, 0.5);
-            if (new THREE.Box3().setFromObject(wave).intersectsBox(new THREE.Box3().setFromObject(player))) {
-                damagePlayer(20, true); // Dano elemental
+            if (player && new THREE.Box3().setFromObject(wave).intersectsBox(new THREE.Box3().setFromObject(player))) {
+                player.takeDamage(20, true); // Dano elemental
             }
             if (distance > mapSize) {
                 clearInterval(interval);

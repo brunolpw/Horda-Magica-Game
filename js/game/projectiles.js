@@ -192,7 +192,7 @@ function updateProjectiles() {
                 const bonusAmount = damageLevel * 2;
                 finalDamage += bonusAmount;
             }
-            const inherentBonus = Math.floor(playerLevel / 5);
+            const inherentBonus = Math.floor((player.level || 1) / 5);
             finalDamage += inherentBonus;
             if (!hit && currentBoss && currentBoss.conduits && currentBoss.conduits.length > 0) {
                 for (let c = currentBoss.conduits.length - 1; c >= 0; c--) {

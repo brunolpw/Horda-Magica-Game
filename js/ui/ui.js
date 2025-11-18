@@ -46,21 +46,21 @@ function setupUIElements() {
 function updateUI() {
     if (!playerNameDisplay) return;
 
-    playerNameDisplay.textContent = playerName;
-    scoreDisplay.textContent = `Pontuação: ${score}`;
-    playerLevelDisplay.textContent = playerLevel;
+    playerNameDisplay.textContent = playerName || 'Mago';
+    scoreDisplay.textContent = `Pontuação: ${player ? player.score : 0}`;
+    playerLevelDisplay.textContent = player ? player.level : 1;
 
     const experienceForNextLevel = player.userData.experienceForNextLevel || baseExperience;
-    const xpPercent = (experiencePoints / experienceForNextLevel) * 100;
+    const xpPercent = ((player.experiencePoints || 0) / experienceForNextLevel) * 100;
     document.getElementById('xp-bar').style.width = `${xpPercent}%`;
-    xpTextDisplay.textContent = `${Math.floor(experiencePoints)}/${experienceForNextLevel}`;
+    xpTextDisplay.textContent = `${Math.floor(player.experiencePoints || 0)}/${experienceForNextLevel}`;
 
     waveLevelDisplay.textContent = currentWave;
 
-    const hpPercent = Math.max(0, playerHP / maxHP) * 100;
+    const hpPercent = player ? Math.max(0, player.hp / player.maxHP) * 100 : 100;
     hpBar.style.width = `${hpPercent}%`;
     const hpTextDisplay = document.getElementById('hp-text-display');
-    hpTextDisplay.textContent = `${Math.floor(playerHP)}/${Math.floor(maxHP)}`;
+    hpTextDisplay.textContent = `${Math.floor(player ? player.hp : 100)}/${Math.floor(player ? player.maxHP : 100)}`;
 
     const activeAbilityId = player.userData.activeAbility;
     if (activeAbilityId) {
@@ -70,7 +70,7 @@ function updateUI() {
         const charges = player.userData.abilityCharges[activeAbilityId] || 0;
 
         // A barra de progresso agora mostra o tempo para a próxima carga
-        const progressPercent = ((CHARGE_TIME_MAX - chargeTimer) / CHARGE_TIME_MAX) * 100;
+        const progressPercent = player ? ((CHARGE_TIME_MAX - player.chargeTimer) / CHARGE_TIME_MAX) * 100 : 0;
 
         activeAbilityIcon.textContent = ability.icon;
         activeAbilityProgressBar.style.width = `${progressPercent}%`;
@@ -86,7 +86,7 @@ function updateUI() {
         }
 
         // Feedback visual para o cooldown global
-        if (specialGlobalCooldown > 0) {
+        if (player.specialGlobalCooldown > 0) {
             activeAbilityHud.style.borderColor = '#4a5568'; // Borda cinza escura
             activeAbilityHud.style.opacity = '0.6'; // Fica semitransparente
             activeAbilityProgressBar.style.backgroundColor = '#6b7280'; // Barra cinza

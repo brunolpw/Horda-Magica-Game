@@ -95,16 +95,16 @@ class Enemy extends Entity {
 
     die() {
         super.die();
-        score += this.score;
-        gainExperience(this.score);
+        if (player) {
+            player.score += this.score;
+            player.gainExperience(this.score);
+            player.killsSinceLastPotion++;
+            if (player.killStats && this.props && player.killStats[this.props.name] !== undefined) {
+                player.killStats[this.props.name]++;
+            }
+        }
 
         if (isBossWave) killsForSoulHarvest++;
-        chargeTimer = Math.max(0, chargeTimer - 60);
-        killsSinceLastPotion++;
-        
-        if (this.props && killStats[this.props.name] !== undefined) {
-            killStats[this.props.name]++;
-        }
 
         const index = enemies.findIndex(e => e.uuid === this.uuid);
         if (index > -1) {
