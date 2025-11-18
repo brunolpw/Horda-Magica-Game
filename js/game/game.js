@@ -159,8 +159,10 @@
                 enemy = new Ghost();
             } else if (type === 'fire_elemental') {
                 enemy = new FireElemental();
-            } else if (type === 'lightning_elemental') {
-                enemy = new LightningElemental();
+            } else if (type === 'ice_elemental') {
+                enemy = new IceElemental();
+            } else if (type === 'summoner_elemental') {
+                enemy = new SummonerElemental();
             } else {
                 // Lógica antiga para inimigos não refatorados
                 const props = entityProps[type];
@@ -581,40 +583,16 @@
                         enemy.position.copy(newPosition);
                     }
                 }
-            } else if (enemyData.type === 'ice_elemental') {
-                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
-                handleStandardMovement(enemy, newPosition, finalSpeed);
-                if (enemy.position.distanceTo(player.position) < enemyData.auraRadius) {
-                    playerSlowTimer = 120; // Aplica lentidão por 2 segundos
-                }
-            } else if (enemyData.type === 'summoner_elemental') {
-                // Lógica de kiting
-                const distanceToPlayer = enemy.position.distanceTo(player.position);
-                const minDistance = 18;
-                let direction = new THREE.Vector3(0, 0, 0);
-                if (distanceToPlayer < minDistance) {
-                    direction.subVectors(enemy.position, player.position).normalize();
-                }
-                if (direction.lengthSq() > 0) {
+            } else if (enemyData.type === 'lightning_elemental') {
+                enemyData.teleportCooldown = Math.max(0, enemyData.teleportCooldown - 1);
+                if (enemyData.teleportCooldown <= 0) {
+                    triggerTeleport(enemy);
+                    enemyData.teleportCooldown = 300; // Reseta cooldown
+                } else {
+                    // Movimento normal se não estiver teleportando
+                    const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
                     const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
                     handleStandardMovement(enemy, newPosition, finalSpeed);
-                }
-
-                // Lógica de ataque
-                enemyData.attackTimer = Math.max(0, enemyData.attackTimer - 1);
-                if (enemyData.attackTimer <= 0) {
-                    const attackDirection = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
-                    createProjectile('necro_bolt', attackDirection, enemy.position);
-                    projectiles[projectiles.length - 1].userData.damage = enemyData.damage;
-                    enemyData.attackTimer = enemyData.attackCooldown;
-                }
-
-                // Lógica de invocação
-                enemyData.summonCooldown = Math.max(0, enemyData.summonCooldown - 1);
-                if (enemyData.summonCooldown <= 0) {
-                    triggerElementalSummon(enemy.position);
-                    enemyData.summonCooldown = 600;
                 }
             } else if (enemyData.type === 'magma_colossus') {
                 // Fúria
@@ -860,11 +838,6 @@
             if (repulsionBubbleTimer <= 0) { // Bolha protege contra auras
                 if (enemyData.type === 'ice_elemental' && enemy.position.distanceTo(player.position) < enemyData.auraRadius) {
                     player.userData.slowTimer = 120;
-                }
-                if (enemyData.type === 'summoner_elemental' && enemy.position.distanceTo(player.position) < enemyData.auraRadius) {
-                    player.userData.slowTimer = 60;
-                    player.userData.burnTimer = 120;
-                    player.userData.electrifiedTimer = 120;
                 }
             }
 
