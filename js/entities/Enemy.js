@@ -46,7 +46,7 @@ class Enemy extends Entity {
         }
     }
 
-    update(player, target, finalSpeed) {
+    update(player, target, finalSpeed, skipMovement = false) {
         if (!this.isAlive) return;
 
         // Atualiza status (timers)
@@ -73,8 +73,10 @@ class Enemy extends Entity {
             currentSpeed *= (this.userData.electrifiedTimer > 0) ? 0 : 0.5;
         }
 
-        const newPosition = this.position.clone().addScaledVector(moveDirection, currentSpeed);
-        handleStandardMovement(this, newPosition, currentSpeed);
+        if (!skipMovement) {
+            const newPosition = this.position.clone().addScaledVector(moveDirection, currentSpeed);
+            handleStandardMovement(this, newPosition, currentSpeed);
+        }
 
         // Lógica de Dano de Contato
         this.handleContactDamage(player);

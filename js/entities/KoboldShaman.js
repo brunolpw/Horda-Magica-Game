@@ -3,19 +3,30 @@ class KoboldShaman extends Enemy {
     constructor() {
         super(entityProps.kobold_shaman);
         this.attackCooldown = 360;
-        this.attackTimer = 0;
+        this.attackTimer = Math.random() * 180; // Start with a random cooldown
         this.idealDistance = 10;
     }
 
     // Sobrescreve o método update para adicionar o comportamento de kiting e ataque
-    update(player, target, finalSpeed, isSlowed) {
-        // A lógica de fuga e status é gerenciada na classe pai (Enemy)
-        // Aqui, implementamos apenas o que é único para o Xamã
+    update(player, target, finalSpeed) {
+        // First, let the parent class handle status effects like fleeing, burning, etc.
+        // We call the parent's update method but prevent it from moving the enemy.
+        super.update(player, target, finalSpeed, true); // `true` prevents parent movement
 
+        let moveDirection = new THREE.Vector3();
+        let currentSpeed = finalSpeed;
+
+        // If the parent class determined the enemy should flee, respect that.
         if (this.userData.isFleeing) {
-            // Se estiver fugindo, usa a lógica de movimento da classe pai
-            super.update(player, target, finalSpeed, isSlowed);
-            return;
+            moveDirection.subVectors(this.position, player.position).normalize();
+        } else {
+            // Kiting Logic: maintain ideal distance
+            const distanceToPlayer = this.position.distanceTo(player.position);
+            if (distanceToPlayer < this.idealDistance - 1) { // Too close, move away
+                moveDirection.subVectors(this.position, player.position).normalize();
+            } else if (distanceToPlayer > this.idealDistance + 1) { // Too far, move closer
+                moveDirection.subVectors(player.position, this.position).normalize();
+            }
         }
 
         // Lógica de ataque
@@ -26,7 +37,8 @@ class KoboldShaman extends Enemy {
             this.attackTimer = this.attackCooldown;
         }
 
-        // A lógica de movimento de kiting será adicionada aqui em um próximo passo
-        super.update(player, target, finalSpeed, isSlowed);
+        // Apply movement
+        const newPosition = this.position.clone().addScaledVector(moveDirection, currentSpeed);
+        handleStandardMovement(this, newPosition, currentSpeed);
     }
 }
