@@ -1,4 +1,5 @@
 // js/entities/Ghost.js
+// js/entities/enemies/Ghost.js
 class Ghost extends Enemy {
     constructor() {
         super(entityProps.ghost);

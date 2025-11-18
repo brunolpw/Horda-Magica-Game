@@ -1,4 +1,5 @@
 // js/entities/FireElemental.js
+// js/entities/enemies/FireElemental.js
 class FireElemental extends Enemy {
     constructor() {
         super(entityProps.fire_elemental);

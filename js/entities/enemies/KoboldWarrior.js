@@ -1,4 +1,5 @@
 // js/entities/KoboldWarrior.js
+// js/entities/enemies/KoboldWarrior.js
 class KoboldWarrior extends Enemy {
     constructor() {
         super(entityProps.kobold_warrior);

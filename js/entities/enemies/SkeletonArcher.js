@@ -1,4 +1,5 @@
 // js/entities/SkeletonArcher.js
+// js/entities/enemies/SkeletonArcher.js
 class SkeletonArcher extends Enemy {
     constructor() {
         super(entityProps.skeleton_archer);

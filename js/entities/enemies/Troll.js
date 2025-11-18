@@ -1,4 +1,5 @@
 // js/entities/Troll.js
+// js/entities/enemies/Troll.js
 class Troll extends Enemy {
     constructor() {
         super(entityProps.troll);

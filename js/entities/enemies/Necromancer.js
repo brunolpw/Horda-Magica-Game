@@ -1,4 +1,5 @@
 // js/entities/Necromancer.js
+// js/entities/enemies/Necromancer.js
 class Necromancer extends Enemy {
     constructor() {
         super(entityProps.necromancer);

@@ -1,4 +1,5 @@
 // js/entities/IceElemental.js
+// js/entities/enemies/IceElemental.js
 class IceElemental extends Enemy {
     constructor() {
         super(entityProps.ice_elemental);
