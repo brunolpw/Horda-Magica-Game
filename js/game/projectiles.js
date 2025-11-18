@@ -194,9 +194,9 @@ function updateProjectiles() {
             }
             const inherentBonus = Math.floor(playerLevel / 5);
             finalDamage += inherentBonus;
-            if (!hit && stormConduits.length > 0) {
-                for (let c = stormConduits.length - 1; c >= 0; c--) {
-                    const conduit = stormConduits[c];
+            if (!hit && currentBoss && currentBoss.conduits && currentBoss.conduits.length > 0) {
+                for (let c = currentBoss.conduits.length - 1; c >= 0; c--) {
+                    const conduit = currentBoss.conduits[c];
                     if (tempBBox.intersectsBox(new THREE.Box3().setFromObject(conduit))) {
                         conduit.userData.hp -= finalDamage;
                         createFloatingText(Math.floor(finalDamage), conduit.position.clone().setY(3.5), 'white');
@@ -205,9 +205,12 @@ function updateProjectiles() {
                         if (conduit.userData.hp <= 0) {
                             triggerOverload(conduit.position);
                             scene.remove(conduit);
-                            stormConduits.splice(c, 1);
-                            updateConduitBeams();
-                            if (stormConduits.length === 0) handleBossDefeat(conduit.userData.boss);
+                            currentBoss.conduits.splice(c, 1);
+                            
+                            // Chama o método do chefe para atualizar os raios e verificar a derrota
+                            if (currentBoss.onConduitDestroyed) {
+                                currentBoss.onConduitDestroyed();
+                            }
                         }
                         break;
                     }
