@@ -165,22 +165,12 @@
                 enemy = new SummonerElemental();
             } else if (type === 'goblin_king') {
                 enemy = new GoblinKing();
+            } else if (type === 'kobold_king') {
+                enemy = new KoboldKing();
             } else {
                 // Lógica antiga para inimigos não refatorados
                 const props = entityProps[type];
                 enemy = new Enemy(props); // Usa a classe base por enquanto
-            }
-            
-            enemy.position.copy(position);
-            enemies.push(enemy);
-            scene.add(enemy);
-            
-            // Adiciona propriedades específicas que ainda são gerenciadas globalmente
-            if (type === 'kobold_king') { // Exemplo
-                enemy.userData.isBoss = true;
-                enemy.userData.junkLaunchCooldown = 600; // 10s
-                enemy.userData.summonCooldown = 900; // 15s
-                enemy.userData.isEnraged = false;
             }
 
             // NOVO: Adiciona propriedades para o Mestre Elemental
@@ -481,32 +471,6 @@
                 const speedMultiplier = (enemyData.electrifiedTimer > 0) ? 0 : 0.5; // Paralisado se eletrificado
                 const slowDirection = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
                 const newPosition = enemy.position.clone().addScaledVector(slowDirection, finalSpeed * speedMultiplier);
-                handleStandardMovement(enemy, newPosition, finalSpeed * speedMultiplier);
-            } else if (enemyData.type === 'kobold_king') {
-                // Fúria
-                if (!enemyData.isEnraged && enemyData.hp / enemyData.maxHP < 0.5) {
-                    enemyData.isEnraged = true;
-                    enemyData.speed *= 1.3;
-                }
-                // Movimento
-                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
-                handleStandardMovement(enemy, newPosition, finalSpeed);
-
-                // Habilidades
-                const furyMultiplier = enemyData.isEnraged ? 0.6 : 1.0;
-                enemyData.junkLaunchCooldown = Math.max(0, enemyData.junkLaunchCooldown - 1);
-                if (enemyData.junkLaunchCooldown <= 0) {
-                    triggerJunkLaunch(enemy.position, enemyData.isEnraged);
-                    enemyData.junkLaunchCooldown = 600 * furyMultiplier;
-                }
-
-                enemyData.summonCooldown = Math.max(0, enemyData.summonCooldown - 1);
-                if (enemyData.summonCooldown <= 0) {
-                    // Invoca um grupo de kobolds perto dele
-                    spawnKoboldGroup(enemy.position);
-                    enemyData.summonCooldown = 900 * furyMultiplier;
-                 }
             } else if (enemyData.type === 'kobold_shaman') {
                  // Lógica de kiting do Xamã
                  const distanceToPlayer = enemy.position.distanceTo(player.position);
