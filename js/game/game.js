@@ -151,6 +151,8 @@
                 enemy = new KoboldWarrior();
             } else if (type === 'kobold_shaman') {
                 enemy = new KoboldShaman();
+            } else if (type === 'skeleton_archer') {
+                enemy = new SkeletonArcher();
             } else {
                 // Lógica antiga para inimigos não refatorados
                 const props = entityProps[type];
