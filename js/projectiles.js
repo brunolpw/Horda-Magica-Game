@@ -254,14 +254,9 @@ function updateProjectiles() {
                         }
 
                         if (hit || finalDamage <= 0) continue;
-                        // Usa o método takeDamage da classe ou modifica o userData
-                        if (enemy.takeDamage) {
-                            enemy.takeDamage(finalDamage);
-                        } else {
-                            enemy.userData.hp -= finalDamage;
-                            enemy.userData.hitTimer = 10;
-                        }
-                        createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.modelHeight || enemy.userData.modelHeight || 1.5), 'white');
+                        enemy.userData.hp -= finalDamage;
+                        createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
+                        enemy.userData.hitTimer = 10;
 
                         // Lógica de perfuração
                         if (projData.type === 'ice_lance') {

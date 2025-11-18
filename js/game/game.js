@@ -145,6 +145,12 @@
                 enemy = new Orc();
             } else if (type === 'troll') {
                 enemy = new Troll();
+            } else if (type === 'kobold') {
+                enemy = new Kobold();
+            } else if (type === 'kobold_warrior') {
+                enemy = new KoboldWarrior();
+            } else if (type === 'kobold_shaman') {
+                enemy = new KoboldShaman();
             } else {
                 // Lógica antiga para inimigos não refatorados
                 const props = entityProps[type];
@@ -226,6 +232,11 @@
             
             for (let i = enemies.length - 1; i >= 0; i--) {
                 const enemy = enemies[i];
+
+                // Se o inimigo não estiver mais vivo (pode ter sido morto por um efeito), pule.
+                // A propriedade `isAlive` é da classe Entity, então precisamos checar se ela existe.
+                if (enemy.isAlive === false) continue;
+
                 const enemyData = enemy.userData;
 
                 // NOVO: Decrementa o cooldown de ataque do monstro
@@ -284,39 +295,27 @@
             let isSlowed = false;
             // Imunidades ao congelamento
             if (enemyData.type !== 'ghost' && enemyData.type !== 'ice_elemental' && enemyData.type !== 'lightning_elemental' && !(enemyData.type === 'juggernaut_troll' && enemyData.armor > 0)) {
-                const distanceToPlayer = enemy.position.distanceTo(player.position); // Matriarca é imune a gelo
-                const auraRadius = 6;
-
-                if (freezingAuraTimer > 0 && distanceToPlayer < auraRadius) {
-                    if (enemyData.type !== 'ice_elemental') enemyData.freezeLingerTimer = 600;
-                }
-                if (flamingAuraTimer > 0 && distanceToPlayer < auraRadius) {
-                    if (enemyData.type !== 'fire_elemental') {
-                        enemyData.burnTimer = 600; // 10 segundos
-                    }
-                }
-                if (electrifyingAuraTimer > 0 && distanceToPlayer < auraRadius) {
-                    if (enemyData.type !== 'lightning_elemental' && enemyData.type !== 'juggernaut_troll') {
-                        enemyData.electrifiedTimer = 120; // 2 segundos
-                    }
-                }
 
                 if (enemyData.freezeLingerTimer > 0) {
                     enemyData.freezeLingerTimer--;
                     enemyData.isFrozen = true;
                     isSlowed = true;
 
-                    // Dano de 5 a cada 1 segundo (60 frames)
+                    // Dano de 5 a cada 1 segundo
                     if (enemyData.freezeLingerTimer % 60 === 0) {
                         let damage = 5;
-                        damage *= getWeaknessMultiplier('ice', enemyData.type);
-                        enemyData.hp -= damage;
-                        enemyData.auraDamageAccumulator += damage;
+                        damage *= getWeaknessMultiplier('ice', enemy.type || enemyData.type);
+                        if (enemy.takeDamage) {
+                            enemy.takeDamage(damage);
+                        } else {
+                            enemyData.hp -= damage;
+                        }
+                        createFloatingText(Math.floor(damage), enemy.position.clone().setY(enemy.modelHeight || enemyData.modelHeight || 1.5), '#87CEFA');
                     }
 
                     // Mostra o dano acumulado a cada segundo
                     if (enemyData.auraDamageAccumulator >= 5 && enemyData.hp > 0) {
-                        createFloatingText(Math.floor(enemyData.auraDamageAccumulator), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#87CEFA');
+                        createFloatingText(Math.floor(enemyData.auraDamageAccumulator), enemy.position.clone().setY(enemy.modelHeight || enemyData.modelHeight || 1.5), '#87CEFA');
                         enemyData.auraDamageAccumulator = 0;
                     }
                 }
@@ -420,12 +419,16 @@
                 if (enemyData.electrifiedTimer % 60 === 0) { // Dano de 25 a cada 1 segundo
                     let damage = 25;
                     damage *= getWeaknessMultiplier('lightning', enemyData.type);
-                    enemyData.hp -= damage;
+                    if (enemy.takeDamage) {
+                        enemy.takeDamage(damage);
+                    } else {
+                        enemyData.hp -= damage;
+                    }
                     if (enemyData.hp <= 0 && enemyData.isBoss) {
                         handleBossDefeat(enemy);
                     }
-                    createFloatingText(Math.floor(damage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
-                    enemyData.hitTimer = 5; // Pequeno feedback visual
+                    createFloatingText(Math.floor(damage), enemy.position.clone().setY(enemy.modelHeight || enemyData.modelHeight || 1.5), '#fde047');
+                    if (enemy.takeDamage) enemy.userData.hitTimer = 5; else enemyData.hitTimer = 5;
                 }
             }
 
@@ -468,6 +471,18 @@
                 enemyData.isFleeing = true;
             }
 
+            // Se for uma instância de classe, usa a nova lógica de movimento
+            if (enemy instanceof Enemy) {
+                let currentSpeed = enemy.speed;
+                if (goblinKingAura && enemy.type === 'Goblin' && !enemy.userData.isBoss && enemy.position.distanceToSquared(currentBoss.position) < auraRadiusSq) {
+                    currentSpeed *= speedBoost;
+                }
+                const targetForClass = (clone && cloneTimer > 0 && enemy.type !== 'Fantasma' && !enemy.userData.isBoss) ? clone : player;
+                enemy.update(player, targetForClass, currentSpeed);
+                continue; // Pula para o próximo inimigo
+            }
+
+            // --- LÓGICA DE MOVIMENTO ANTIGA (PARA INIMIGOS NÃO REFATORADOS) ---
 
             // --- LÓGICA DE MOVIMENTO ---
             if (enemyData.isTeleporting) {
@@ -954,34 +969,6 @@
             
             if (enemyData.hp <= 0) {
                 // NOVO: Lógica de derrota do chefe
-                if (enemyData.isBoss) {
-                    handleBossDefeat(enemy);
-                    // A função handleBossDefeat já remove o inimigo
-                    const index = enemies.indexOf(enemy);
-                    if (index > -1) enemies.splice(index, 1);
-                    scene.remove(enemy);
-                    removeEnemyUI(enemy);
-                    // A função handleBossDefeat já remove o inimigo
-                    continue; // Pula para o próximo inimigo no loop
-                }
-                score += enemyData.score;
-
-                if (enemyData.shatterOnDeath) {
-                    triggerIceShatter(enemy.position);
-                }
-
-                gainExperience(enemyData.score); 
-                if (isBossWave) killsForSoulHarvest++; // Contador para o Arquilich
-
-                // NOVO: Cada abate reduz o tempo de recarga da próxima carga em 1 segundo (60 frames)
-                chargeTimer = Math.max(0, chargeTimer - 60);
-
-                killsSinceLastPotion++;
-
-                if (killStats[enemyData.type] !== undefined) {
-                    killStats[enemyData.type]++;
-                }
-
                 scene.remove(enemy);
                 removeEnemyUI(enemy);
                 enemies.splice(i, 1);

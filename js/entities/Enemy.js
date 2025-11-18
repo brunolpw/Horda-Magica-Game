@@ -1,45 +1,117 @@
 // js/entities/Enemy.js
 class Enemy extends Entity {
     constructor(props) {
-        // Passa as propriedades para a classe pai (Entity)
         super(props);
 
         this.score = props.score || 0;
         this.damage = props.damage || 5;
-        this.type = props.name; // Para referência e UI
+        this.type = props.name;
         this.modelHeight = props.modelHeight || 1.5;
 
-        // Adiciona o modelo 3D específico deste inimigo
         if (props.modelFn) {
             const model = props.modelFn();
             this.add(model);
         }
 
-        // Cria a UI (barra de vida, nome) para este inimigo
-        // Assumimos que createEnemyUI é uma função global por enquanto
         createEnemyUI(this, props.name);
 
-        // Copia as propriedades para o userData para manter a compatibilidade com a lógica antiga
-        // Isso será removido gradualmente conforme a refatoração avança
+        // Inicializa o userData com todos os status necessários
         this.userData = {
-            ...this.userData,
-            type: this.type,
             hp: this.hp,
             maxHP: this.maxHP,
-            speed: this.speed,
-            score: this.score,
-            damage: this.damage,
+            type: this.type,
             hitTimer: 0,
             modelHeight: this.modelHeight,
+            damageCooldown: 0,
+            isFleeing: false,
+            isFrozen: false,
+            freezeLingerTimer: 0,
+            burnTimer: 0,
+            electrifiedTimer: 0,
+            auraDamageAccumulator: 0,
         };
     }
 
-    // Comportamento padrão: perseguir o jogador
-    update(player, finalSpeed) {
+    // Sobrescreve o takeDamage para usar o userData e o hitTimer
+    takeDamage(amount) {
         if (!this.isAlive) return;
 
-        const direction = new THREE.Vector3().subVectors(player.position, this.position).normalize();
-        const newPosition = this.position.clone().addScaledVector(direction, finalSpeed);
-        handleStandardMovement(this, newPosition, finalSpeed);
+        this.hp -= amount;
+        this.userData.hp = this.hp; // Sincroniza com userData para a UI
+        this.userData.hitTimer = 10; // Ativa o piscar
+
+        if (this.hp <= 0) {
+            this.hp = 0;
+            this.die();
+        }
+    }
+
+    update(player, target, finalSpeed) {
+        if (!this.isAlive) return;
+
+        // Atualiza status (timers)
+        if (this.userData.damageCooldown > 0) this.userData.damageCooldown--;
+        if (this.userData.freezeLingerTimer > 0) this.userData.freezeLingerTimer--;
+        if (this.userData.burnTimer > 0) this.userData.burnTimer--;
+        if (this.userData.electrifiedTimer > 0) this.userData.electrifiedTimer--;
+
+        // Lógica de Fuga (Kobolds e Queimadura)
+        this.userData.isFleeing = (this.type.startsWith('Kobold') && (this.hp / this.maxHP) < 0.6) || this.userData.burnTimer > 0;
+
+        // Lógica de Movimento
+        let moveDirection = new THREE.Vector3();
+        let currentSpeed = finalSpeed;
+
+        if (this.userData.isFleeing) {
+            moveDirection.subVectors(this.position, player.position).normalize();
+        } else {
+            moveDirection.subVectors(target.position, this.position).normalize();
+        }
+
+        const isSlowed = this.userData.freezeLingerTimer > 0 || this.userData.electrifiedTimer > 0;
+        if (isSlowed) {
+            currentSpeed *= (this.userData.electrifiedTimer > 0) ? 0 : 0.5;
+        }
+
+        const newPosition = this.position.clone().addScaledVector(moveDirection, currentSpeed);
+        handleStandardMovement(this, newPosition, currentSpeed);
+
+        // Lógica de Dano de Contato
+        this.handleContactDamage(player);
+    }
+
+    handleContactDamage(player) {
+        if (this.userData.damageCooldown > 0 || this.userData.electrifiedTimer > 0) return;
+
+        const playerBBox = new THREE.Box3().setFromObject(player);
+        if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(this))) {
+            damagePlayer(this.damage);
+            createFloatingText(this.damage, player.position.clone().setY(1.5), '#ff0000', '1.5rem');
+            this.userData.damageCooldown = 60; // 1 segundo de cooldown
+        }
+    }
+
+    die() {
+        super.die();
+        score += this.score;
+        gainExperience(this.score);
+
+        if (isBossWave) killsForSoulHarvest++;
+        chargeTimer = Math.max(0, chargeTimer - 60);
+        killsSinceLastPotion++;
+        
+        if (this.props && killStats[this.props.name] !== undefined) {
+            killStats[this.props.name]++;
+        }
+
+        const index = enemies.findIndex(e => e.uuid === this.uuid);
+        if (index > -1) {
+            enemies.splice(index, 1);
+        }
+
+        scene.remove(this);
+        removeEnemyUI(this);
+        enemiesAliveThisWave--;
+        updateUI();
     }
 }
