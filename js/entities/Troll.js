@@ -1,7 +1,7 @@
-// js/entities/Orc.js
-class Orc extends Enemy {
+// js/entities/Troll.js
+class Troll extends Enemy {
     constructor() {
-        super(entityProps.orc);
+        super(entityProps.troll);
     }
     // Não precisa de um método 'update' aqui, pois ele usará o da classe Enemy (perseguir o jogador).
 }

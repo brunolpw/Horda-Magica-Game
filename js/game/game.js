@@ -143,6 +143,8 @@
                 enemy = new Goblin();
             } else if (type === 'orc') {
                 enemy = new Orc();
+            } else if (type === 'troll') {
+                enemy = new Troll();
             } else {
                 // Lógica antiga para inimigos não refatorados
                 const props = entityProps[type];
