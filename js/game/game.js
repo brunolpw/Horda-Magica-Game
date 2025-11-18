@@ -163,6 +163,8 @@
                 enemy = new IceElemental();
             } else if (type === 'summoner_elemental') {
                 enemy = new SummonerElemental();
+            } else if (type === 'goblin_king') {
+                enemy = new GoblinKing();
             } else {
                 // Lógica antiga para inimigos não refatorados
                 const props = entityProps[type];
@@ -337,21 +339,6 @@
                 enemyData.isFrozen = false;
             }
 
-            // NOVO: Lógica do Rei Goblin
-            if (enemyData.type === 'goblin_king') {
-                enemyData.summonCooldown = Math.max(0, enemyData.summonCooldown - 1);
-                if (enemyData.summonCooldown <= 0 && enemies.length < maxActiveEnemies) {
-                    // Invoca entre 5 e 10 goblins
-                    const summonCount = 5 + Math.floor(Math.random() * 6);
-                    for (let j = 0; j < summonCount; j++) {
-                        const offset = new THREE.Vector3((Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6);
-                        const spawnPosition = enemy.position.clone().add(offset);
-                        createEnemy('goblin', spawnPosition, true);
-                    }
-                    enemyData.summonCooldown = enemyData.summonInterval;
-                }
-            }
-
             // NOVO: Lógica do Arquilich
             if (enemyData.type === 'archlich') {
                 // Colheita de Almas
@@ -481,19 +468,7 @@
             if (enemyData.isTeleporting) {
                 continue; // Pula movimento se estiver se teleportando
             }
-            if (enemyData.type === 'goblin_king' && enemyData.hp / enemyData.maxHP < 0.3) { // Fuga do Rei Goblin
-                // Foge do jogador
-                const fleeDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
-                const newPosition = enemy.position.clone().addScaledVector(fleeDirection, finalSpeed);
-                handleStandardMovement(enemy, newPosition, finalSpeed);
-
-                enemyData.rockThrowCooldown = Math.max(0, enemyData.rockThrowCooldown - 1);
-                if (enemyData.rockThrowCooldown <= 0) {
-                    const rockTargetPosition = player.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 5, 0, (Math.random() - 0.5) * 5));
-                    triggerRockFall(rockTargetPosition);
-                    enemyData.rockThrowCooldown = 240; // Atira a cada 4 segundos
-                }
-            } else if (enemyData.isFleeing) {
+            if (enemyData.isFleeing) {
                 // Lógica de Fuga para outros inimigos
                 let fleeSpeed = finalSpeed;
                 if (isSlowed) fleeSpeed *= 0.5; // Aplica lentidão à fuga
