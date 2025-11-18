@@ -1,4 +1,4 @@
-// js/entities/Orc.js
+// js/entities/enemies/Orc.js
 class Orc extends Enemy {
     constructor() {
         super(entityProps.orc);

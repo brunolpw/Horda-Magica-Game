@@ -1,4 +1,3 @@
-// js/entities/LightningElemental.js
 // js/entities/enemies/LightningElemental.js
 class LightningElemental extends Enemy {
     constructor() {

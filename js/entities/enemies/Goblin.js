@@ -1,4 +1,3 @@
-// js/entities/Goblin.js
 // js/entities/enemies/Goblin.js
 class Goblin extends Enemy {
     constructor() {

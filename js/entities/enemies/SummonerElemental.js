@@ -1,4 +1,3 @@
-// js/entities/SummonerElemental.js
 // js/entities/enemies/SummonerElemental.js
 class SummonerElemental extends Enemy {
     constructor() {
