@@ -157,6 +157,10 @@
                 enemy = new Necromancer();
             } else if (type === 'ghost') {
                 enemy = new Ghost();
+            } else if (type === 'fire_elemental') {
+                enemy = new FireElemental();
+            } else if (type === 'lightning_elemental') {
+                enemy = new LightningElemental();
             } else {
                 // Lógica antiga para inimigos não refatorados
                 const props = entityProps[type];
@@ -577,34 +581,12 @@
                         enemy.position.copy(newPosition);
                     }
                 }
-            } else if (enemyData.type === 'fire_elemental') {
-                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
-                handleStandardMovement(enemy, newPosition, finalSpeed);
-
-                enemyData.fireTrailCooldown = Math.max(0, enemyData.fireTrailCooldown - 1);
-                if (enemyData.fireTrailCooldown <= 0) {
-                    createFirePuddle(enemy.position.clone());
-                    enemyData.fireTrailCooldown = 45; // Deixa uma poça a cada 0.75s
-                    enemyData.fireTrailCooldown = 45;
-                }
             } else if (enemyData.type === 'ice_elemental') {
                 const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
                 const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
                 handleStandardMovement(enemy, newPosition, finalSpeed);
                 if (enemy.position.distanceTo(player.position) < enemyData.auraRadius) {
                     playerSlowTimer = 120; // Aplica lentidão por 2 segundos
-                }
-            } else if (enemyData.type === 'lightning_elemental') {
-                enemyData.teleportCooldown = Math.max(0, enemyData.teleportCooldown - 1);
-                if (enemyData.teleportCooldown <= 0) {
-                    triggerTeleport(enemy);
-                    enemyData.teleportCooldown = 300; // Reseta cooldown
-                } else {
-                    // Movimento normal se não estiver teleportando
-                    const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                    const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
-                    handleStandardMovement(enemy, newPosition, finalSpeed);
                 }
             } else if (enemyData.type === 'summoner_elemental') {
                 // Lógica de kiting
@@ -906,9 +888,6 @@
                     if (enemyData.damageCooldown <= 0) {
                         damagePlayer(enemyData.damage);
                         createFloatingText(enemyData.damage, player.position.clone().setY(1.5), '#ff0000', '1.5rem');
-                        if (enemyData.type === 'fire_elemental') {
-                            player.userData.burnTimer = 300; // Aplica queimadura no contato
-                        }
                         enemyData.damageCooldown = 60; // Reseta o cooldown para 1 segundo (60 frames)
                     }
                 }

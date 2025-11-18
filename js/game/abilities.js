@@ -653,8 +653,6 @@ function triggerEarthquakeVisual(position, maxRadius) {
 }
 
 function triggerTeleport(elemental) {
-    elemental.userData.isTeleporting = true;
-
     // Animação de desaparecimento
     let scale = 1.0;
     const shrinkInterval = setInterval(() => {
@@ -675,7 +673,7 @@ function triggerTeleport(elemental) {
                 if (scale >= 1.0) {
                     clearInterval(growInterval);
                     elemental.scale.set(1, 1, 1);
-                    elemental.userData.isTeleporting = false;
+                    if (elemental.isTeleporting !== undefined) elemental.isTeleporting = false;
 
                     // Dispara projéteis ao reaparecer
                     const numProjectiles = 3 + Math.floor(Math.random() * 3); // 3 a 5 projéteis
