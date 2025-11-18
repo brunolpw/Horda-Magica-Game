@@ -796,13 +796,20 @@ function showLevelUpOptions() {
         return currentLevel < upgrades[key].maxLevel;
     });
 
-    const chosenUpgrades = [];
-    while (chosenUpgrades.length < 3 && availableUpgradeKeys.length > 0) {
-        const randomIndex = Math.floor(Math.random() * availableUpgradeKeys.length);
-        const upgradeId = availableUpgradeKeys.splice(randomIndex, 1)[0];
-        chosenUpgrades.push(upgradeId);
-    }
+    let chosenUpgrades = [];
 
+    // MODO DEBUG: Se o nome do jogador for "a", mostra todas as melhorias.
+    if (playerName === 'a') {
+        chosenUpgrades = availableUpgradeKeys;
+    } else {
+        // Modo normal: Mostra 3 opções aleatórias.
+        while (chosenUpgrades.length < 3 && availableUpgradeKeys.length > 0) {
+            const randomIndex = Math.floor(Math.random() * availableUpgradeKeys.length);
+            const upgradeId = availableUpgradeKeys.splice(randomIndex, 1)[0];
+            chosenUpgrades.push(upgradeId);
+        }
+    }
+    
     chosenUpgrades.forEach(upgradeId => {
         const upgrade = upgrades[upgradeId];
         const currentLevel = playerUpgrades[upgradeId] || 0;
