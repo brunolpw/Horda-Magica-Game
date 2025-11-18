@@ -167,6 +167,8 @@
                 enemy = new GoblinKing();
             } else if (type === 'kobold_king') {
                 enemy = new KoboldKing();
+            } else if (type === 'juggernaut_troll') {
+                enemy = new JuggernautTroll();
             } else {
                 // Lógica antiga para inimigos não refatorados
                 const props = entityProps[type];
@@ -346,38 +348,6 @@
                 if (enemyData.bonePrisonCooldown <= 0) {
                     triggerBonePrison();
                     enemyData.bonePrisonCooldown = 1200; // Reseta cooldown
-                }
-            }
-
-            // NOVO: Lógica do Juggernaut Troll
-            if (enemyData.type === 'juggernaut_troll') {
-                // Aumenta o dano conforme perde vida
-                const hpPercentage = enemyData.hp / enemyData.maxHP;
-                enemyData.damage = entityProps.juggernaut_troll.damage + Math.floor((1 - hpPercentage) * 20); // Adiciona até +20 de dano
-
-                enemyData.earthquakeCooldown = Math.max(0, enemyData.earthquakeCooldown - 1);
-                if (enemyData.earthquakeCooldown <= 0) {
-                    // Efeito visual do terremoto
-                    triggerCameraShake(0.8, 45);
-                    triggerEarthquakeVisual(enemy.position, 25); // Efeito visual com raio máximo
-
-                    // Lógica de dano em área com múltiplos raios
-                    const distanceToPlayer = player.position.distanceTo(enemy.position);
-                    let damageDealt = 0;
-
-                    if (distanceToPlayer < 15) { // Raio 1: 15 unidades
-                        damageDealt = 30;
-                    } else if (distanceToPlayer < 20) { // Raio 2: 20 unidades
-                        damageDealt = 25;
-                    } else if (distanceToPlayer < 25) { // Raio 3: 25 unidades
-                        damageDealt = 20;
-                    }
-
-                    if (damageDealt > 0) {
-                        damagePlayer(damageDealt);
-                        createFloatingText(damageDealt, player.position.clone().setY(1.5), '#ff4500', '1.5rem');
-                    }
-                    enemyData.earthquakeCooldown = 600; // Reseta cooldown
                 }
             }
 
