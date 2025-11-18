@@ -155,6 +155,8 @@
                 enemy = new SkeletonArcher();
             } else if (type === 'necromancer') {
                 enemy = new Necromancer();
+            } else if (type === 'ghost') {
+                enemy = new Ghost();
             } else {
                 // Lógica antiga para inimigos não refatorados
                 const props = entityProps[type];
@@ -575,11 +577,6 @@
                         enemy.position.copy(newPosition);
                     }
                 }
-            } else if (enemyData.type === 'ghost') {
-                // Lógica de movimento do Fantasma (ignora paredes)
-                const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                enemy.position.addScaledVector(direction, finalSpeed);
-
             } else if (enemyData.type === 'fire_elemental') {
                 const direction = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
                 const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
