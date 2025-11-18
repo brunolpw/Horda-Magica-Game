@@ -153,6 +153,8 @@
                 enemy = new KoboldShaman();
             } else if (type === 'skeleton_archer') {
                 enemy = new SkeletonArcher();
+            } else if (type === 'necromancer') {
+                enemy = new Necromancer();
             } else {
                 // Lógica antiga para inimigos não refatorados
                 const props = entityProps[type];
@@ -325,25 +327,6 @@
             // Se chegou aqui, não está congelado
             if (enemyData.freezeLingerTimer <= 0) {
                 enemyData.isFrozen = false;
-            }
-
-            // Lógica de invocação do Necromante
-            if (enemyData.type === 'necromancer') {
-                enemyData.summonCooldown = Math.max(0, enemyData.summonCooldown - 1);
-                
-                if (enemyData.summonCooldown <= 0 && enemies.length < maxActiveEnemies) {
-                    // NOVO: Invoca um tipo de esqueleto aleatório
-                    const summonRoll = Math.random() * 100;
-                    let summonType;
-                    if (summonRoll < 50) summonType = 'skeleton';          // 50%
-                    else if (summonRoll < 80) summonType = 'skeleton_archer'; // 30%
-                    else summonType = 'skeleton_warrior';    // 20%
-
-                    const offset = new THREE.Vector3((Math.random() - 0.5) * 4, 0, (Math.random() - 0.5) * 4);
-                    const spawnPosition = enemy.position.clone().add(offset);
-                    createEnemy(summonType, spawnPosition, true);
-                    enemyData.summonCooldown = enemyData.summonInterval;
-                }
             }
 
             // NOVO: Lógica do Rei Goblin
@@ -540,39 +523,6 @@
                     // Invoca um grupo de kobolds perto dele
                     spawnKoboldGroup(enemy.position);
                     enemyData.summonCooldown = 900 * furyMultiplier;
-                }
-            } else if (enemyData.type === 'necromancer') {
-                // Lógica de movimento do Necromante (kiting)
-                 const distanceToPlayer = enemy.position.distanceTo(player.position);
-                 const minDistance = 10; // Distância mínima que ele quer manter
-                 const maxDistance = 15; // Distância máxima antes de se aproximar
-                 let direction = new THREE.Vector3(0, 0, 0);
- 
-                 if (distanceToPlayer < minDistance) {
-                     direction = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
-                 } else if (distanceToPlayer > maxDistance) {
-                     direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
-                 }
- 
-                 if (enemyData.attackTimer > 0) {
-                     enemyData.attackTimer--;
-                 } else if (Math.abs(enemy.position.x) < mapSize && Math.abs(enemy.position.z) < mapSize) {
-                    // Só ataca se estiver dentro do mapa
-                     const attackDirection = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
-                     createProjectile('necro_bolt', attackDirection, enemy.position);
-                     enemyData.attackTimer = enemyData.attackCooldown;
-                 }
- 
-                 if (direction.lengthSq() > 0) {
-                     const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
-                     tempPlayer.position.copy(newPosition);
-                     tempPlayer.updateMatrixWorld();
-                     let fullEnemyBBox = new THREE.Box3().setFromObject(tempPlayer);
-                     let collisionDetected = obstacles.some(o => fullEnemyBBox.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
- 
-                     if (!collisionDetected) {
-                         enemy.position.copy(newPosition);
-                     }
                  }
             } else if (enemyData.type === 'kobold_shaman') {
                  // Lógica de kiting do Xamã
