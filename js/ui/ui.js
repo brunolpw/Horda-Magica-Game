@@ -37,14 +37,16 @@ function setupUIElements() {
     openSpellbookButton = document.getElementById('open-spellbook-button');
 
     document.getElementById('level-up-prompt-button').onclick = () => {
-        showLevelUpOptions();
+        showLevelUpOptions(window.upgrades);
     };
 }
 
 // --- Funções de Atualização da HUD ---
 
-function updateUI() {
+function updateUI(upgrades) {
     if (!playerNameDisplay) return;
+    // Fallback para garantir que upgrades não seja nulo
+    if (!upgrades) upgrades = window.upgrades || {};
 
     playerNameDisplay.textContent = playerName || 'Mago';
     scoreDisplay.textContent = `Pontuação: ${player ? player.score : 0}`;
@@ -65,7 +67,7 @@ function updateUI() {
     const activeAbilityId = player.userData.activeAbility;
     if (activeAbilityId) {
         activeAbilityHud.classList.remove('hidden');
-        const abilityTitle = document.getElementById('active-ability-title');
+        const abilityTitle = document.getElementById('active-ability-title'); // upgrades is not defined
         const ability = upgrades[activeAbilityId]; // Apenas para obter o ícone e o título
         const charges = player.userData.abilityCharges[activeAbilityId] || 0;
 
@@ -160,7 +162,7 @@ function updateUI() {
     }
 
     // Mostra o botão do grimório se o jogador tiver mais de uma magia ativa
-    const activeAbilities = Object.keys(player.userData.upgrades).filter(key => upgrades[key].type === 'active');
+    const activeAbilities = Object.keys(player.userData.upgrades).filter(key => upgrades && upgrades[key] && upgrades[key].type === 'active');
     if (activeAbilities.length > 0) {
         openSpellbookButton.classList.remove('hidden');
     } else {
@@ -397,8 +399,8 @@ function displayHealingMessage(amount) {
     }, 10);
 }
 
-function displayLevelUpMessage() {
-    levelUpMessage.textContent = `LEVEL ${playerLevel}!`;
+function displayLevelUpMessage() { // playerLevel is not defined
+    levelUpMessage.textContent = `LEVEL ${player ? player.level : 1}!`;
     levelUpMessage.style.opacity = 1;
     levelUpMessage.style.transform = 'translate(-50%, -50%)';
     levelUpMessage.style.transition = 'none';
@@ -410,11 +412,13 @@ function displayLevelUpMessage() {
     }, 10);
 }
 
-function showLevelUpOptions() {
-    isGamePaused = true;
-    pendingLevelUps--;
+function showLevelUpOptions(upgrades) {
+    if (!upgrades) upgrades = window.upgrades || {};
 
-    if (pendingLevelUps <= 0) {
+    isGamePaused = true;
+    player.pendingLevelUps--;
+
+    if (player.pendingLevelUps <= 0) {
         document.getElementById('level-up-prompt-button').classList.add('hidden');
     }
 
@@ -422,6 +426,9 @@ function showLevelUpOptions() {
     upgradeOptionsContainer.innerHTML = '';
     knownUpgradesContainer.innerHTML = '';
     document.getElementById('confirm-upgrade-container').classList.add('hidden');
+    // DEBUG: Exibe o estado atual das melhorias do jogador no console.
+    console.log("DEBUG: Conteúdo de player.userData.upgrades:", JSON.parse(JSON.stringify(player.userData.upgrades)));
+
     const playerUpgrades = player.userData.upgrades;
     const activeAbility = player.userData.activeAbility;
 
@@ -430,59 +437,69 @@ function showLevelUpOptions() {
         return currentLevel < upgrades[key].maxLevel;
     });
 
-    const chosenUpgrades = [];
-    while (chosenUpgrades.length < 3 && availableUpgradeKeys.length > 0) {
-        const randomIndex = Math.floor(Math.random() * availableUpgradeKeys.length);
-        const upgradeId = availableUpgradeKeys.splice(randomIndex, 1)[0];
-        chosenUpgrades.push(upgradeId);
+    let chosenUpgrades = [];
+
+    if (playerName === 'a') {
+        // MODO DEBUG: Todas as melhorias disponíveis são oferecidas.
+        chosenUpgrades = availableUpgradeKeys;
+    } else {
+        // MODO NORMAL: Pega 3 opções novas aleatórias.
+        const availableForRandom = [...availableUpgradeKeys];
+        while (chosenUpgrades.length < 3 && availableForRandom.length > 0) {
+            const randomIndex = Math.floor(Math.random() * availableForRandom.length);
+            const upgradeId = availableForRandom.splice(randomIndex, 1)[0];
+            chosenUpgrades.push(upgradeId);
+        }
     }
 
+    // Renderiza as 3 (ou todas, em debug) opções novas.
     chosenUpgrades.forEach(upgradeId => {
         const upgrade = upgrades[upgradeId];
         const currentLevel = playerUpgrades[upgradeId] || 0;
         const nextLevel = currentLevel + 1;
         const card = document.createElement('div');
         card.className = 'upgrade-card';
-        card.onclick = () => selectUpgrade(upgradeId, false);
         let cardHTML = `
             <div class="upgrade-icon">${upgrade.icon}</div>
             <div class="upgrade-title">${upgrade.title}</div>
             <div class="upgrade-description">${upgrade.description(nextLevel)}</div>`;
-
         if (upgrade.type === 'active' && activeAbility && activeAbility !== upgradeId) {
-            cardHTML += `<div class="upgrade-replace-text">Substitui ${upgrades[activeAbility].title}</div>`;
+            cardHTML += `<div class="upgrade-replace-text">Substitui ${upgrades[activeAbility] ? upgrades[activeAbility].title : ''}</div>`;
         }
         cardHTML += `<div class="upgrade-level">${currentLevel > 0 ? `Nível ${currentLevel} ➔ ${nextLevel}` : 'APRENDER'}</div>`;
         card.innerHTML = cardHTML;
+        card.onclick = () => selectUpgrade(upgradeId, false, upgrades);
         upgradeOptionsContainer.appendChild(card);
     });
 
-    Object.keys(playerUpgrades).forEach(upgradeId => {
-        const upgrade = upgrades[upgradeId];
-        const currentLevel = playerUpgrades[upgradeId];
-        const isMaxLevel = currentLevel >= upgrade.maxLevel;
+    // Renderiza as magias que o jogador já conhece (exceto em modo debug, onde tudo já foi mostrado).
+    if (playerName !== 'a') {
+        Object.keys(playerUpgrades).forEach(upgradeId => {
+            const upgrade = upgrades[upgradeId];
+            if (!upgrade) return;
+            const currentLevel = playerUpgrades[upgradeId] || 0;
+            const isMaxLevel = currentLevel >= upgrade.maxLevel;
 
-        const card = document.createElement('div');
-        card.className = 'upgrade-card';
-        if (isMaxLevel) card.classList.add('opacity-50', 'cursor-not-allowed');
+            const card = document.createElement('div');
+            card.className = 'upgrade-card';
+            if (isMaxLevel) card.classList.add('opacity-50', 'cursor-not-allowed');
 
-        let cardHTML = `
-            <div class="upgrade-icon">${upgrade.icon}</div>
-            <div class="upgrade-title">${upgrade.title}</div>
-            <div class="upgrade-level">${isMaxLevel ? 'NÍVEL MÁXIMO' : `Nível ${currentLevel} ➔ ${currentLevel + 1}`}</div>
-            <div class="upgrade-description">${upgrade.description(isMaxLevel ? currentLevel : currentLevel + 1)}</div>`;
+            let cardHTML = `
+                <div class="upgrade-icon">${upgrade.icon}</div>
+                <div class="upgrade-title">${upgrade.title}</div>
+                <div class="upgrade-level">${isMaxLevel ? 'NÍVEL MÁXIMO' : `Nível ${currentLevel} ➔ ${currentLevel + 1}`}</div>
+                <div class="upgrade-description">${upgrade.description(isMaxLevel ? currentLevel : currentLevel + 1)}</div>`;
+            if (upgrade.type === 'active') cardHTML += `<div class="upgrade-replace-text">Clique para equipar</div>`;
+            card.innerHTML = cardHTML;
 
-        if (upgrade.type === 'active') cardHTML += `<div class="upgrade-replace-text">Clique para equipar</div>`;
-        card.innerHTML = cardHTML;
-
-        if (upgradeId === activeAbility) card.classList.add('selected');
-        if (!isMaxLevel) card.onclick = () => selectUpgrade(upgradeId, isMaxLevel);
-
-        knownUpgradesContainer.appendChild(card);
-    });
+            if (upgradeId === activeAbility) card.classList.add('selected');
+            if (!isMaxLevel) card.onclick = () => selectUpgrade(upgradeId, false, upgrades);
+            knownUpgradesContainer.appendChild(card);
+        });
+    }
 }
 
-function selectUpgrade(upgradeId, isMaxLevel) {
+function selectUpgrade(upgradeId, isMaxLevel, upgrades) {
     const upgrade = upgrades[upgradeId];
     if (!upgrade) return;
 
@@ -490,9 +507,7 @@ function selectUpgrade(upgradeId, isMaxLevel) {
         player.userData.upgrades[upgradeId] = (player.userData.upgrades[upgradeId] || 0) + 1;
 
         if (upgrade.type === 'active' && player.userData.activeAbility !== upgradeId) {
-            const isNew = !player.userData.upgrades[upgradeId] || player.userData.upgrades[upgradeId] === 1;
-            player.userData.activeAbility = upgradeId;
-            if (isNew) chargeTimer = CHARGE_TIME_MAX; // Reseta o timer apenas se for uma magia nova
+            player.equipSpell(upgradeId);
         }
 
         if (upgrade.apply) upgrade.apply();
@@ -501,18 +516,19 @@ function selectUpgrade(upgradeId, isMaxLevel) {
         // Fecha o modal de level up e volta ao jogo para evitar inconsistências
         levelUpModal.classList.add('hidden');
         isGamePaused = false;
-        if (pendingLevelUps > 0) document.getElementById('level-up-prompt-button').classList.remove('hidden');
-        updateUI();
+        if (player && player.pendingLevelUps > 0) document.getElementById('level-up-prompt-button').classList.remove('hidden');
+        updateUI(upgrades);
     } else if (upgrade.type === 'active') {
         // Se a magia já está no nível máximo, apenas equipa
-        equipSpell(upgradeId);
+        player.equipSpell(upgradeId);
         // Fecha o modal após equipar para evitar confusão
         levelUpModal.classList.add('hidden');
         isGamePaused = false;
+        updateUI(window.upgrades);
     }
 }
 
-function promptEquipActiveAbility() {
+function promptEquipActiveAbility(upgrades) {
     upgradeOptionsContainer.innerHTML = '<p class="text-lg text-gray-300 col-span-3 text-center">Escolha a magia que deseja manter equipada.</p>';
     knownUpgradesContainer.innerHTML = '';
 
@@ -521,22 +537,24 @@ function promptEquipActiveAbility() {
 
     activeAbilities.forEach(upgradeId => {
         const upgrade = upgrades[upgradeId];
-        const currentLevel = playerUpgrades[upgradeId];
+        const currentLevel = playerUpgrades[upgradeId] || 0;
         const card = document.createElement('div');
         card.className = 'upgrade-card';
-        card.innerHTML = `
+        let cardHTML = `
             <div class="upgrade-icon">${upgrade.icon}</div>
             <div class="upgrade-title">${upgrade.title}</div>
             <div class="upgrade-level">Nível ${currentLevel}</div>
             <div class="upgrade-description">${upgrade.description(currentLevel)}</div>
         `;
 
+        card.innerHTML = cardHTML;
+
         if (upgradeId === player.userData.activeAbility) card.classList.add('selected');
 
         card.onclick = () => {
             // A lógica de troca agora está centralizada em equipSpell
             player.userData.activeAbility = upgradeId;
-            promptEquipActiveAbility();
+            promptEquipActiveAbility(upgrades);
         };
         knownUpgradesContainer.appendChild(card);
     });
@@ -546,14 +564,14 @@ function promptEquipActiveAbility() {
     document.getElementById('confirm-upgrade-button').onclick = () => {
         levelUpModal.classList.add('hidden');
         isGamePaused = false;
-        if (pendingLevelUps > 0) {
+        if (player.pendingLevelUps > 0) {
             document.getElementById('level-up-prompt-button').classList.remove('hidden');
         }
-        updateUI();
+        updateUI(upgrades);
     };
 }
 
-function showSpecialLevelUpOptions() {
+function showSpecialLevelUpOptions(upgrades) {
     isGamePaused = true;
     levelUpModal.classList.remove('hidden');
     upgradeOptionsContainer.innerHTML = '<p class="text-lg text-yellow-400 col-span-3 text-center">O Arquilich foi derrotado! Escolha qualquer poder como sua recompensa.</p>';
@@ -576,47 +594,22 @@ function showSpecialLevelUpOptions() {
                 <div class="upgrade-description">${upgrade.description(currentLevel + 1)}</div>
             `;
             card.onclick = () => {
-                selectUpgrade(upgradeId, false);
+                selectUpgrade(upgradeId, false, upgrades);
             };
             knownUpgradesContainer.appendChild(card);
         }
     });
 }
 
-// --- Funções de Controle de Menu ---
-
-function handleRestartClick() {
-    gameOverModal.classList.add('hidden');
-    startMenuModal.classList.remove('hidden');
-}
-
-function handleStartGameClick() {
-    const playerNameInput = document.getElementById('mage-name').value.trim();
-    if (playerNameInput.length === 0) {
-        const input = document.getElementById('mage-name');
-        input.placeholder = 'NOME OBRIGATÓRIO!';
-        input.classList.add('border-red-500', 'border-2');
-        setTimeout(() => input.classList.remove('border-red-500', 'border-2'), 1000);
-        return;
-    }
-    startMenuModal.classList.add('hidden');
-    startGame(playerNameInput);
-}
-
-
-function handleViewRankingClick() {
-    window.loadRanking();
-    document.getElementById('full-ranking-modal').classList.remove('hidden');
-}
-
 // --- Funções do Grimório ---
 
-function openSpellbook() {
+function openSpellbook(upgrades) {
     if (isGameOver) return;
+    if (!upgrades) upgrades = window.upgrades || {};
     isGamePaused = true;
     spellbookModal.classList.remove('hidden');
     spellbookGrid.innerHTML = '';
-
+    
     const playerUpgrades = player.userData.upgrades;
     const activeAbilities = Object.keys(playerUpgrades).filter(key => upgrades[key].type === 'active');
 
@@ -636,7 +629,7 @@ function openSpellbook() {
             card.classList.add('selected');
         }
 
-        card.onclick = () => equipSpell(upgradeId);
+        card.onclick = () => player.equipSpell(upgradeId);
         spellbookGrid.appendChild(card);
     });
 }
@@ -644,314 +637,6 @@ function openSpellbook() {
 function closeSpellbook() {
     spellbookModal.classList.add('hidden');
     isGamePaused = false;
-}
-
-// --- Funções de Criação/Remoção de Elementos da UI ---
-
-function createEnemyUI(enemy, name) {
-    const label = document.createElement('div');
-    label.className = 'enemy-label';
-    label.textContent = name;
-    enemyLabelsContainer.appendChild(label);
-
-    const hpBarContainer = document.createElement('div');
-    hpBarContainer.className = 'enemy-hp-bar';
-    const hpFill = document.createElement('div');
-    hpFill.className = 'enemy-hp-fill';
-    hpBarContainer.appendChild(hpFill);
-
-    const armorBarContainer = document.createElement('div');
-    armorBarContainer.className = 'enemy-armor-bar';
-    const armorFill = document.createElement('div');
-    armorFill.className = 'enemy-hp-fill';
-    armorFill.style.backgroundColor = '#A9A9A9';
-    armorBarContainer.appendChild(armorFill);
-
-    enemyLabelsContainer.appendChild(hpBarContainer);
-
-    let summonMarker = null;
-    if (enemy.userData.isSummon) {
-        summonMarker = document.createElement('div');
-        summonMarker.className = 'summon-marker';
-        enemyLabelsContainer.appendChild(summonMarker);
-    }
-
-    const frozenMarker = document.createElement('div');
-    frozenMarker.className = 'frozen-marker';
-    frozenMarker.innerHTML = '❄️';
-    frozenMarker.style.display = 'none';
-    enemyLabelsContainer.appendChild(frozenMarker);
-
-    const electrifiedMarker = document.createElement('div');
-    electrifiedMarker.className = 'electrified-marker';
-    electrifiedMarker.innerHTML = '⚡';
-    electrifiedMarker.style.display = 'none';
-    enemyLabelsContainer.appendChild(electrifiedMarker);
-
-    enemyLabels.set(enemy.uuid, { nameLabel: label, hpBar: hpBarContainer, hpFill: hpFill, armorBar: armorBarContainer, armorFill: armorFill, summonMarker: summonMarker, frozenMarker: frozenMarker, electrifiedMarker: electrifiedMarker });
-}
-
-function removeEnemyUI(enemy) {
-    const uiElements = enemyLabels.get(enemy.uuid);
-    if (uiElements) {
-        Object.values(uiElements).forEach(element => {
-            if (element && element.parentNode) {
-                element.parentNode.removeChild(element);
-            }
-        });
-        enemyLabels.delete(enemy.uuid);
-    }
-}
-
-function createPowerUpLabel(powerUp, type) {
-    let text = 'Item';
-    switch (type) {
-        case 'potion': text = 'Cura'; break;
-        case 'shield': text = 'Escudo'; break;
-        case 'repulsionBubble': text = 'Bolha Repulsora'; break;
-        case 'clone': text = 'Clone'; break;
-        case 'freezingAura': text = 'Aura Congelante'; break; // NOVO
-        case 'flamingAura': text = 'Aura Flamejante'; break;
-        case 'electrifyingAura': text = 'Aura Eletrizante'; break;
-        case 'expBoost': text = 'EXP em Dobro'; break;
-    }
-
-    const label = document.createElement('div');
-    label.className = 'powerup-label';
-    label.textContent = text;
-    enemyLabelsContainer.appendChild(label);
-    powerUpLabels.set(powerUp.uuid, label);
-}
-
-function removePowerUpLabel(powerUp) {
-    const label = powerUpLabels.get(powerUp.uuid);
-    if (label) {
-        enemyLabelsContainer.removeChild(label);
-        powerUpLabels.delete(powerUp.uuid);
-    }
-}
-
-function createFloatingText(text, position, color = 'white', fontSize = '1rem') {
-    const textElement = document.createElement('div');
-    textElement.className = 'floating-text';
-    textElement.textContent = text;
-    textElement.style.color = color;
-    textElement.style.fontSize = fontSize;
-
-    document.getElementById('floating-text-container').appendChild(textElement);
-
-    floatingTexts.push({
-        element: textElement,
-        position: position.clone(),
-        life: 60,
-        velocity: new THREE.Vector3(0, 0.03, 0)
-    });
-}
-
-// --- Funções de Feedback Visual e Modais ---
-
-function displayHealingMessage(amount) {
-    healingMessage.textContent = `+${amount} HP!`;
-    healingMessage.style.opacity = 1;
-    healingMessage.style.transform = 'translate(-50%, -50%)';
-    healingMessage.style.transition = 'none';
-
-    setTimeout(() => {
-        healingMessage.style.transition = 'opacity 1.5s ease-out, transform 1.5s ease-out';
-        healingMessage.style.opacity = 0;
-        healingMessage.style.transform = 'translate(-50%, -150%)';
-    }, 10);
-}
-
-function displayLevelUpMessage() {
-    levelUpMessage.textContent = `LEVEL ${playerLevel}!`;
-    levelUpMessage.style.opacity = 1;
-    levelUpMessage.style.transform = 'translate(-50%, -50%)';
-    levelUpMessage.style.transition = 'none';
-
-    setTimeout(() => {
-        levelUpMessage.style.transition = 'opacity 1.5s ease-out, transform 1.5s ease-out';
-        levelUpMessage.style.opacity = 0;
-        levelUpMessage.style.transform = 'translate(-50%, -150%)';
-    }, 10);
-}
-
-function showLevelUpOptions() {
-    isGamePaused = true;
-    pendingLevelUps--;
-
-    if (pendingLevelUps <= 0) {
-        document.getElementById('level-up-prompt-button').classList.add('hidden');
-    }
-
-    levelUpModal.classList.remove('hidden');
-    upgradeOptionsContainer.innerHTML = '';
-    knownUpgradesContainer.innerHTML = '';
-    document.getElementById('confirm-upgrade-container').classList.add('hidden');
-    const playerUpgrades = player.userData.upgrades;
-    const activeAbility = player.userData.activeAbility;
-
-    const availableUpgradeKeys = Object.keys(upgrades).filter(key => {
-        const currentLevel = playerUpgrades[key] || 0;
-        return currentLevel < upgrades[key].maxLevel;
-    });
-
-    let chosenUpgrades = [];
-
-    // MODO DEBUG: Se o nome do jogador for "a", mostra todas as melhorias.
-    if (playerName === 'a') {
-        chosenUpgrades = availableUpgradeKeys;
-    } else {
-        // Modo normal: Mostra 3 opções aleatórias.
-        while (chosenUpgrades.length < 3 && availableUpgradeKeys.length > 0) {
-            const randomIndex = Math.floor(Math.random() * availableUpgradeKeys.length);
-            const upgradeId = availableUpgradeKeys.splice(randomIndex, 1)[0];
-            chosenUpgrades.push(upgradeId);
-        }
-    }
-    
-    chosenUpgrades.forEach(upgradeId => {
-        const upgrade = upgrades[upgradeId];
-        const currentLevel = playerUpgrades[upgradeId] || 0;
-        const nextLevel = currentLevel + 1;
-        const card = document.createElement('div');
-        card.className = 'upgrade-card';
-        card.onclick = () => selectUpgrade(upgradeId, false);
-        let cardHTML = `
-            <div class="upgrade-icon">${upgrade.icon}</div>
-            <div class="upgrade-title">${upgrade.title}</div>
-            <div class="upgrade-description">${upgrade.description(nextLevel)}</div>`;
-
-        if (upgrade.type === 'active' && activeAbility && activeAbility !== upgradeId) {
-            cardHTML += `<div class="upgrade-replace-text">Substitui ${upgrades[activeAbility].title}</div>`;
-        }
-        cardHTML += `<div class="upgrade-level">${currentLevel > 0 ? `Nível ${currentLevel} ➔ ${nextLevel}` : 'APRENDER'}</div>`;
-        card.innerHTML = cardHTML;
-        upgradeOptionsContainer.appendChild(card);
-    });
-
-    Object.keys(playerUpgrades).forEach(upgradeId => {
-        const upgrade = upgrades[upgradeId];
-        const currentLevel = playerUpgrades[upgradeId];
-        const isMaxLevel = currentLevel >= upgrade.maxLevel;
-
-        const card = document.createElement('div');
-        card.className = 'upgrade-card';
-        if (isMaxLevel) card.classList.add('opacity-50', 'cursor-not-allowed');
-
-        let cardHTML = `
-            <div class="upgrade-icon">${upgrade.icon}</div>
-            <div class="upgrade-title">${upgrade.title}</div>
-            <div class="upgrade-level">${isMaxLevel ? 'NÍVEL MÁXIMO' : `Nível ${currentLevel} ➔ ${currentLevel + 1}`}</div>
-            <div class="upgrade-description">${upgrade.description(isMaxLevel ? currentLevel : currentLevel + 1)}</div>`;
-
-        if (upgrade.type === 'active') cardHTML += `<div class="upgrade-replace-text">Clique para equipar</div>`;
-        card.innerHTML = cardHTML;
-
-        if (upgradeId === activeAbility) card.classList.add('selected');
-        if (!isMaxLevel) card.onclick = () => selectUpgrade(upgradeId, isMaxLevel);
-
-        knownUpgradesContainer.appendChild(card);
-    });
-}
-
-function selectUpgrade(upgradeId, isMaxLevel) {
-    const upgrade = upgrades[upgradeId];
-    if (!upgrade) return;
-
-    if (!isMaxLevel) {
-        player.userData.upgrades[upgradeId] = (player.userData.upgrades[upgradeId] || 0) + 1;
-
-        if (upgrade.type === 'active' && player.userData.activeAbility !== upgradeId) {
-            const isNew = !player.userData.upgrades[upgradeId] || player.userData.upgrades[upgradeId] === 1;
-            if (isNew) killPoints = 0;
-            player.userData.activeAbility = upgradeId;
-        }
-
-        if (upgrade.apply) upgrade.apply();
-        displayLevelUpMessage();
-        promptEquipActiveAbility();
-    } else if (upgrade.type === 'active') {
-        const isNew = player.userData.activeAbility !== upgradeId;
-        if (isNew) killPoints = 0;
-        player.userData.activeAbility = upgradeId;
-        promptEquipActiveAbility();
-    }
-}
-
-function promptEquipActiveAbility() {
-    upgradeOptionsContainer.innerHTML = '<p class="text-lg text-gray-300 col-span-3 text-center">Escolha a magia que deseja manter equipada.</p>';
-    knownUpgradesContainer.innerHTML = '';
-
-    const playerUpgrades = player.userData.upgrades;
-    const activeAbilities = Object.keys(playerUpgrades).filter(key => upgrades[key].type === 'active');
-
-    activeAbilities.forEach(upgradeId => {
-        const upgrade = upgrades[upgradeId];
-        const currentLevel = playerUpgrades[upgradeId];
-        const card = document.createElement('div');
-        card.className = 'upgrade-card';
-        card.innerHTML = `
-            <div class="upgrade-icon">${upgrade.icon}</div>
-            <div class="upgrade-title">${upgrade.title}</div>
-            <div class="upgrade-level">Nível ${currentLevel}</div>
-            <div class="upgrade-description">${upgrade.description(currentLevel)}</div>
-        `;
-
-        if (upgradeId === player.userData.activeAbility) card.classList.add('selected');
-
-        card.onclick = () => {
-            if (player.userData.activeAbility !== upgradeId) {
-                const newAbility = upgrades[upgradeId];
-                const newMaxKills = newAbility.getKillCost(player.userData.upgrades[upgradeId] || 1);
-                if (killPoints > newMaxKills) killPoints = newMaxKills;
-            }
-            player.userData.activeAbility = upgradeId;
-            promptEquipActiveAbility();
-        };
-        knownUpgradesContainer.appendChild(card);
-    });
-
-    const confirmContainer = document.getElementById('confirm-upgrade-container');
-    confirmContainer.classList.remove('hidden');
-    document.getElementById('confirm-upgrade-button').onclick = () => {
-        levelUpModal.classList.add('hidden');
-        isGamePaused = false;
-        if (pendingLevelUps > 0) {
-            document.getElementById('level-up-prompt-button').classList.remove('hidden');
-        }
-        updateUI();
-    };
-}
-
-function showSpecialLevelUpOptions() {
-    isGamePaused = true;
-    levelUpModal.classList.remove('hidden');
-    upgradeOptionsContainer.innerHTML = '<p class="text-lg text-yellow-400 col-span-3 text-center">O Arquilich foi derrotado! Escolha qualquer poder como sua recompensa.</p>';
-    knownUpgradesContainer.innerHTML = '';
-    document.getElementById('confirm-upgrade-container').classList.add('hidden');
-
-    const playerUpgrades = player.userData.upgrades;
-
-    Object.keys(upgrades).forEach(upgradeId => {
-        const upgrade = upgrades[upgradeId];
-        const currentLevel = playerUpgrades[upgradeId] || 0;
-
-        if (currentLevel < upgrade.maxLevel) {
-            const card = document.createElement('div');
-            card.className = 'upgrade-card';
-            card.innerHTML = `
-                <div class="upgrade-icon">${upgrade.icon}</div>
-                <div class="upgrade-title">${upgrade.title}</div>
-                <div class="upgrade-level">${currentLevel > 0 ? `Nível ${currentLevel} ➔ ${currentLevel + 1}` : 'APRENDER'}</div>
-                <div class="upgrade-description">${upgrade.description(currentLevel + 1)}</div>
-            `;
-            card.onclick = () => {
-                selectUpgrade(upgradeId, false);
-            };
-            knownUpgradesContainer.appendChild(card);
-        }
-    });
 }
 
 // --- Funções de Controle de Menu ---

@@ -185,15 +185,7 @@ function updateProjectiles() {
             }
 
             // Colisão com Conduítes do Chefe de Raio
-            // CORREÇÃO: O cálculo do dano final foi movido para cá para ser usado em todas as colisões.
-            const damageLevel = player.userData.upgrades.increase_damage || 0;
-            let finalDamage = projData.damage;
-            if (damageLevel > 0) {
-                const bonusAmount = damageLevel * 2;
-                finalDamage += bonusAmount;
-            }
-            const inherentBonus = Math.floor(playerLevel / 5);
-            finalDamage += inherentBonus;
+            let finalDamage = player.calculateDamage(projData.damage);
             if (!hit && stormConduits.length > 0) {
                 for (let c = stormConduits.length - 1; c >= 0; c--) {
                     const conduit = stormConduits[c];

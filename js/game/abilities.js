@@ -307,8 +307,8 @@ function updateClone() {
     if (cloneTimer > 0 && clone) {
         cloneTimer--; // CORREÇÃO: Decrementa o timer do clone a cada frame.
         const direction = new THREE.Vector3().subVectors(clone.position, player.position).normalize();
-        const movementVector = new THREE.Vector2(direction.x, direction.z).normalize();
-        const currentMovement = new THREE.Vector3(movementVector.x, 0, movementVector.y).multiplyScalar(playerSpeed * 0.8);
+        const movementVector = new THREE.Vector2(direction.x, direction.z).normalize(); // playerSpeed is not defined
+        const currentMovement = new THREE.Vector3(movementVector.x, 0, movementVector.y).multiplyScalar(player.speed * 0.8);
         const newPosition = clone.position.clone().add(currentMovement);
         
         const tempCloneBBox = new THREE.Box3();
@@ -488,12 +488,18 @@ function updateShield() {
             
             for (const enemy of enemies) {
                 const enemyBBox = new THREE.Box3().setFromObject(enemy);
-                if (sphereBBox.intersectsBox(enemyBBox)) {
-                    enemy.userData.hp -= projectileProps.weak.damage;
-                    createFloatingText(projectileProps.weak.damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
-                    enemy.userData.hitTimer = 10;
-                    hitEnemy = enemy;
-                    break;
+                if (sphereBBox.intersectsBox(enemyBBox) && enemy.isAlive) {
+                    const shieldDamage = 10; // Dano fixo para as esferas do escudo
+                    if (enemy.takeDamage) {
+                        enemy.takeDamage(shieldDamage);
+                    } else {
+                        // Fallback para inimigos não refatorados
+                        enemy.userData.hp -= shieldDamage;
+                        enemy.userData.hitTimer = 10;
+                    }
+                    createFloatingText(shieldDamage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
+                    hitEnemy = enemy; // Marca que houve colisão
+                    break; // A esfera só atinge um inimigo por vez
                 }
             }
 
@@ -543,8 +549,8 @@ function triggerRockFall(targetPosition) {
     scene.add(targetMarker);
 
     setTimeout(() => {
-        if (player.position.distanceToSquared(targetPosition) < fallRadius * fallRadius) {
-            damagePlayer(damage, false); // Dano físico
+        if (player && player.position.distanceToSquared(targetPosition) < fallRadius * fallRadius) {
+            player.takeDamage(damage, false); // Dano físico
             createFloatingText(damage, player.position.clone().setY(1.5), '#ff4500', '1.5rem');
         }
         const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1), new THREE.MeshLambertMaterial({ color: 0x8B4513 }));

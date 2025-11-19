@@ -87,7 +87,7 @@ class Enemy extends Entity {
 
         const playerBBox = new THREE.Box3().setFromObject(player);
         if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(this))) {
-            damagePlayer(this.damage);
+            player.takeDamage(this.damage);
             createFloatingText(this.damage, player.position.clone().setY(1.5), '#ff0000', '1.5rem');
             this.userData.damageCooldown = 60; // 1 segundo de cooldown
         }

@@ -96,8 +96,7 @@ class Player extends Entity {
         if (this.projectileCooldown <= 0 && !this.isBlinded) {
             const direction = new THREE.Vector3().subVectors(intersection, this.position).normalize();
             createProjectile('weak', direction, this.position);
-            const currentCooldown = Math.max(10, this.baseCooldown - (this.level - 1) * 2);
-            this.projectileCooldown = currentCooldown;
+            this.projectileCooldown = this.baseCooldown;
         }
     }
 
