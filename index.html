@@ -116,6 +116,9 @@
             <button id="start-game-button" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full transition duration-300 shadow-lg mb-4 w-full" onclick="handleStartGameClick()">
                 Novo Jogo
             </button>
+            <button id="start-debug-button" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg text-xl transition-colors duration-200 w-full mt-2">
+                Novo Jogo (debug)
+            </button>
             <button id="view-ranking-button" class="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 text-white font-bold rounded-full transition duration-300 shadow-lg w-full" onclick="handleViewRankingClick()">
                 Visualizar Ranking
             </button>
@@ -333,8 +336,8 @@
     <script src="./projectiles.js"></script>
     <script src="./map.js"></script>
     <script src="./player.js"></script>
-    <script src="./ui.js"></script>
-    <script src="./game.js"></script> 
+    <script src="./js/game/ui.js"></script> <!-- CORREÇÃO: Mantém apenas este caminho -->
+    <script src="./js/game/game.js"></script> 
     
     <!-- Script para garantir o foco correto ao pressionar ENTER -->
     <script>

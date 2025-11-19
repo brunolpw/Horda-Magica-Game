@@ -114,7 +114,7 @@ canvas {
 /* NOVO: Estilo para o display de timers de power-ups */
 #powerup-timers-display {
     position: absolute;
-    top: 180px; /* Mais para baixo */
+    top: 35%; /* AJUSTE: Um pouco acima do meio */
     right: 20px; /* Movido para a direita */
     align-items: flex-end; /* Alinha o texto à direita */
     display: flex;

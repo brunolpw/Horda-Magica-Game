@@ -8,6 +8,7 @@
         let cameraShakeDuration = 0;
 
         let isGameOver = true; // Inicia como TRUE para mostrar o menu
+        let isDebugMode = false; // NOVO: Flag para o modo de depuração
         let isGamePaused = false; // NOVO: Flag para pausar o jogo durante o level up
         let keys = {};
         let playerSlowTimer = 0;
@@ -103,6 +104,33 @@
             // Teclas de Movimento
             document.addEventListener('keydown', (e) => {
                 keys[e.key] = true;
+
+                // NOVO: Lógica de debug para ganhar EXP
+                if (isDebugMode && (e.key === 'l' || e.key === 'L') && !isGamePaused) {
+                    const xpNeeded = player.userData.experienceForNextLevel - experiencePoints;
+                    gainExperience(xpNeeded);
+                }
+
+                // NOVO: Lógica de debug para invocar inimigos
+                if (isDebugMode && !isGamePaused && !isGameOver) {
+                    let enemyType;
+                    switch (e.key) {
+                        case '1': enemyType = 'goblin'; break;
+                        case '2': enemyType = 'orc'; break;
+                        case '3': enemyType = 'troll'; break;
+                        case '4': enemyType = 'necromancer'; break;
+                        case '5': enemyType = 'skeleton_warrior'; break;
+                        case '6': enemyType = 'fire_elemental'; break;
+                        case '7': enemyType = 'ice_elemental'; break;
+                        case '8': enemyType = 'lightning_elemental'; break;
+                        case '9': enemyType = 'ghost'; break;
+                    }
+
+                    if (enemyType) {
+                        const spawnPosition = new THREE.Vector3(0, 0, 0); // AJUSTE: Spawna no centro do mapa.
+                        createEnemy(enemyType, spawnPosition);
+                    }
+                }
             });
             document.addEventListener('keyup', (e) => {
                 keys[e.key] = false;
@@ -128,7 +156,7 @@
         }
 
         function handleMouseClick(event) {
-            if (event.button === 0 && !isGameOver && !isGamePaused) {
+            if (event.button === 0 && !isGameOver && !isGamePaused) { // Garante que nenhuma magia seja usada com o jogo pausado
                 attemptSpecialAttack();
             }
         }
@@ -1523,9 +1551,10 @@
 
 
 
-        // Função startGame agora recebe o nome do jogador
-        window.startGame = function (name) {
+        // Função startGame agora recebe o nome do jogador e uma flag de debug
+        window.startGame = function (name, forceDebug = false) {
             playerName = name || 'Mago Anônimo';
+            isDebugMode = forceDebug; // NOVO: Ativa o modo debug via flag
             resetPlayerState();
             if (freezingAuraMesh) freezingAuraMesh.visible = false; // NOVO: Esconde a aura
             if (expBoostAuraMesh) expBoostAuraMesh.visible = false; // NOVO: Esconde a aura de EXP
@@ -1541,6 +1570,16 @@
             conduitBeams.length = 0;
 
             triggerBlizzard(false); // Garante que a nevasca não esteja ativa
+
+            // NOVO: Se for modo debug, spawna todos os power-ups
+            if (isDebugMode) {
+                showDebugWindow(); // NOVO: Mostra a janela de atalhos
+                Object.keys(powerUpProps).forEach(type => {
+                    createPowerUp(type);
+                });
+            } else {
+                hideDebugWindow(); // NOVO: Garante que a janela esteja oculta
+            }
             
             // CORREÇÃO: Define como "jogo iniciado" APENAS DEPOIS que tudo foi criado
             isGameOver = false;
