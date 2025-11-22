@@ -216,6 +216,30 @@
                 createEnemyUI(troll.mesh, entityProps.troll.name);
                 return;
             }
+            if (type === 'necromancer') {
+                const necromancer = new Necromancer(position, isSummon);
+                enemies.push(necromancer);
+                createEnemyUI(necromancer.mesh, entityProps.necromancer.name);
+                return;
+            }
+            if (type === 'skeleton') {
+                const skeleton = new Skeleton(position, isSummon);
+                enemies.push(skeleton);
+                createEnemyUI(skeleton.mesh, entityProps.skeleton.name);
+                return;
+            }
+            if (type === 'skeleton_warrior') {
+                const warrior = new SkeletonWarrior(position, isSummon);
+                enemies.push(warrior);
+                createEnemyUI(warrior.mesh, entityProps.skeleton_warrior.name);
+                return;
+            }
+            if (type === 'skeleton_archer') {
+                const archer = new SkeletonArcher(position, isSummon);
+                enemies.push(archer);
+                createEnemyUI(archer.mesh, entityProps.skeleton_archer.name);
+                return;
+            }
 
             const props = entityProps[type];
             const enemy = props.modelFn(); // Usa a função para criar o modelo
@@ -301,11 +325,6 @@
                 enemy.userData.isRanged = true; // Marca como inimigo de longa distância
                 enemy.userData.attackCooldown = 360; // Ataca a cada 6 segundos
                 enemy.userData.attackTimer = Math.random() * 180;
-            }
-            // NOVO: Adiciona propriedades para o Esqueleto Arqueiro
-            if (type === 'skeleton_archer') {
-                enemy.userData.attackCooldown = 60; // Ataca a cada 1 segundo
-                enemy.userData.attackTimer = Math.random() * 60;
             }
 
             // NOVO: Adiciona propriedades para o Elemental de Gelo
@@ -478,25 +497,6 @@
             }
             const targetPos = target.position;
 
-            // Lógica de invocação do Necromante
-            if (enemyData.type === 'necromancer') {
-                enemyData.summonCooldown = Math.max(0, enemyData.summonCooldown - 1);
-                
-                if (enemyData.summonCooldown <= 0 && enemies.length < maxActiveEnemies) {
-                    // NOVO: Invoca um tipo de esqueleto aleatório
-                    const summonRoll = Math.random() * 100;
-                    let summonType;
-                    if (summonRoll < 50) summonType = 'skeleton';          // 50%
-                    else if (summonRoll < 80) summonType = 'skeleton_archer'; // 30%
-                    else summonType = 'skeleton_warrior';    // 20%
-
-                    const offset = new THREE.Vector3((Math.random() - 0.5) * 4, 0, (Math.random() - 0.5) * 4);
-                    const spawnPosition = enemy.position.clone().add(offset);
-                    createEnemy(summonType, spawnPosition, true);
-                    enemyData.summonCooldown = enemyData.summonInterval;
-                }
-            }
-
             // NOVO: Lógica do Rei Goblin
             if (enemyData.type === 'goblin_king') {
                 enemyData.summonCooldown = Math.max(0, enemyData.summonCooldown - 1);
@@ -617,73 +617,6 @@
                     // Invoca um grupo de kobolds perto dele
                     spawnKoboldGroup(enemy.position);
                     enemyData.summonCooldown = 900 * furyMultiplier;
-                }
-            } else if (enemyData.type === 'necromancer') {
-                // Lógica de movimento do Necromante (kiting)
-                 const distanceToPlayer = enemy.position.distanceTo(player.position);
-                 const minDistance = 10; // Distância mínima que ele quer manter
-                 const maxDistance = 15; // Distância máxima antes de se aproximar
-                 let direction = new THREE.Vector3(0, 0, 0);
- 
-                 if (distanceToPlayer < minDistance) {
-                     direction = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
-                 } else if (distanceToPlayer > maxDistance) {
-                     direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
-                 }
- 
-                 if (enemyData.attackTimer > 0) {
-                     enemyData.attackTimer--;
-                 } else if (Math.abs(enemy.position.x) < mapSize && Math.abs(enemy.position.z) < mapSize) {
-                    // Só ataca se estiver dentro do mapa
-                     const attackDirection = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
-                     createProjectile('necro_bolt', attackDirection, enemy.position);
-                     enemyData.attackTimer = enemyData.attackCooldown;
-                 }
- 
-                 if (direction.lengthSq() > 0) {
-                     const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
-                     tempPlayer.position.copy(newPosition);
-                     tempPlayer.updateMatrixWorld();
-                     let fullEnemyBBox = new THREE.Box3().setFromObject(tempPlayer);
-                     let collisionDetected = obstacles.some(o => fullEnemyBBox.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
- 
-                     if (!collisionDetected) {
-                         enemy.position.copy(newPosition);
-                     }
-                 }
-                 const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
-                 handleStandardMovement(enemy, newPosition, finalSpeed);
-            } else if (enemyData.type === 'skeleton_archer') {
-                // Lógica de movimento do Arqueiro (similar ao Necromante)
-                const distanceToPlayer = enemy.position.distanceTo(player.position);
-                const minDistance = 15; // Distância mínima
-                const maxDistance = 20; // Distância máxima
-                let direction = new THREE.Vector3(0, 0, 0);
-
-                if (distanceToPlayer < minDistance) {
-                    direction = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
-                } else if (distanceToPlayer > maxDistance) {
-                    direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
-                }
-
-                if (enemyData.attackTimer > 0) {
-                    enemyData.attackTimer--;
-                } else if (Math.abs(enemy.position.x) < mapSize && Math.abs(enemy.position.z) < mapSize) {
-                    // Só ataca se estiver dentro do mapa
-                    const attackDirection = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
-                    createProjectile('arrow', attackDirection, enemy.position);
-                    enemyData.attackTimer = enemyData.attackCooldown;
-                }
-
-                if (direction.lengthSq() > 0) {
-                    const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
-                    tempPlayer.position.copy(newPosition);
-                    tempPlayer.updateMatrixWorld();
-                    let fullEnemyBBox = new THREE.Box3().setFromObject(tempPlayer);
-                    let collisionDetected = obstacles.some(o => fullEnemyBBox.intersectsBox(o.userData.collisionMesh ? new THREE.Box3().setFromObject(o.userData.collisionMesh) : new THREE.Box3().setFromObject(o)));
-                    if (!collisionDetected) {
-                        enemy.position.copy(newPosition);
-                    }
                 }
             } else if (enemyData.type === 'ghost') {
                 // Lógica de movimento do Fantasma (ignora paredes)
@@ -1013,8 +946,8 @@
 
             // Checa colisão com o jogador APÓS o movimento
             const playerBBox = new THREE.Box3().setFromObject(player);
-            // Inimigos de longa distância não causam dano de toque
-            if (enemyData.type !== 'necromancer' && enemyData.type !== 'skeleton_archer' && enemyData.type !== 'kobold_shaman' && enemyData.electrifiedTimer <= 0) {
+            // Inimigos de longa distância (apenas o Xamã que não foi refatorado ainda) não causam dano de toque
+            if (enemyData.type !== 'kobold_shaman' && enemyData.electrifiedTimer <= 0) {
                 if (playerBBox.intersectsBox(new THREE.Box3().setFromObject(enemy))) {
                     if (enemyData.damageCooldown <= 0) {
                         damagePlayer(enemyData.damage);
