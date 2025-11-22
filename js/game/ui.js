@@ -193,56 +193,69 @@ function updateUI() {
 function updateEnemyUI() {
     const tempV = new THREE.Vector3();
     enemies.forEach(enemy => {
-        const uiElements = enemyLabels.get(enemy.uuid);
+        // --- LÓGICA DE REATORAÇÃO (COEXISTÊNCIA) ---
+        const isClassBased = enemy instanceof Enemy;
+        const mesh = isClassBased ? enemy.mesh : enemy;
+        const data = isClassBased ? enemy : enemy.userData;
+        // --- FIM DA LÓGICA DE REATORAÇÃO ---
+
+        const uiElements = enemyLabels.get(mesh.uuid);
         if (!uiElements) return;
 
-        if (enemy.userData.isBoss && uiElements.hpBar) {
+        if (data.isBoss && uiElements.hpBar) {
             uiElements.hpBar.style.backgroundColor = '#FFD700';
         }
 
         const { nameLabel, hpBar, hpFill, armorBar, armorFill, summonMarker, frozenMarker, electrifiedMarker } = uiElements;
-        const modelHeight = enemy.userData.modelHeight || 1.0;
+        const modelHeight = data.modelHeight || 1.0;
 
-        const labelBaseY = enemy.position.y + modelHeight;
-        tempV.set(enemy.position.x, labelBaseY, enemy.position.z);
+        const labelBaseY = mesh.position.y + modelHeight;
+        tempV.set(mesh.position.x, labelBaseY, mesh.position.z);
         tempV.project(camera);
 
         const x = (tempV.x * 0.5 + 0.5) * window.innerWidth;
         const y = (-tempV.y * 0.5 + 0.5) * window.innerHeight;
 
         nameLabel.style.left = `${x}px`;
-        nameLabel.style.top = `${y - 8}px`;
+        nameLabel.style.top = `${y - 8}px`; // Posição do nome
 
-        if (enemy.userData.armor > 0) {
+        if (data.armor > 0) {
             armorBar.style.display = 'block';
             armorBar.style.left = `${x}px`;
             armorBar.style.top = `${y}px`;
             hpBar.style.left = `${x}px`;
-            hpBar.style.top = `${y + 8}px`;
+            hpBar.style.top = `${y + 8}px`; // Desce a barra de HP
         } else {
             if (armorBar) armorBar.style.display = 'none';
             hpBar.style.left = `${x}px`;
             hpBar.style.top = `${y}px`;
         }
 
-        if (armorFill) armorFill.style.width = `${(enemy.userData.armor / enemy.userData.maxArmor) * 100}%`;
-        hpFill.style.width = `${(enemy.userData.hp / enemy.userData.maxHP) * 100}%`;
+        if (armorFill && data.maxArmor) {
+            armorFill.style.width = `${(data.armor / data.maxArmor) * 100}%`;
+        }
+        if (hpFill && data.maxHP) {
+            hpFill.style.width = `${(data.hp / data.maxHP) * 100}%`;
+        }
 
         if (summonMarker) {
             summonMarker.style.left = `${x}px`;
             summonMarker.style.top = `${y - 18}px`;
+            // A lógica para mostrar/esconder o marcador de invocação precisa ser adicionada aqui se necessário
         }
 
         if (frozenMarker) {
-            frozenMarker.style.display = enemy.userData.isFrozen ? 'block' : 'none';
-            if (enemy.userData.isFrozen) {
+            const isFrozen = isClassBased ? enemy.isFrozen : data.isFrozen;
+            frozenMarker.style.display = isFrozen ? 'block' : 'none';
+            if (isFrozen) {
                 frozenMarker.style.left = `${x}px`;
                 frozenMarker.style.top = `${y - 18}px`;
             }
         }
 
         if (electrifiedMarker) {
-            if (enemy.userData.electrifiedTimer > 0) {
+            const electTimer = data.electrifiedTimer || 0;
+            if (electTimer > 0) {
                 electrifiedMarker.style.display = 'block';
                 electrifiedMarker.style.left = `${x + 10}px`;
                 electrifiedMarker.style.top = `${y - 18}px`;
@@ -311,9 +324,15 @@ function createEnemyUI(enemy, name) {
     armorBarContainer.appendChild(armorFill);
 
     enemyLabelsContainer.appendChild(hpBarContainer);
-
+    
+    // --- LÓGICA DE REATORAÇÃO (COEXISTÊNCIA) ---
+    // Verifica de forma segura se o parâmetro recebido é uma instância da classe Enemy
+    const isClassBased = enemy instanceof Enemy || (enemy.userData && enemy.userData.class);
+    const isSummon = isClassBased ? (enemy instanceof Enemy ? enemy.isSummon : (enemy.userData && enemy.userData.class ? enemy.userData.class.isSummon : enemy.userData.isSummon)) : false;
+    // --- FIM DA LÓGICA DE REATORAÇÃO ---
+    
     let summonMarker = null;
-    if (enemy.userData.isSummon) {
+    if (isSummon) {
         summonMarker = document.createElement('div');
         summonMarker.className = 'summon-marker';
         enemyLabelsContainer.appendChild(summonMarker);
@@ -678,8 +697,13 @@ function createEnemyUI(enemy, name) {
 
     enemyLabelsContainer.appendChild(hpBarContainer);
 
+    // --- LÓGICA DE REATORAÇÃO (COEXISTÊNCIA) ---
+    const isClassBased = enemy instanceof Enemy || (enemy.userData && enemy.userData.class);
+    const isSummon = isClassBased ? (enemy instanceof Enemy ? enemy.isSummon : (enemy.userData && enemy.userData.class ? enemy.userData.class.isSummon : enemy.userData.isSummon)) : false;
+    // --- FIM DA LÓGICA DE REATORAÇÃO ---
+
     let summonMarker = null;
-    if (enemy.userData.isSummon) {
+    if (isSummon) {
         summonMarker = document.createElement('div');
         summonMarker.className = 'summon-marker';
         enemyLabelsContainer.appendChild(summonMarker);

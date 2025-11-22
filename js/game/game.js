@@ -18,6 +18,14 @@
         const traps = [];
         const firePuddles = [];
 
+        // Helper para normalizar referências a inimigos que podem ser
+        // instâncias da classe Enemy ou meshes puros.
+        function getEnemyRef(enemyItem) {
+            const isClassBased = enemyItem instanceof Enemy;
+            const mesh = isClassBased ? enemyItem.mesh : enemyItem;
+            const data = isClassBased ? enemyItem : (mesh && mesh.userData) ? mesh.userData : {};
+            return { isClassBased, mesh, data };
+        }
         // Variável temporária para checagem de colisão
         let tempPlayer; 
 
@@ -82,16 +90,22 @@
         // NOVO: Função para encontrar os inimigos mais próximos (ou mais fortes)
         function findClosestEnemies(position, count, sortByStrength = false) {
             let sortedEnemies = enemies
-                .map(enemy => ({
-                    enemy,
-                    distanceSq: enemy.position.distanceToSquared(position)
-                }));
+                .map(enemy => {
+                    const isClassBased = enemy instanceof Enemy;
+                    const mesh = isClassBased ? enemy.mesh : enemy;
+                    return {
+                        enemy,
+                        distanceSq: mesh.position.distanceToSquared(position)
+                    };
+                });
 
             if (sortByStrength) {
                 // Ordena por HP máximo (mais forte) e depois por HP atual
                 sortedEnemies.sort((a, b) => {
-                    if (b.enemy.userData.maxHP !== a.enemy.userData.maxHP) return b.enemy.userData.maxHP - a.enemy.userData.maxHP;
-                    return b.enemy.userData.hp - a.enemy.userData.hp;
+                    const dataA = a.enemy instanceof Enemy ? a.enemy : a.enemy.userData;
+                    const dataB = b.enemy instanceof Enemy ? b.enemy : b.enemy.userData;
+                    if (dataB.maxHP !== dataA.maxHP) return dataB.maxHP - dataA.maxHP;
+                    return dataB.hp - dataA.hp;
                 });
             } else {
                 sortedEnemies.sort((a, b) => a.distanceSq - b.distanceSq);
@@ -165,6 +179,44 @@
         // --- Funções de Entidade e Spawning ---
         
         function createEnemy(type, position, isSummon = false) {
+            // REATORAÇÃO: Se o tipo for 'goblin', usa a nova classe.
+            if (type === 'goblin') {
+                const goblin = new Goblin(position, isSummon); // CORREÇÃO: Passa o status 'isSummon'
+                enemies.push(goblin);
+                createEnemyUI(goblin.mesh, entityProps.goblin.name); // A UI ainda precisa do mesh
+                return; // Sai da função para não executar o código antigo.
+            }
+            if (type === 'kobold') {
+                const kobold = new Kobold(position, isSummon);
+                enemies.push(kobold);
+                createEnemyUI(kobold.mesh, entityProps.kobold.name);
+                return;
+            }
+            if (type === 'kobold_warrior') {
+                const warrior = new KoboldWarrior(position, isSummon);
+                enemies.push(warrior);
+                createEnemyUI(warrior.mesh, entityProps.kobold_warrior.name);
+                return;
+            }
+            if (type === 'kobold_shaman') {
+                const shaman = new KoboldShaman(position, isSummon);
+                enemies.push(shaman);
+                createEnemyUI(shaman.mesh, entityProps.kobold_shaman.name);
+                return; // Sai da função para não executar o código antigo.
+            }
+            if (type === 'orc') {
+                const orc = new Orc(position, isSummon);
+                enemies.push(orc);
+                createEnemyUI(orc.mesh, entityProps.orc.name);
+                return;
+            }
+            if (type === 'troll') {
+                const troll = new Troll(position, isSummon);
+                enemies.push(troll);
+                createEnemyUI(troll.mesh, entityProps.troll.name);
+                return;
+            }
+
             const props = entityProps[type];
             const enemy = props.modelFn(); // Usa a função para criar o modelo
 
@@ -362,7 +414,34 @@
             
             for (let i = enemies.length - 1; i >= 0; i--) {
                 const enemy = enemies[i];
-                const enemyData = enemy.userData;
+
+                // --- LÓGICA DE REATORAÇÃO (COEXISTÊNCIA) ---
+                if (enemy instanceof Enemy) {
+                    // Se for uma instância da nova classe Enemy, delega a lógica.
+                    enemy.update(player, obstacles);
+
+                    if (enemy.isDead()) {
+                        score += enemy.score;
+                        gainExperience(enemy.score);
+                        if (isBossWave) killsForSoulHarvest++;
+                        chargeTimer = Math.max(0, chargeTimer - 60);
+                        killsSinceLastPotion++;
+                        if (killStats[enemy.type] !== undefined) {
+                            killStats[enemy.type]++;
+                        }
+
+                        scene.remove(enemy.mesh);
+                        removeEnemyUI(enemy.mesh); // A UI usa o mesh como chave
+                        enemies.splice(i, 1);
+                        enemiesAliveThisWave--;
+                        updateUI();
+                    }
+                    continue; // Pula para o próximo inimigo do loop
+                }
+                // --- FIM DA LÓGICA DE REATORAÇÃO ---
+
+                // O código abaixo só será executado para inimigos do sistema antigo.
+                const enemyData = enemy.userData; 
 
                 // NOVO: Decrementa o cooldown de ataque do monstro
                 if (enemyData.damageCooldown > 0) {
@@ -388,19 +467,6 @@
                     });
                 }
                 
-                // NOVO: Lógica da Bolha de Repulsão
-                if (repulsionBubbleTimer > 0) {
-                    const distanceToPlayer = enemy.position.distanceTo(player.position);
-                    const repulsionRadius = 4; // Raio da bolha
-                    if (distanceToPlayer < repulsionRadius) {
-                        // Calcula a direção para empurrar o inimigo para longe
-                        const pushDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
-                        const pushSpeed = 0.1; // Força com que são empurrados
-                        enemy.position.addScaledVector(pushDirection, pushSpeed);
-                        continue; // Pula o resto da lógica de movimento normal
-                    }
-                }
-            
             // CORREÇÃO: Toda a lógica abaixo foi movida para dentro do loop 'for'
 
             // NOVO: Define o alvo (fantasmas ignoram o clone)
@@ -411,56 +477,6 @@
                 target = player;
             }
             const targetPos = target.position;
-
-            // Lógica de congelamento persistente e dano por segundo
-            let finalSpeed = enemyData.speed;
-            if (goblinKingAura && enemyData.type === 'goblin' && !enemyData.isBoss && enemy.position.distanceToSquared(currentBoss.position) < auraRadiusSq) {
-                finalSpeed *= speedBoost;
-            }
-            let isSlowed = false;
-            // Imunidades ao congelamento
-            if (enemyData.type !== 'ghost' && enemyData.type !== 'ice_elemental' && enemyData.type !== 'lightning_elemental' && !(enemyData.type === 'juggernaut_troll' && enemyData.armor > 0)) {
-                const distanceToPlayer = enemy.position.distanceTo(player.position); // Matriarca é imune a gelo
-                const auraRadius = 6;
-
-                if (freezingAuraTimer > 0 && distanceToPlayer < auraRadius) {
-                    if (enemyData.type !== 'ice_elemental') enemyData.freezeLingerTimer = 600;
-                }
-                if (flamingAuraTimer > 0 && distanceToPlayer < auraRadius) {
-                    if (enemyData.type !== 'fire_elemental') {
-                        enemyData.burnTimer = 600; // 10 segundos
-                    }
-                }
-                if (electrifyingAuraTimer > 0 && distanceToPlayer < auraRadius) {
-                    if (enemyData.type !== 'lightning_elemental' && enemyData.type !== 'juggernaut_troll') {
-                        enemyData.electrifiedTimer = 120; // 2 segundos
-                    }
-                }
-
-                if (enemyData.freezeLingerTimer > 0) {
-                    enemyData.freezeLingerTimer--;
-                    enemyData.isFrozen = true;
-                    isSlowed = true;
-
-                    // Dano de 5 a cada 1 segundo (60 frames)
-                    if (enemyData.freezeLingerTimer % 60 === 0) {
-                        let damage = 5;
-                        damage *= getWeaknessMultiplier('ice', enemyData.type);
-                        enemyData.hp -= damage;
-                        enemyData.auraDamageAccumulator += damage;
-                    }
-
-                    // Mostra o dano acumulado a cada segundo
-                    if (enemyData.auraDamageAccumulator >= 5 && enemyData.hp > 0) {
-                        createFloatingText(Math.floor(enemyData.auraDamageAccumulator), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#87CEFA');
-                        enemyData.auraDamageAccumulator = 0;
-                    }
-                }
-            }
-            // Se chegou aqui, não está congelado
-            if (enemyData.freezeLingerTimer <= 0) {
-                enemyData.isFrozen = false;
-            }
 
             // Lógica de invocação do Necromante
             if (enemyData.type === 'necromancer') {
@@ -548,64 +564,12 @@
                 }
             }
 
-            // NOVO: Lógica do status Eletrificado
-            if (enemyData.electrifiedTimer > 0 && !(enemyData.type === 'juggernaut_troll' && enemyData.armor > 0) && enemyData.type !== 'lightning_elemental') {
-                enemyData.electrifiedTimer--; // Dura 2 segundos (120 frames)
-                isSlowed = true; // Efeito de paralisia
-
-                if (enemyData.electrifiedTimer % 60 === 0) { // Dano de 25 a cada 1 segundo
-                    let damage = 25;
-                    damage *= getWeaknessMultiplier('lightning', enemyData.type);
-                    enemyData.hp -= damage;
-                    if (enemyData.hp <= 0 && enemyData.isBoss) {
-                        handleBossDefeat(enemy);
-                    }
-                    createFloatingText(Math.floor(damage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047');
-                    enemyData.hitTimer = 5; // Pequeno feedback visual
-                }
-            }
-
-            // Efeito de piscar amarelo do monstro quando eletrificado
-            if (enemyData.electrifiedTimer > 0) {
-                if (Math.random() > 0.5) {
-                    enemy.traverse(child => {
-                        if (child.isMesh) child.material.color.setHex(0xfde047);
-                    });
-                }
-            } else if (enemyData.hitTimer <= 0) { // Garante que não sobrescreva o piscar de dano
-                // Volta à cor normal (já tratado na lógica de hitTimer)
-                enemy.visible = true; // Garante que o monstro não fique invisível
-            }
-
-            // NOVO: Lógica do status Queimado
-            if (enemyData.burnTimer > 0 
-            && enemyData.type !== 'ghost' 
-            && enemyData.type !== 'fire_elemental'
-            && enemyData.type !== 'magma_colossus') {
-                enemyData.burnTimer--; // Dura 10 segundos (600 frames)
-                enemyData.isFleeing = true;
-
-                // Efeito visual de fogo no inimigo
-                if (Math.random() < 0.3) { // Chance de criar partícula a cada frame
-                    const fireParticleGeo = new THREE.SphereGeometry(0.1, 4, 4);
-                    const fireParticleMat = new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xff4500 : 0xffa500 });
-                    const fireParticle = new THREE.Mesh(fireParticleGeo, fireParticleMat);
-                    const offset = new THREE.Vector3((Math.random() - 0.5) * 0.8, Math.random() * (enemyData.modelHeight || 1), (Math.random() - 0.5) * 0.8);
-                    fireParticle.position.copy(enemy.position).add(offset);
-                    scene.add(fireParticle);
-                    setTimeout(() => scene.remove(fireParticle), 200 + Math.random() * 200);
-                }
-            } else {
-                enemyData.isFleeing = false;
-            }
-
-            // NOVO: Lógica de fuga do Kobold
-            if (enemyData.type.startsWith('kobold') && (enemyData.hp / enemyData.maxHP) < 0.6) {
-                enemyData.isFleeing = true;
-            }
-
 
             // --- LÓGICA DE MOVIMENTO ---
+            let finalSpeed = enemyData.speed;
+            if (goblinKingAura && enemyData.type === 'goblin' && !enemyData.isBoss && enemy.position.distanceToSquared(currentBoss.position) < auraRadiusSq) {
+                finalSpeed *= speedBoost;
+            }
             if (enemyData.isTeleporting) {
                 continue; // Pula movimento se estiver se teleportando
             }
@@ -629,12 +593,6 @@
                 const fleeDirection = new THREE.Vector3().subVectors(enemy.position, player.position).normalize();
                 const newPosition = enemy.position.clone().addScaledVector(fleeDirection, fleeSpeed);
                 handleStandardMovement(enemy, newPosition, finalSpeed);
-            } else if (isSlowed) { // Inimigos congelados ou eletrificados (que não estão fugindo)
-                // Movimento lento ou paralisado
-                const speedMultiplier = (enemyData.electrifiedTimer > 0) ? 0 : 0.5; // Paralisado se eletrificado
-                const slowDirection = new THREE.Vector3().subVectors(targetPos, enemy.position).normalize();
-                const newPosition = enemy.position.clone().addScaledVector(slowDirection, finalSpeed * speedMultiplier);
-                handleStandardMovement(enemy, newPosition, finalSpeed * speedMultiplier);
             } else if (enemyData.type === 'kobold_king') {
                 // Fúria
                 if (!enemyData.isEnraged && enemyData.hp / enemyData.maxHP < 0.5) {
@@ -692,23 +650,6 @@
                      if (!collisionDetected) {
                          enemy.position.copy(newPosition);
                      }
-                 }
-            } else if (enemyData.type === 'kobold_shaman') {
-                 // Lógica de kiting do Xamã
-                 const distanceToPlayer = enemy.position.distanceTo(player.position);
-                 const idealDistance = 10;
-                 let direction = new THREE.Vector3(0, 0, 0);
-
-                 if (distanceToPlayer < idealDistance - 1) { // Se estiver muito perto, afasta-se
-                     direction.subVectors(enemy.position, player.position).normalize();
-                 } else if (distanceToPlayer > idealDistance + 1) { // Se estiver muito longe, aproxima-se
-                     direction.subVectors(player.position, enemy.position).normalize();
-                 }
-                 enemyData.attackTimer = Math.max(0, enemyData.attackTimer - 1);
-                 if (enemyData.attackTimer <= 0) {
-                     const attackDirection = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
-                     createProjectile('shaman_bolt', attackDirection, enemy.position);
-                     enemyData.attackTimer = enemyData.attackCooldown;
                  }
                  const newPosition = enemy.position.clone().addScaledVector(direction, finalSpeed);
                  handleStandardMovement(enemy, newPosition, finalSpeed);
@@ -1478,32 +1419,41 @@
 
         // NOVO: Função para lidar com a derrota de um chefe (movida para game.js)
         function handleBossDefeat(boss) {
-            score += boss.userData.score;
-            gainExperience(boss.userData.score);
+            // CORREÇÃO DE SEGURANÇA: Impede a execução se o chefe for nulo ou indefinido.
+            if (!boss) return;
+
+            // --- LÓGICA DE REATORAÇÃO (COEXISTÊNCIA) ---
+            const isClassBased = boss instanceof Enemy;
+            const data = isClassBased ? boss : boss.userData;
+            const position = isClassBased ? boss.mesh.position : boss.position;
+            // --- FIM DA LÓGICA DE REATORAÇÃO ---
+
+            score += data.score;
+            gainExperience(data.score);
             
             const numDrops = Math.floor(Math.random() * 3) + 3;
             for (let i = 0; i < numDrops; i++) {
                 const offset = new THREE.Vector3((Math.random() - 0.5) * 4, 0, (Math.random() - 0.5) * 4);
-                spawnRandomItem(boss.position.clone().add(offset));
+                spawnRandomItem(position.clone().add(offset));
             }
 
-            if (boss.userData.type === 'archlich') {
+            if (data.type === 'archlich') {
                 showSpecialLevelUpOptions();
             }
-            if (boss.userData.type === 'storm_sovereign') {
+            if (data.type === 'storm_sovereign') {
                 // Limpa os conduítes e raios restantes
                 stormConduits.forEach(c => scene.remove(c));
                 stormConduits.length = 0;
                 conduitBeams.forEach(b => scene.remove(b));
                 conduitBeams.length = 0;
             }
-            if (boss.userData.type === 'glacial_matriarch' && boss.userData.isEnraged) {
+            if (data.type === 'glacial_matriarch' && data.isEnraged) {
                 triggerBlizzard(false); // Desativa a nevasca
             }
             // Remove os cacos de gelo restantes
-            if (boss.userData.shardShields) {
-                boss.userData.shardShields.forEach(shard => scene.remove(shard));
-                boss.userData.shardShields.length = 0;
+            if (data.shardShields) {
+                data.shardShields.forEach(shard => scene.remove(shard));
+                data.shardShields.length = 0;
             }
             isBossWave = false;
             currentBoss = null;
@@ -1602,15 +1552,20 @@
         }
 
         function updateBossShields() {
-            enemies.forEach(enemy => {
-                if (enemy.userData.type === 'glacial_matriarch' && enemy.userData.shardShields) {
-                    const shields = enemy.userData.shardShields;
-                    shields.forEach((shard, index) => {
+            enemies.forEach(enemyItem => {
+                // Pode ser uma instância da classe Enemy ou um mesh puro
+                const isClassBased = enemyItem instanceof Enemy;
+                const mesh = isClassBased ? enemyItem.mesh : enemyItem;
+                const data = mesh.userData || (isClassBased ? enemyItem : {});
+
+                if (data.type === 'glacial_matriarch' && data.shardShields) {
+                    const shields = data.shardShields;
+                    shields.forEach((shard) => {
                         shard.userData.angle += 0.01;
-                        const x = enemy.position.x + Math.cos(shard.userData.angle) * shard.userData.radius;
-                        const z = enemy.position.z + Math.sin(shard.userData.angle) * shard.userData.radius;
+                        const x = mesh.position.x + Math.cos(shard.userData.angle) * shard.userData.radius;
+                        const z = mesh.position.z + Math.sin(shard.userData.angle) * shard.userData.radius;
                         shard.position.set(x, 1.5, z);
-                        shard.lookAt(enemy.position);
+                        shard.lookAt(mesh.position);
                     });
                 }
             });

@@ -202,13 +202,16 @@ function damagePlayer(amount, isElemental = false) {
     const shieldLevel = player.userData.upgrades.magic_shield || 0;
     if (shieldLevel > 0) {
         let reductionPercent = 0;
-        if (isElemental && shieldLevel >= 4) {
+        if (isElemental && shieldLevel >= 4) { // Dano elemental
             reductionPercent = shieldLevel === 4 ? 0.15 : 0.30;
-        } else if (!isElemental) {
+        } else if (!isElemental) { // CORREÇÃO: Aplica a redução física APENAS se o dano NÃO for elemental.
+            // Isso impede que o dano elemental seja reduzido pela regra do dano físico.
             reductionPercent = Math.min(0.3, shieldLevel * 0.1);
         }
 
-        const reductionAmount = Math.max(1, Math.ceil(finalDamage * reductionPercent));
+        // CORREÇÃO: Arredonda o valor da redução para cima, como solicitado.
+        // Ex: 7.1 de redução se torna 8.
+        const reductionAmount = Math.ceil(finalDamage * reductionPercent);
         finalDamage -= reductionAmount;
     }
     finalDamage = Math.max(0, finalDamage);
@@ -289,15 +292,12 @@ function attemptSpecialAttack() {
             
             if (!target) return;
 
-            // CORREÇÃO: Acessa o mesh do inimigo se for uma classe
-            const targetMesh = target instanceof Enemy ? target.mesh : target;
-
-            const direction = new THREE.Vector3().subVectors(targetMesh.position, player.position).normalize();
+            const direction = new THREE.Vector3().subVectors(target.position, player.position).normalize();
             createProjectile('ethereal_fire', direction, player.position);
             const proj = projectiles[projectiles.length - 1];
             proj.userData.damage = damage;
             proj.userData.isHoming = true;
-            proj.userData.target = target; // O alvo é a instância da classe ou o objeto antigo
+            proj.userData.target = target;
             proj.userData.hasBeenReflected = 'homing'; // Não pode ser refletido
             break;
         }
@@ -308,11 +308,7 @@ function attemptSpecialAttack() {
             const numProjectiles = sphereCounts[level - 1];
             const radius = 25;
 
-            const nearbyEnemies = enemies.filter(e => {
-                // CORREÇÃO: Acessa o mesh do inimigo se for uma classe
-                const mesh = e instanceof Enemy ? e.mesh : e; 
-                return mesh.position.distanceTo(player.position) <= radius;
-            });
+            const nearbyEnemies = enemies.filter(e => e.position.distanceTo(player.position) <= radius);
             if (nearbyEnemies.length === 0) return;
 
             const targets = [];
@@ -343,9 +339,7 @@ function attemptSpecialAttack() {
             let minDistanceSq = jumpDistance * jumpDistance;
 
             enemies.forEach(enemy => {
-                // CORREÇÃO: Acessa o mesh do inimigo se for uma classe
-                const mesh = enemy instanceof Enemy ? enemy.mesh : enemy; 
-                const distanceSq = mesh.position.distanceToSquared(player.position);
+                const distanceSq = enemy.position.distanceToSquared(player.position);
                 if (distanceSq < minDistanceSq) {
                     minDistanceSq = distanceSq;
                     closestEnemy = enemy;
@@ -368,16 +362,13 @@ function attemptSpecialAttack() {
             const target = findClosestEnemies(player.position, 1, false)[0];
             if (!target) return;
 
-            // CORREÇÃO: Acessa o mesh do inimigo se for uma classe
-            const targetMesh = target instanceof Enemy ? target.mesh : target;
-
-            const direction = new THREE.Vector3().subVectors(targetMesh.position, player.position).normalize();
+            const direction = new THREE.Vector3().subVectors(target.position, player.position).normalize();
             
             createProjectile('explosion', direction, player.position);
             
             const lastProjectile = projectiles[projectiles.length - 1];
             lastProjectile.userData.isHoming = true;
-            lastProjectile.userData.target = target; // O alvo é a instância da classe ou o objeto antigo
+            lastProjectile.userData.target = target; // Mantido para referência
             lastProjectile.userData.hasBeenReflected = 'homing';
             lastProjectile.userData.explosionRadius = [5, 7, 8, 9, 10][level - 1];
             let explosionDamage = [50, 60, 70, 80, 100][level - 1];

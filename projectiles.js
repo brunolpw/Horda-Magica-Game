@@ -86,11 +86,20 @@ function triggerBigExplosion(position, radius, damage, level) {
     }, 30);
 
     const radiusSq = radius * radius;
-    enemies.forEach(enemy => {
-        if (enemy.position.distanceToSquared(position) <= radiusSq) {
-            enemy.userData.hp -= damage;
-            createFloatingText(damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#ff4500');
-            enemy.userData.hitTimer = 10;
+    enemies.forEach(enemyItem => {
+        const isClassBased = enemyItem instanceof Enemy;
+        const mesh = isClassBased ? enemyItem.mesh : enemyItem;
+        const data = isClassBased ? enemyItem : enemyItem.userData;
+
+        if (mesh.position.distanceToSquared(position) <= radiusSq) {
+            if (isClassBased) {
+                enemyItem.takeDamage(damage);
+                enemyItem.hitTimer = 10;
+            } else {
+                data.hp -= damage;
+                data.hitTimer = 10;
+            }
+            createFloatingText(damage, mesh.position.clone().setY(data.modelHeight || 1.5), '#ff4500');
         }
     });
 
@@ -136,8 +145,13 @@ function updateProjectiles() {
         projectile.updateMatrixWorld();
         tempBBox.setFromObject(projectile);
 
-        if (projData.isHoming && projData.target && projData.target.userData.hp > 0) {
-            const targetPosition = projData.target.position;
+        if (projData.isHoming && projData.target) {
+            const isClassBased = projData.target instanceof Enemy;
+            const data = isClassBased ? projData.target : projData.target.userData;
+            const mesh = isClassBased ? projData.target.mesh : projData.target;
+            if (data.hp <= 0) projData.isHoming = false;
+
+            const targetPosition = mesh.position;
             const directionToTarget = new THREE.Vector3().subVectors(targetPosition, projectile.position).normalize();
             projData.direction.lerp(directionToTarget, 0.1);
         } else if (projData.isHoming) {
@@ -170,12 +184,16 @@ function updateProjectiles() {
         // Colisão de projéteis do jogador com escudos de chefes
         if (projData.type !== 'necro_bolt' && projData.type !== 'arrow' && projData.type !== 'ice_shard' && projData.type !== 'shaman_bolt') {
             for (const enemy of enemies) {
-                if (enemy.userData.shardShields && enemy.userData.shardShields.length > 0) {
-                    for (let s = enemy.userData.shardShields.length - 1; s >= 0; s--) {
-                        const shard = enemy.userData.shardShields[s];
+                const isClassBased = enemy instanceof Enemy;
+                const mesh = isClassBased ? enemy.mesh : enemy;
+                const data = isClassBased ? enemy : enemy.userData;
+
+                if (data.shardShields && data.shardShields.length > 0) {
+                    for (let s = data.shardShields.length - 1; s >= 0; s--) {
+                        const shard = data.shardShields[s];
                         if (tempBBox.intersectsBox(new THREE.Box3().setFromObject(shard))) {
                             scene.remove(shard);
-                            enemy.userData.shardShields.splice(s, 1);
+                            data.shardShields.splice(s, 1);
                             hit = true;
                             break;
                         }
@@ -188,9 +206,13 @@ function updateProjectiles() {
             if (!hit && stormConduits.length > 0) {
                 for (let c = stormConduits.length - 1; c >= 0; c--) {
                     const conduit = stormConduits[c];
+                    // A lógica de dano ao conduíte precisa saber o dano final do projétil
+                    const damageLevel = player.userData.upgrades.increase_damage || 0;
+                    let finalDamage = projData.damage + (damageLevel * 2) + Math.floor(playerLevel / 5);
+
                     if (tempBBox.intersectsBox(new THREE.Box3().setFromObject(conduit))) {
-                        conduit.userData.hp -= finalDamage;
-                        createFloatingText(Math.floor(finalDamage), conduit.position.clone().setY(3.5), 'white');
+                        conduit.userData.hp -= finalDamage; // Aplica dano ao conduíte
+                        createFloatingText(Math.floor(finalDamage), conduit.position.clone().setY(3.5), 'white'); // Feedback visual
                         hit = true; // Projétil é destruído
 
                         if (conduit.userData.hp <= 0) {
@@ -198,7 +220,11 @@ function updateProjectiles() {
                             scene.remove(conduit);
                             stormConduits.splice(c, 1);
                             updateConduitBeams();
-                            if (stormConduits.length === 0) handleBossDefeat(conduit.userData.boss);
+                            // CORREÇÃO CRÍTICA: Garante que o chefe seja derrotado apenas quando todos os conduítes caírem.
+                            if (stormConduits.length === 0) {
+                                // A referência 'currentBoss' é mais segura do que 'conduit.userData.boss'.
+                                handleBossDefeat(currentBoss);
+                            }
                         }
                         break;
                     }
@@ -207,15 +233,22 @@ function updateProjectiles() {
 
             if (!hit) { // Se não atingiu um escudo, checa os inimigos
                 for (const enemy of enemies) {
-                    const enemyBBox = new THREE.Box3().setFromObject(enemy);
+                    // --- LÓGICA DE REATORAÇÃO (COEXISTÊNCIA) ---
+                    const isClassBased = enemy instanceof Enemy;
+                    const mesh = isClassBased ? enemy.mesh : enemy;
+                    const data = isClassBased ? enemy : enemy.userData;
+                    // --- FIM DA LÓGICA DE REATORAÇÃO ---
+
+                    // CORREÇÃO: Usa o 'mesh' para criar a BBox
+                    const enemyBBox = new THREE.Box3().setFromObject(mesh);
 
                     // Evita que um projétil perfurante atinja o mesmo inimigo duas vezes
-                    if (projData.hitEnemies.includes(enemy.uuid)) {
+                    if (projData.hitEnemies.includes(mesh.uuid)) {
                         continue;
                     }
 
                     if (tempBBox.intersectsBox(enemyBBox)) {
-                        const damageLevel = player.userData.upgrades.increase_damage || 0;
+                        const damageLevel = player.userData.upgrades.increase_damage || 0; // Assumindo que player.userData ainda é usado para upgrades
                         let finalDamage = projData.damage;
                         if (damageLevel > 0) {
                             // +2 de dano por nível (2, 4, 6, 8, 10)
@@ -229,42 +262,42 @@ function updateProjectiles() {
 
                         // Lógica do Míssil de Fogo Etéreo
                         if (projData.type === 'ethereal_fire') {
-                            finalDamage *= getWeaknessMultiplier('fire', enemy.userData.type);
-                            const enemyType = enemy.userData.type;
+                            finalDamage *= getWeaknessMultiplier('fire', data.type);
+                            const enemyType = data.type;
                             if (enemyType.includes('skeleton') || enemyType === 'ghost') {
                                 finalDamage = Math.ceil(finalDamage * 1.10); // +10% de dano
                             }
                             if (enemyType !== 'ghost') {
-                                enemy.userData.burnTimer = 600; // 10 segundos de queimadura
+                                data.burnTimer = 600; // 10 segundos de queimadura
                             }
                         }
 
                         // Lógica da Lança de Gelo
                         if (projData.type === 'ice_lance') {
-                            finalDamage *= getWeaknessMultiplier('ice', enemy.userData.type);
+                            finalDamage *= getWeaknessMultiplier('ice', data.type);
                         }
 
-                        if (enemy.userData.isBoss && enemy.userData.soulShieldCharges > 0) {
-                            enemy.userData.soulShieldCharges--;
+                        if (data.isBoss && data.soulShieldCharges > 0) {
+                            data.soulShieldCharges--;
                             removeShield();
-                            if (enemy.userData.soulShieldCharges > 0) createBossShield(enemy.userData.soulShieldCharges);
+                            if (data.soulShieldCharges > 0) createBossShield(data.soulShieldCharges);
                             hit = true;
-                        } else if (enemy.userData.armor > 0) {
-                            const armorDamage = Math.min(enemy.userData.armor, finalDamage);
-                            enemy.userData.armor -= armorDamage;
+                        } else if (data.armor > 0) {
+                            const armorDamage = Math.min(data.armor, finalDamage);
+                            data.armor -= armorDamage;
                             finalDamage -= armorDamage;
-                            createFloatingText(Math.floor(armorDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#A9A9A9');
+                            createFloatingText(Math.floor(armorDamage), mesh.position.clone().setY(data.modelHeight || 1.5), '#A9A9A9');
                         }
 
                         if (hit || finalDamage <= 0) continue;
-                        enemy.userData.hp -= finalDamage;
-                        createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
-                        enemy.userData.hitTimer = 10;
+                        data.hp -= finalDamage;
+                        createFloatingText(Math.floor(finalDamage), mesh.position.clone().setY(data.modelHeight || 1.5), 'white');
+                        data.hitTimer = 10;
 
                         // Lógica de perfuração
                         if (projData.type === 'ice_lance') {
-                            enemy.userData.freezeLingerTimer = 600; // Aplica congelamento
-                            projData.hitEnemies.push(enemy.uuid);
+                            data.freezeLingerTimer = 600; // Aplica congelamento
+                            projData.hitEnemies.push(mesh.uuid);
                             projData.pierceCount++;
                             if (projData.pierceCount >= projData.maxPierce) {
                                 hit = true; // Destrói a lança após atingir o máximo de alvos

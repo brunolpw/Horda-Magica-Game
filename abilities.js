@@ -367,13 +367,19 @@ function triggerChainLightning(startEnemy) {
         let closestEnemy = null;
         let minDistanceSq = maxJumpDistanceSq;
 
+        const currentEnemyMesh = currentEnemy instanceof Enemy ? currentEnemy.mesh : currentEnemy;
+
         enemies.forEach(enemy => {
             if (!chain.includes(enemy)) {
+                const isClassBased = enemy instanceof Enemy;
+                const mesh = isClassBased ? enemy.mesh : enemy;
+                const data = isClassBased ? enemy : enemy.userData;
+
                 // Fantasmas não podem ser alvo secundário da corrente
-                if (enemy.userData.type === 'ghost') {
+                if (data.type === 'ghost') {
                     return;
                 }
-                const distanceSq = enemy.position.distanceToSquared(currentEnemy.position);
+                const distanceSq = mesh.position.distanceToSquared(currentEnemyMesh.position);
                 if (distanceSq < minDistanceSq) {
                     minDistanceSq = distanceSq;
                     closestEnemy = enemy;
@@ -391,17 +397,31 @@ function triggerChainLightning(startEnemy) {
 
     for (let i = 0; i < chain.length; i++) {
         const enemy = chain[i];
-        let finalDamage = damage;
-        finalDamage *= getWeaknessMultiplier('lightning', enemy.userData.type);
-        enemy.userData.hp -= finalDamage;
-        createFloatingText(Math.floor(finalDamage), enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), '#fde047'); // Amarelo elétrico
-        if (enemy.userData.type !== 'ghost' && enemy.userData.type !== 'lightning_elemental') {
-            enemy.userData.electrifiedTimer = 120; // Aplica paralisia por 2 segundos
-        }
-        enemy.userData.hitTimer = 10;
+        const isClassBased = enemy instanceof Enemy;
+        const mesh = isClassBased ? enemy.mesh : enemy;
+        const data = isClassBased ? enemy : enemy.userData;
 
-        let startPoint = (i > 0) ? chain[i - 1].position.clone() : player.position.clone();
-        const endPoint = enemy.position.clone();
+        let finalDamage = damage;
+        finalDamage *= getWeaknessMultiplier('lightning', data.type);
+
+        // Aplica dano de forma compatível com ambas as representações
+        if (isClassBased) {
+            enemy.takeDamage(finalDamage);
+            enemy.hitTimer = 10;
+        } else {
+            data.hp -= finalDamage;
+            data.hitTimer = 10;
+        }
+
+        createFloatingText(Math.floor(finalDamage), mesh.position.clone().setY(data.modelHeight || 1.5), '#fde047'); // Amarelo elétrico
+
+        if (data.type !== 'ghost' && data.type !== 'lightning_elemental') {
+            if (isClassBased) enemy.electrifiedTimer = 120;
+            else data.electrifiedTimer = 120;
+        }
+
+        let startPoint = (i > 0) ? (chain[i - 1] instanceof Enemy ? chain[i - 1].mesh.position.clone() : chain[i - 1].position.clone()) : player.position.clone();
+        const endPoint = mesh.position.clone();
         startPoint.y = endPoint.y = 0.5;
 
         const distance = startPoint.distanceTo(endPoint);
@@ -486,13 +506,21 @@ function updateShield() {
             const sphereBBox = new THREE.Box3().setFromObject(sphere);
             let hitEnemy = null;
 
-            for (const enemy of enemies) {
-                const enemyBBox = new THREE.Box3().setFromObject(enemy);
+            for (const enemyItem of enemies) {
+                const isClassBased = enemyItem instanceof Enemy;
+                const mesh = isClassBased ? enemyItem.mesh : enemyItem;
+                const data = isClassBased ? enemyItem : enemyItem.userData;
+                const enemyBBox = new THREE.Box3().setFromObject(mesh);
                 if (sphereBBox.intersectsBox(enemyBBox)) {
-                    enemy.userData.hp -= projectileProps.weak.damage;
-                    createFloatingText(projectileProps.weak.damage, enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 'white');
-                    enemy.userData.hitTimer = 10;
-                    hitEnemy = enemy;
+                    if (isClassBased) {
+                        enemyItem.takeDamage(projectileProps.weak.damage);
+                        enemyItem.hitTimer = 10;
+                    } else {
+                        data.hp -= projectileProps.weak.damage;
+                        data.hitTimer = 10;
+                    }
+                    createFloatingText(projectileProps.weak.damage, mesh.position.clone().setY(data.modelHeight || 1.5), 'white');
+                    hitEnemy = enemyItem;
                     break;
                 }
             }
@@ -965,11 +993,14 @@ function updateRunes() {
         // Se a runa ainda não foi ativada, checa por inimigos
         if (rune.activationTimer < 0) {
             let triggered = false;
-            for (const enemy of enemies) {
+            for (const enemyItem of enemies) {
+                const isClassBased = enemyItem instanceof Enemy;
+                const mesh = isClassBased ? enemyItem.mesh : enemyItem;
+                const data = isClassBased ? enemyItem : enemyItem.userData;
                 // Fantasmas não ativam runas
-                if (enemy.userData.type === 'ghost') continue;
+                if (data.type === 'ghost') continue;
 
-                if (enemy.position.distanceToSquared(rune.position) < rune.radius * rune.radius) {
+                if (mesh.position.distanceToSquared(rune.position) < rune.radius * rune.radius) {
                     triggered = true;
                     rune.activationTimer = rune.activationTime;
                     // Efeito visual de ativação
@@ -987,26 +1018,37 @@ function updateRunes() {
                 triggerCameraShake(0.6, 30);
                 const radiusSq = rune.radius * rune.radius;
 
-                enemies.forEach(enemy => {
-                    if (enemy.position.distanceToSquared(rune.position) <= radiusSq) {
+                enemies.forEach(enemyItem => {
+                    const isClassBased = enemyItem instanceof Enemy;
+                    const mesh = isClassBased ? enemyItem.mesh : enemyItem;
+                    const data = isClassBased ? enemyItem : enemyItem.userData;
+
+                    if (mesh.position.distanceToSquared(rune.position) <= radiusSq) {
                         let finalDamage = rune.damage;
                         let damageElement = '', damageColor = '#ff8c00';
                         if (rune.type === 'runa_fogo') { damageElement = 'fire'; damageColor = '#ff4500'; }
                         else if (rune.type === 'runa_gelo') { damageElement = 'ice'; damageColor = '#87CEFA'; }
                         else if (rune.type === 'runa_raio') { damageElement = 'lightning'; damageColor = '#fde047'; }
 
-                        finalDamage *= getWeaknessMultiplier(damageElement, enemy.userData.type);
+                        finalDamage *= getWeaknessMultiplier(damageElement, data.type);
 
-                        enemy.userData.hp -= finalDamage;
+                        if (isClassBased) {
+                            enemyItem.takeDamage(finalDamage);
+                            enemyItem.hitTimer = 10;
+                        } else {
+                            data.hp -= finalDamage;
+                            data.hitTimer = 10;
+                        }
+
                         createFloatingText(
                             Math.floor(finalDamage), 
-                            enemy.position.clone().setY(enemy.userData.modelHeight || 1.5), 
+                            mesh.position.clone().setY(data.modelHeight || 1.5), 
                             damageColor);
-                        enemy.userData.hitTimer = 10;
 
                         // Aplica status (fantasmas são imunes a todos os status de runas)
-                        if (enemy.userData.type !== 'ghost' && enemy.userData.type !== 'fire_elemental' && enemy.userData.type !== 'ice_elemental' && enemy.userData.type !== 'lightning_elemental') {
-                            enemy.userData[rune.statusEffect] = rune.statusTimer;
+                        if (data.type !== 'ghost' && data.type !== 'fire_elemental' && data.type !== 'ice_elemental' && data.type !== 'lightning_elemental') {
+                            if (isClassBased) enemyItem[rune.statusEffect] = rune.statusTimer;
+                            else data[rune.statusEffect] = rune.statusTimer;
                         }
                     }
                 });
